@@ -43,9 +43,26 @@ export const ContentActions = {
   GET_COMPUTED_STYLE: "content.getComputedStyle",
 } as const;
 
+export const ConsoleActions = {
+  GET_LOGS: "console.getLogs",
+  GET_ERRORS: "console.getErrors",
+  SUBSCRIBE: "console.subscribe",
+  CLEAR: "console.clear",
+} as const;
+
+export const NetworkActions = {
+  GET_LOGS: "network.getLogs",
+  GET_ERRORS: "network.getErrors",
+  SUBSCRIBE: "network.subscribe",
+  FILTER: "network.filter",
+  CLEAR: "network.clear",
+} as const;
+
 export type ActionString =
   | (typeof TabActions)[keyof typeof TabActions]
   | (typeof PageActions)[keyof typeof PageActions]
   | (typeof JsActions)[keyof typeof JsActions]
   | (typeof DomActions)[keyof typeof DomActions]
-  | (typeof ContentActions)[keyof typeof ContentActions];
+  | (typeof ContentActions)[keyof typeof ContentActions]
+  | (typeof ConsoleActions)[keyof typeof ConsoleActions]
+  | (typeof NetworkActions)[keyof typeof NetworkActions];
