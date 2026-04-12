@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Vortex",
+  "description": "Browser automation core engine",
+  "version": "0.1.0",
+  "permissions": [
+    "nativeMessaging",
+    "debugger",
+    "scripting",
+    "tabs",
+    "webNavigation",
+    "downloads",
+    "cookies",
+    "offscreen",
+    "storage",
+    "activeTab",
+    "alarms"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "src/background.ts",
+    "type": "module"
+  }
+}
