@@ -9,19 +9,23 @@ import { registerDomHandlers } from "./handlers/dom.js";
 import { registerContentHandlers } from "./handlers/content.js";
 import { registerConsoleHandlers } from "./handlers/console.js";
 import { registerNetworkHandlers } from "./handlers/network.js";
+import { registerStorageHandlers } from "./handlers/storage.js";
+import { registerCaptureHandlers } from "./handlers/capture.js";
+import { registerFileHandlers } from "./handlers/file.js";
 
-// 初始化核心组件
 const router = new ActionRouter();
 const debuggerMgr = new DebuggerManager();
 
-// 注册不需要 debugger 的 handler
+// 不需要 debugger/nm 的 handler
 registerTabHandlers(router);
 registerPageHandlers(router);
 registerJsHandlers(router);
 registerDomHandlers(router);
 registerContentHandlers(router);
+registerStorageHandlers(router);
+registerCaptureHandlers(router);
 
-// 初始化 NM 连接
+// NM 客户端
 const nm = new NativeMessagingClient(
   async (msg) => {
     if (msg.type === "tool_request") {
@@ -34,10 +38,10 @@ const nm = new NativeMessagingClient(
   },
 );
 
-// 注册需要 debugger + nm 的 handler（必须在 nm 创建后）
+// 需要 debugger + nm 的 handler（必须在 nm 创建后）
 registerConsoleHandlers(router, debuggerMgr, nm);
 registerNetworkHandlers(router, debuggerMgr, nm);
+registerFileHandlers(router, nm);
 
 console.log("[vortex] registered actions:", router.getRegisteredActions());
-
 nm.connect();
