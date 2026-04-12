@@ -58,6 +58,31 @@ export const NetworkActions = {
   CLEAR: "network.clear",
 } as const;
 
+export const CaptureActions = {
+  SCREENSHOT: "capture.screenshot",
+  ELEMENT: "capture.element",
+  GIF_START: "capture.gifStart",
+  GIF_STOP: "capture.gifStop",
+  GIF_FRAME: "capture.gifFrame",
+} as const;
+
+export const StorageActions = {
+  GET_COOKIES: "storage.getCookies",
+  SET_COOKIE: "storage.setCookie",
+  DELETE_COOKIE: "storage.deleteCookie",
+  GET_LOCAL_STORAGE: "storage.getLocalStorage",
+  SET_LOCAL_STORAGE: "storage.setLocalStorage",
+  GET_SESSION_STORAGE: "storage.getSessionStorage",
+  SET_SESSION_STORAGE: "storage.setSessionStorage",
+} as const;
+
+export const FileActions = {
+  UPLOAD: "file.upload",
+  DOWNLOAD: "file.download",
+  GET_DOWNLOADS: "file.getDownloads",
+  ON_DOWNLOAD_COMPLETE: "file.onDownloadComplete",
+} as const;
+
 export type ActionString =
   | (typeof TabActions)[keyof typeof TabActions]
   | (typeof PageActions)[keyof typeof PageActions]
@@ -65,4 +90,7 @@ export type ActionString =
   | (typeof DomActions)[keyof typeof DomActions]
   | (typeof ContentActions)[keyof typeof ContentActions]
   | (typeof ConsoleActions)[keyof typeof ConsoleActions]
-  | (typeof NetworkActions)[keyof typeof NetworkActions];
+  | (typeof NetworkActions)[keyof typeof NetworkActions]
+  | (typeof CaptureActions)[keyof typeof CaptureActions]
+  | (typeof StorageActions)[keyof typeof StorageActions]
+  | (typeof FileActions)[keyof typeof FileActions];
