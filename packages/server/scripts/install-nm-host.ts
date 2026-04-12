@@ -12,7 +12,8 @@ if (!EXTENSION_ID) {
   process.exit(1);
 }
 
-const nativeHostPath = resolve(join(__dirname, "..", "native-host.sh"));
+// __dirname 在编译后指向 dist/scripts/，需要回退两级到 packages/server/
+const nativeHostPath = resolve(join(__dirname, "..", "..", "native-host.sh"));
 
 const manifest = {
   name: NM_HOST_NAME,
