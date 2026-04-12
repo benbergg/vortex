@@ -27,7 +27,7 @@ export function registerContentHandlers(router: ActionRouter): void {
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector],
+        args: [selector ?? null],
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
@@ -52,7 +52,7 @@ export function registerContentHandlers(router: ActionRouter): void {
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector],
+        args: [selector ?? null],
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
@@ -166,7 +166,7 @@ export function registerContentHandlers(router: ActionRouter): void {
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector],
+        args: [selector ?? null],
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
@@ -210,7 +210,7 @@ export function registerContentHandlers(router: ActionRouter): void {
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, properties],
+        args: [selector, properties ?? null],
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };

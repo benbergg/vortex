@@ -146,7 +146,7 @@ export function registerDomHandlers(router: ActionRouter): void {
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, text, delay],
+        args: [selector, text, delay ?? 0],
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
@@ -283,7 +283,7 @@ export function registerDomHandlers(router: ActionRouter): void {
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, container, position, x, y],
+        args: [selector ?? null, container ?? null, position ?? null, x ?? null, y ?? null],
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
@@ -376,7 +376,7 @@ export function registerDomHandlers(router: ActionRouter): void {
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector],
+        args: [selector ?? null],
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
