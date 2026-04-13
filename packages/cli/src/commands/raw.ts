@@ -1,0 +1,56 @@
+import type { Command } from "commander";
+import { sendRequest, subscribe } from "../client.js";
+import { printResponse, printEvent, exitWithError } from "../output.js";
+
+export function registerRawCommand(program: Command): void {
+  program
+    .command("raw <action>")
+    .description("Send a raw action to vortex-server")
+    .option("--follow", "keep connection open for events")
+    .allowUnknownOption(true)
+    .action(async (action: string, opts: any, cmd: Command) => {
+      const root = cmd.parent!;
+      const port = root.opts().port as number;
+      const tab = root.opts().tab as number | undefined;
+      const pretty = root.opts().pretty as boolean | undefined;
+      const quiet = root.opts().quiet as boolean | undefined;
+
+      const params: Record<string, unknown> = {};
+
+      const rawArgs = cmd.args.slice(1);
+      for (let i = 0; i < rawArgs.length; i++) {
+        const arg = rawArgs[i];
+        if (arg.startsWith("--") && arg !== "--follow") {
+          const key = arg.slice(2);
+          const value = rawArgs[i + 1];
+          if (value && !value.startsWith("--")) {
+            if (value === "true") params[key] = true;
+            else if (value === "false") params[key] = false;
+            else if (/^\d+$/.test(value)) params[key] = parseInt(value);
+            else params[key] = value;
+            i++;
+          } else {
+            params[key] = true;
+          }
+        }
+      }
+
+      try {
+        if (opts.follow) {
+          const resp = await subscribe(action, params, {
+            port,
+            tabId: tab,
+            follow: true,
+            onEvent: (event) => printEvent(event, { pretty, quiet }),
+          });
+          printResponse(resp, { pretty, quiet });
+          await new Promise(() => {});
+        } else {
+          const resp = await sendRequest(action, params, { port, tabId: tab });
+          printResponse(resp, { pretty, quiet });
+        }
+      } catch (err: any) {
+        exitWithError(err.message);
+      }
+    });
+}

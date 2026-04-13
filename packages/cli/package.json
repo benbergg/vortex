@@ -1,0 +1,23 @@
+{
+  "name": "@bytenew/vortex-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "vortex": "dist/bin/vortex.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@bytenew/vortex-shared": "workspace:*",
+    "commander": "^13.0.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.0",
+    "typescript": "^5.7.0"
+  }
+}
