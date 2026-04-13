@@ -11,6 +11,7 @@ import { registerConsoleHandlers } from "./handlers/console.js";
 import { registerNetworkHandlers } from "./handlers/network.js";
 import { registerStorageHandlers } from "./handlers/storage.js";
 import { registerCaptureHandlers } from "./handlers/capture.js";
+import { registerKeyboardHandlers } from "./handlers/keyboard.js";
 import { registerFileHandlers } from "./handlers/file.js";
 
 const router = new ActionRouter();
@@ -18,7 +19,7 @@ const debuggerMgr = new DebuggerManager();
 
 // 不需要 debugger/nm 的 handler
 registerTabHandlers(router);
-registerPageHandlers(router);
+registerPageHandlers(router, debuggerMgr);
 registerJsHandlers(router);
 registerDomHandlers(router);
 registerContentHandlers(router);
@@ -41,6 +42,7 @@ const nm = new NativeMessagingClient(
 // 需要 debugger + nm 的 handler（必须在 nm 创建后）
 registerConsoleHandlers(router, debuggerMgr, nm);
 registerNetworkHandlers(router, debuggerMgr, nm);
+registerKeyboardHandlers(router, debuggerMgr);
 registerFileHandlers(router, nm);
 
 console.log("[vortex] registered actions:", router.getRegisteredActions());

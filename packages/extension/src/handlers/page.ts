@@ -1,5 +1,6 @@
 import { PageActions } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
+import type { DebuggerManager } from "../lib/debugger-manager.js";
 
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
@@ -26,7 +27,7 @@ function waitForTabLoad(tabId: number, timeoutMs: number = 30_000): Promise<void
   });
 }
 
-export function registerPageHandlers(router: ActionRouter): void {
+export function registerPageHandlers(router: ActionRouter, debuggerMgr: DebuggerManager): void {
   router.registerAll({
     [PageActions.NAVIGATE]: async (args, tabId) => {
       const url = args.url as string;
@@ -98,6 +99,55 @@ export function registerPageHandlers(router: ActionRouter): void {
       const tid = await getActiveTabId(tabId);
       const tab = await chrome.tabs.get(tid);
       return { url: tab.url, title: tab.title, status: tab.status, tabId: tab.id, windowId: tab.windowId };
+    },
+
+    [PageActions.WAIT_FOR_NETWORK_IDLE]: async (args, tabId) => {
+      const tid = await getActiveTabId(tabId);
+      const timeout = (args.timeout as number) ?? 30_000;
+      const idleTime = (args.idleTime as number) ?? 500;
+
+      await debuggerMgr.enableDomain(tid, "Network");
+
+      return new Promise<{ idle: true; waitedMs: number }>((resolve, reject) => {
+        let pending = 0;
+        let idleTimer: ReturnType<typeof setTimeout> | null = null;
+        const startTime = Date.now();
+
+        const timeoutTimer = setTimeout(() => {
+          cleanup();
+          reject(new Error(`Network not idle after ${timeout}ms (${pending} requests pending)`));
+        }, timeout);
+
+        function checkIdle(): void {
+          if (pending <= 0) {
+            idleTimer = setTimeout(() => {
+              cleanup();
+              resolve({ idle: true, waitedMs: Date.now() - startTime });
+            }, idleTime);
+          }
+        }
+
+        function onEvent(evtTabId: number, method: string): void {
+          if (evtTabId !== tid) return;
+          if (method === "Network.requestWillBeSent") {
+            pending++;
+            if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+          } else if (method === "Network.loadingFinished" || method === "Network.loadingFailed") {
+            pending--;
+            checkIdle();
+          }
+        }
+
+        function cleanup(): void {
+          clearTimeout(timeoutTimer);
+          if (idleTimer) clearTimeout(idleTimer);
+          debuggerMgr.offEvent(onEvent);
+        }
+
+        debuggerMgr.onEvent(onEvent);
+        // 立即检查：如果当前没有进行中的请求，开始计时
+        checkIdle();
+      });
     },
   });
 }

@@ -27,6 +27,10 @@ export function registerNetworkCommands(program: Command): void {
       statusMin: opts.statusMin, statusMax: opts.statusMax,
     })));
 
+  net.command("getResponseBody <requestId>")
+    .description("Get response body for a specific request")
+    .action(makeAction("network.getResponseBody", (args) => ({ requestId: args[0] })));
+
   net.command("clear")
     .description("Clear network log cache")
     .action(makeAction("network.clear", () => ({})));

@@ -34,4 +34,13 @@ export function registerPageCommands(program: Command): void {
 
   page.command("info").description("Get page info")
     .action(makeAction("page.info", () => ({})));
+
+  page.command("waitForNetworkIdle")
+    .description("Wait until no pending network requests")
+    .option("--timeout <ms>", "timeout in ms", parseInt, 30000)
+    .option("--idle-time <ms>", "idle duration to confirm", parseInt, 500)
+    .action(makeAction("page.waitForNetworkIdle", (_args, opts) => ({
+      timeout: opts.timeout,
+      idleTime: opts.idleTime,
+    })));
 }

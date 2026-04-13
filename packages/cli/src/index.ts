@@ -10,6 +10,7 @@ import { registerConsoleCommands } from "./commands/console.js";
 import { registerNetworkCommands } from "./commands/network.js";
 import { registerStorageCommands } from "./commands/storage.js";
 import { registerFileCommands } from "./commands/file.js";
+import { registerKeyboardCommands } from "./commands/keyboard.js";
 import { registerRawCommand } from "./commands/raw.js";
 
 export function createProgram(): Command {
@@ -38,6 +39,7 @@ export function createProgram(): Command {
   registerNetworkCommands(program);
   registerStorageCommands(program);
   registerFileCommands(program);
+  registerKeyboardCommands(program);
 
   // 通用 raw 命令
   registerRawCommand(program);

@@ -19,6 +19,7 @@ interface NetworkEntry {
   error?: string;
   requestHeaders?: Record<string, string>;
   responseHeaders?: Record<string, string>;
+  requestBody?: string;
 }
 
 const networkLogs = new Map<number, NetworkEntry[]>();
@@ -26,6 +27,8 @@ const networkLogs = new Map<number, NetworkEntry[]>();
 const pendingRequests = new Map<string, NetworkEntry>();
 const MAX_LOGS = 500;
 const subscribedTabs = new Set<number>();
+const MAX_RESPONSE_BODIES = 100;
+const responseBodies = new Map<string, { tabId: number; body: string; encoding: string }>();
 
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
@@ -62,6 +65,7 @@ export function registerNetworkHandlers(
         startTime: Date.now(),
         requestHeaders: params.request.headers,
       };
+      entry.requestBody = params.request?.postData;
       // 暂存，等待 response
       pendingRequests.set(params.requestId, entry);
 
@@ -108,6 +112,26 @@ export function registerNetworkHandlers(
       }
     }
 
+    if (method === "Network.loadingFinished") {
+      const reqId = params.requestId as string;
+      debuggerMgr.sendCommand(tabId, "Network.getResponseBody", { requestId: reqId })
+        .then((result: any) => {
+          responseBodies.set(reqId, {
+            tabId,
+            body: result.body,
+            encoding: result.base64Encoded ? "base64" : "text",
+          });
+          // FIFO 淘汰
+          while (responseBodies.size > MAX_RESPONSE_BODIES) {
+            const firstKey = responseBodies.keys().next().value;
+            responseBodies.delete(firstKey!);
+          }
+        })
+        .catch(() => {
+          // 部分请求（204、重定向等）可能无 body，忽略
+        });
+    }
+
     if (method === "Network.loadingFailed") {
       const pending = pendingRequests.get(params.requestId);
       if (pending) {
@@ -138,6 +162,10 @@ export function registerNetworkHandlers(
   chrome.tabs.onRemoved.addListener((tabId) => {
     networkLogs.delete(tabId);
     subscribedTabs.delete(tabId);
+    // 清理该 tab 的 responseBodies
+    for (const [reqId, entry] of responseBodies) {
+      if (entry.tabId === tabId) responseBodies.delete(reqId);
+    }
   });
 
   router.registerAll({
@@ -193,6 +221,25 @@ export function registerNetworkHandlers(
       );
       networkLogs.delete(tid);
       return { cleared: true, tabId: tid };
+    },
+
+    [NetworkActions.GET_RESPONSE_BODY]: async (args, tabId) => {
+      const requestId = args.requestId as string;
+      if (!requestId) throw new Error("requestId is required");
+      const cached = responseBodies.get(requestId);
+      if (cached) {
+        return { requestId, body: cached.body, encoding: cached.encoding };
+      }
+      const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
+      if (debuggerMgr.isAttached(tid)) {
+        try {
+          const result = await debuggerMgr.sendCommand(tid, "Network.getResponseBody", { requestId }) as any;
+          return { requestId, body: result.body, encoding: result.base64Encoded ? "base64" : "text" };
+        } catch {
+          throw new Error(`Response body not available for ${requestId}`);
+        }
+      }
+      throw new Error(`Response body not found for ${requestId}`);
     },
   });
 }

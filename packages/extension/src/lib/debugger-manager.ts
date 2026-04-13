@@ -61,6 +61,14 @@ export class DebuggerManager {
   }
 
   /**
+   * 注销 CDP 事件回调。
+   */
+  offEvent(callback: CdpEventCallback): void {
+    const idx = this.eventCallbacks.indexOf(callback);
+    if (idx >= 0) this.eventCallbacks.splice(idx, 1);
+  }
+
+  /**
    * 确保 tab 已 attach debugger，并启用指定 domain。
    * 如果已经 attach + enable 过，直接返回。
    */

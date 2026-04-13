@@ -13,6 +13,7 @@ export const PageActions = {
   FORWARD: "page.forward",
   WAIT: "page.wait",
   INFO: "page.info",
+  WAIT_FOR_NETWORK_IDLE: "page.waitForNetworkIdle",
 } as const;
 
 export const JsActions = {
@@ -56,6 +57,7 @@ export const NetworkActions = {
   SUBSCRIBE: "network.subscribe",
   FILTER: "network.filter",
   CLEAR: "network.clear",
+  GET_RESPONSE_BODY: "network.getResponseBody",
 } as const;
 
 export const CaptureActions = {
@@ -76,6 +78,11 @@ export const StorageActions = {
   SET_SESSION_STORAGE: "storage.setSessionStorage",
 } as const;
 
+export const KeyboardActions = {
+  PRESS: "keyboard.press",
+  SHORTCUT: "keyboard.shortcut",
+} as const;
+
 export const FileActions = {
   UPLOAD: "file.upload",
   DOWNLOAD: "file.download",
@@ -93,4 +100,5 @@ export type ActionString =
   | (typeof NetworkActions)[keyof typeof NetworkActions]
   | (typeof CaptureActions)[keyof typeof CaptureActions]
   | (typeof StorageActions)[keyof typeof StorageActions]
+  | (typeof KeyboardActions)[keyof typeof KeyboardActions]
   | (typeof FileActions)[keyof typeof FileActions];
