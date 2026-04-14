@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@bytenew/vortex-shared": "workspace:*",
+    "commander": "^13.0.0",
     "express": "^4.21.0",
     "ws": "^8.18.0"
   },
