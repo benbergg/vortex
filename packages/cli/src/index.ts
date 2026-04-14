@@ -11,6 +11,7 @@ import { registerNetworkCommands } from "./commands/network.js";
 import { registerStorageCommands } from "./commands/storage.js";
 import { registerFileCommands } from "./commands/file.js";
 import { registerKeyboardCommands } from "./commands/keyboard.js";
+import { registerMouseCommands } from "./commands/mouse.js";
 import { registerFramesCommands } from "./commands/frames.js";
 import { registerRawCommand } from "./commands/raw.js";
 
@@ -42,6 +43,7 @@ export function createProgram(): Command {
   registerStorageCommands(program);
   registerFileCommands(program);
   registerKeyboardCommands(program);
+  registerMouseCommands(program);
   registerFramesCommands(program);
 
   // 通用 raw 命令

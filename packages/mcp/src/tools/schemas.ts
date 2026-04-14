@@ -42,7 +42,7 @@ function domTools(): ToolDef[] {
   return [
     { name: "vortex_dom_query", action: "dom.query", description: "Find a single element by CSS selector. Returns its tag, text, classes, and attributes.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
     { name: "vortex_dom_query_all", action: "dom.queryAll", description: "Find all elements matching a CSS selector.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
-    { name: "vortex_dom_click", action: "dom.click", description: "Click an element by CSS selector. Scrolls into view if needed.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of element to click" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
+    { name: "vortex_dom_click", action: "dom.click", description: "Click an element by CSS selector. Scrolls into view if needed.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of element to click" }, useRealMouse: { type: "boolean", description: "Use CDP real mouse events (mousedown+mouseup) instead of element.click(). Try this when normal click doesn't trigger React onClick handlers or when blocked by anti-bot detection." }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
     { name: "vortex_dom_type", action: "dom.type", description: "Type text into an input element character by character. Use dom.fill for faster value setting.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of input element" }, text: { type: "string", description: "Text to type" }, delay: { type: "number", description: "Delay between keystrokes in ms" }, ...optionalTabId, ...optionalFrameId }, required: ["selector", "text"] } },
     { name: "vortex_dom_fill", action: "dom.fill", description: "Set the value of a form field directly (faster than type, but doesn't trigger key events).", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of form field" }, value: { type: "string", description: "Value to set" }, ...optionalTabId, ...optionalFrameId }, required: ["selector", "value"] } },
     { name: "vortex_dom_select", action: "dom.select", description: "Select an option in a dropdown/select element by value.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of select element" }, value: { type: "string", description: "Option value to select" }, ...optionalTabId, ...optionalFrameId }, required: ["selector", "value"] } },
@@ -79,9 +79,57 @@ function keyboardTools(): ToolDef[] {
   ];
 }
 
+function mouseTools(): ToolDef[] {
+  return [
+    {
+      name: "vortex_mouse_click",
+      action: "mouse.click",
+      description: "Click at specific x,y coordinates using CDP real mouse events (mousedown + mouseup sequence). Use this when dom.click doesn't trigger expected behavior (React synthetic events, anti-bot detection). For element-based clicking, prefer vortex_dom_click with useRealMouse=true.",
+      schema: {
+        type: "object",
+        properties: {
+          x: { type: "number", description: "X coordinate in viewport" },
+          y: { type: "number", description: "Y coordinate in viewport" },
+          button: { type: "string", enum: ["left", "right", "middle"], description: "Mouse button", default: "left" },
+          ...optionalTabId,
+        },
+        required: ["x", "y"],
+      },
+    },
+    {
+      name: "vortex_mouse_double_click",
+      action: "mouse.doubleClick",
+      description: "Double-click at specific coordinates using CDP real mouse events.",
+      schema: {
+        type: "object",
+        properties: {
+          x: { type: "number", description: "X coordinate" },
+          y: { type: "number", description: "Y coordinate" },
+          ...optionalTabId,
+        },
+        required: ["x", "y"],
+      },
+    },
+    {
+      name: "vortex_mouse_move",
+      action: "mouse.move",
+      description: "Move the mouse to specific coordinates. Useful for triggering hover effects that require real mouse events.",
+      schema: {
+        type: "object",
+        properties: {
+          x: { type: "number", description: "X coordinate" },
+          y: { type: "number", description: "Y coordinate" },
+          ...optionalTabId,
+        },
+        required: ["x", "y"],
+      },
+    },
+  ];
+}
+
 function captureTools(): ToolDef[] {
   return [
-    { name: "vortex_capture_screenshot", action: "capture.screenshot", description: "Take a screenshot of the visible page area. Returns the image for visual inspection. Use this to verify page state, check layouts, or debug visual issues.", schema: { type: "object", properties: { format: { type: "string", enum: ["png", "jpeg"], default: "png" }, ...optionalTabId }, required: [] }, returnsImage: true },
+    { name: "vortex_capture_screenshot", action: "capture.screenshot", description: "Take a screenshot of the visible page area. Returns the image for visual inspection. Use this to verify page state, check layouts, or debug visual issues.", schema: { type: "object", properties: { format: { type: "string", enum: ["png", "jpeg"], default: "png" }, fullPage: { type: "boolean", description: "Capture the full scrollable page (max 8000px height). Useful for long pages." }, clip: { type: "object", description: "Custom clip region (overrides fullPage)", properties: { x: { type: "number" }, y: { type: "number" }, width: { type: "number" }, height: { type: "number" } } }, ...optionalTabId }, required: [] }, returnsImage: true },
     { name: "vortex_capture_element", action: "capture.element", description: "Take a screenshot of a specific element. The tab must be active.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] }, returnsImage: true },
     { name: "vortex_capture_gif_start", action: "capture.gifStart", description: "Start collecting GIF frames.", schema: { type: "object", properties: { fps: { type: "number", description: "Frames per second", default: 2 }, ...optionalTabId }, required: [] } },
     { name: "vortex_capture_gif_frame", action: "capture.gifFrame", description: "Manually capture a GIF frame.", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
@@ -159,6 +207,7 @@ export function getAllToolDefs(): ToolDef[] {
     ...contentTools(),
     ...jsTools(),
     ...keyboardTools(),
+    ...mouseTools(),
     ...captureTools(),
     ...consoleTools(),
     ...networkTools(),

@@ -83,6 +83,12 @@ export const KeyboardActions = {
   SHORTCUT: "keyboard.shortcut",
 } as const;
 
+export const MouseActions = {
+  CLICK: "mouse.click",
+  DOUBLE_CLICK: "mouse.doubleClick",
+  MOVE: "mouse.move",
+} as const;
+
 export const FramesActions = {
   LIST: "frames.list",
   FIND: "frames.find",
@@ -106,5 +112,6 @@ export type ActionString =
   | (typeof CaptureActions)[keyof typeof CaptureActions]
   | (typeof StorageActions)[keyof typeof StorageActions]
   | (typeof KeyboardActions)[keyof typeof KeyboardActions]
+  | (typeof MouseActions)[keyof typeof MouseActions]
   | (typeof FramesActions)[keyof typeof FramesActions]
   | (typeof FileActions)[keyof typeof FileActions];

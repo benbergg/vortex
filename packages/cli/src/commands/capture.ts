@@ -11,12 +11,15 @@ export function registerCaptureCommands(program: Command): void {
     .description("Take a screenshot")
     .option("--output <file>", "save to file")
     .option("--format <fmt>", "png or jpeg", "png")
+    .option("--full-page", "capture full scrollable page (max 8000px)")
     .action(async (opts: any, cmd: Command) => {
       const { port, tab } = getGlobalOpts(cmd);
       try {
+        const params: Record<string, unknown> = { format: opts.format };
+        if (opts.fullPage) params.fullPage = true;
         const resp = await sendRequest(
           "capture.screenshot",
-          { format: opts.format },
+          params,
           { port, tabId: tab },
         );
         if (opts.output && resp.result) {

@@ -13,6 +13,7 @@ import { registerNetworkHandlers } from "./handlers/network.js";
 import { registerStorageHandlers } from "./handlers/storage.js";
 import { registerCaptureHandlers } from "./handlers/capture.js";
 import { registerKeyboardHandlers } from "./handlers/keyboard.js";
+import { registerMouseHandlers } from "./handlers/mouse.js";
 import { registerFileHandlers } from "./handlers/file.js";
 
 const router = new ActionRouter();
@@ -23,7 +24,7 @@ registerTabHandlers(router);
 registerFramesHandlers(router);
 registerPageHandlers(router, debuggerMgr);
 registerJsHandlers(router);
-registerDomHandlers(router);
+registerDomHandlers(router, debuggerMgr);
 registerContentHandlers(router);
 registerStorageHandlers(router);
 registerCaptureHandlers(router, debuggerMgr);
@@ -45,6 +46,7 @@ const nm = new NativeMessagingClient(
 registerConsoleHandlers(router, debuggerMgr, nm);
 registerNetworkHandlers(router, debuggerMgr, nm);
 registerKeyboardHandlers(router, debuggerMgr);
+registerMouseHandlers(router, debuggerMgr);
 registerFileHandlers(router, nm);
 
 console.log("[vortex] registered actions:", router.getRegisteredActions());

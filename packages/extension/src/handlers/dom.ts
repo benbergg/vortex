@@ -1,8 +1,13 @@
 import { DomActions } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
+import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
+import { getIframeOffset } from "../lib/iframe-offset.js";
 
-export function registerDomHandlers(router: ActionRouter): void {
+export function registerDomHandlers(
+  router: ActionRouter,
+  debuggerMgr: DebuggerManager,
+): void {
   router.registerAll({
     [DomActions.QUERY]: async (args, tabId) => {
       const selector = args.selector as string;
@@ -82,6 +87,59 @@ export function registerDomHandlers(router: ActionRouter): void {
       if (!selector) throw new Error("Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
+      const useRealMouse = args.useRealMouse as boolean | undefined;
+
+      if (useRealMouse) {
+        // 取元素中心坐标
+        const rectResults = await chrome.scripting.executeScript({
+          target: buildExecuteTarget(tid, frameId),
+          func: (sel: string) => {
+            const el = document.querySelector(sel) as HTMLElement | null;
+            if (!el) return { error: `Element not found: ${sel}` };
+            el.scrollIntoView({ block: "center", inline: "center" });
+            const r = el.getBoundingClientRect();
+            return {
+              result: {
+                x: r.left + r.width / 2,
+                y: r.top + r.height / 2,
+                tag: el.tagName.toLowerCase(),
+                text: el.innerText?.slice(0, 200),
+              },
+            };
+          },
+          args: [selector],
+          world: "MAIN",
+        });
+        const rectRes = rectResults[0]?.result as { result?: any; error?: string };
+        if (rectRes?.error) throw new Error(rectRes.error);
+        const { x: cx, y: cy, tag, text } = rectRes.result;
+
+        // iframe 坐标偏移
+        const { x: offsetX, y: offsetY } = await getIframeOffset(tid, frameId);
+        const x = cx + offsetX;
+        const y = cy + offsetY;
+
+        // CDP 真实鼠标事件
+        await debuggerMgr.attach(tid);
+        await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
+          type: "mouseMoved", x, y,
+        });
+        await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
+          type: "mousePressed", x, y, button: "left", clickCount: 1,
+        });
+        await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
+          type: "mouseReleased", x, y, button: "left", clickCount: 1,
+        });
+
+        return {
+          success: true,
+          element: { tag, text },
+          x, y,
+          mode: "realMouse",
+        };
+      }
+
+      // 普通 element.click() 路径
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {

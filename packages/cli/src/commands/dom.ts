@@ -11,7 +11,11 @@ export function registerDomCommands(program: Command): void {
     .action(makeAction("dom.queryAll", (args) => ({ selector: args[0] })));
 
   dom.command("click <selector>").description("Click element")
-    .action(makeAction("dom.click", (args) => ({ selector: args[0] })));
+    .option("--real-mouse", "Use CDP real mouse events (bypass React synthetic events)")
+    .action(makeAction("dom.click", (args, opts) => ({
+      selector: args[0],
+      useRealMouse: opts.realMouse,
+    })));
 
   dom.command("type <selector> <text>").description("Type text into element")
     .option("--delay <ms>", "delay between keystrokes", parseInt)

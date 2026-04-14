@@ -11,7 +11,6 @@
     "webNavigation",
     "downloads",
     "cookies",
-    "offscreen",
     "storage",
     "activeTab",
     "alarms"
