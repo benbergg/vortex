@@ -1,6 +1,7 @@
 import { PageActions } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
+import { buildExecuteTarget } from "../lib/tab-utils.js";
 
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
@@ -72,8 +73,9 @@ export function registerPageHandlers(router: ActionRouter, debuggerMgr: Debugger
       const timeout = (args.timeout as number) ?? 10_000;
 
       if (selector) {
+        const frameId = args.frameId as number | undefined;
         const result = await chrome.scripting.executeScript({
-          target: { tabId: tid },
+          target: buildExecuteTarget(tid, frameId),
           func: (sel: string, ms: number) => {
             return new Promise<boolean>((resolve) => {
               if (document.querySelector(sel)) { resolve(true); return; }

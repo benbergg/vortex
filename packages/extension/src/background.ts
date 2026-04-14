@@ -3,6 +3,7 @@ import { NativeMessagingClient } from "./lib/native-messaging.js";
 import { ActionRouter } from "./lib/router.js";
 import { DebuggerManager } from "./lib/debugger-manager.js";
 import { registerTabHandlers } from "./handlers/tab.js";
+import { registerFramesHandlers } from "./handlers/frames.js";
 import { registerPageHandlers } from "./handlers/page.js";
 import { registerJsHandlers } from "./handlers/js.js";
 import { registerDomHandlers } from "./handlers/dom.js";
@@ -19,12 +20,13 @@ const debuggerMgr = new DebuggerManager();
 
 // 不需要 debugger/nm 的 handler
 registerTabHandlers(router);
+registerFramesHandlers(router);
 registerPageHandlers(router, debuggerMgr);
 registerJsHandlers(router);
 registerDomHandlers(router);
 registerContentHandlers(router);
 registerStorageHandlers(router);
-registerCaptureHandlers(router);
+registerCaptureHandlers(router, debuggerMgr);
 
 // NM 客户端
 const nm = new NativeMessagingClient(

@@ -1,20 +1,15 @@
 import { ContentActions } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
-
-async function getActiveTabId(tabId?: number): Promise<number> {
-  if (tabId) return tabId;
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
-  return tab.id;
-}
+import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 
 export function registerContentHandlers(router: ActionRouter): void {
   router.registerAll({
     [ContentActions.GET_TEXT]: async (args, tabId) => {
       const selector = args.selector as string | undefined;
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string | undefined) => {
           try {
             if (sel) {
@@ -38,8 +33,9 @@ export function registerContentHandlers(router: ActionRouter): void {
     [ContentActions.GET_HTML]: async (args, tabId) => {
       const selector = args.selector as string | undefined;
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string | undefined) => {
           try {
             if (sel) {
@@ -62,8 +58,9 @@ export function registerContentHandlers(router: ActionRouter): void {
 
     [ContentActions.GET_ACCESSIBILITY_TREE]: async (args, tabId) => {
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: () => {
           try {
             interface A11yNode {
@@ -155,8 +152,9 @@ export function registerContentHandlers(router: ActionRouter): void {
       const selector = args.selector as string;
       if (!selector) throw new Error("Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
           try {
             const el = document.querySelector(sel);
@@ -179,8 +177,9 @@ export function registerContentHandlers(router: ActionRouter): void {
       const properties = args.properties as string[] | undefined;
       if (!selector) throw new Error("Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string, props: string[] | undefined) => {
           try {
             const el = document.querySelector(sel);

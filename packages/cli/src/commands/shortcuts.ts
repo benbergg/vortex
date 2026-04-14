@@ -8,9 +8,15 @@ function getOpts(cmd: Command) {
   return {
     port: root.opts().port as number,
     tab: root.opts().tab as number | undefined,
+    frameId: root.opts().frameId as number | undefined,
     pretty: root.opts().pretty as boolean | undefined,
     quiet: root.opts().quiet as boolean | undefined,
   };
+}
+
+/** 如果全局 --frame-id 指定了，注入到 params */
+function withFrameId(params: Record<string, unknown>, frameId?: number): Record<string, unknown> {
+  return frameId != null ? { ...params, frameId } : params;
 }
 
 export function registerShortcuts(program: Command): void {
@@ -18,9 +24,9 @@ export function registerShortcuts(program: Command): void {
     .command("navigate <url>")
     .description("Navigate to URL (shortcut for page.navigate)")
     .action(async (url: string, _opts: unknown, cmd: Command) => {
-      const { port, tab, pretty, quiet } = getOpts(cmd);
+      const { port, tab, frameId, pretty, quiet } = getOpts(cmd);
       try {
-        const resp = await sendRequest("page.navigate", { url }, { port, tabId: tab });
+        const resp = await sendRequest("page.navigate", withFrameId({ url }, frameId), { port, tabId: tab });
         printResponse(resp, { pretty, quiet });
       } catch (err: any) {
         exitWithError(err.message);
@@ -31,9 +37,9 @@ export function registerShortcuts(program: Command): void {
     .command("click <selector>")
     .description("Click an element (shortcut for dom.click)")
     .action(async (selector: string, _opts: unknown, cmd: Command) => {
-      const { port, tab, pretty, quiet } = getOpts(cmd);
+      const { port, tab, frameId, pretty, quiet } = getOpts(cmd);
       try {
-        const resp = await sendRequest("dom.click", { selector }, { port, tabId: tab });
+        const resp = await sendRequest("dom.click", withFrameId({ selector }, frameId), { port, tabId: tab });
         printResponse(resp, { pretty, quiet });
       } catch (err: any) {
         exitWithError(err.message);
@@ -45,12 +51,12 @@ export function registerShortcuts(program: Command): void {
     .description("Type text into an element (shortcut for dom.type)")
     .option("--delay <ms>", "delay between keystrokes", parseInt)
     .action(async (selector: string, text: string, opts: any, cmd: Command) => {
-      const { port, tab, pretty, quiet } = getOpts(cmd);
+      const { port, tab, frameId, pretty, quiet } = getOpts(cmd);
       try {
         const resp = await sendRequest(
           "dom.type",
-          { selector, text, delay: opts.delay },
-          { port },
+          withFrameId({ selector, text, delay: opts.delay }, frameId),
+          { port, tabId: tab },
         );
         printResponse(resp, { pretty, quiet });
       } catch (err: any) {
@@ -62,9 +68,9 @@ export function registerShortcuts(program: Command): void {
     .command("fill <selector> <value>")
     .description("Fill a form field (shortcut for dom.fill)")
     .action(async (selector: string, value: string, _opts: unknown, cmd: Command) => {
-      const { port, tab, pretty, quiet } = getOpts(cmd);
+      const { port, tab, frameId, pretty, quiet } = getOpts(cmd);
       try {
-        const resp = await sendRequest("dom.fill", { selector, value }, { port, tabId: tab });
+        const resp = await sendRequest("dom.fill", withFrameId({ selector, value }, frameId), { port, tabId: tab });
         printResponse(resp, { pretty, quiet });
       } catch (err: any) {
         exitWithError(err.message);
@@ -75,9 +81,9 @@ export function registerShortcuts(program: Command): void {
     .command("eval <code>")
     .description("Execute JavaScript (shortcut for js.evaluate)")
     .action(async (code: string, _opts: unknown, cmd: Command) => {
-      const { port, tab, pretty, quiet } = getOpts(cmd);
+      const { port, tab, frameId, pretty, quiet } = getOpts(cmd);
       try {
-        const resp = await sendRequest("js.evaluate", { code }, { port, tabId: tab });
+        const resp = await sendRequest("js.evaluate", withFrameId({ code }, frameId), { port, tabId: tab });
         printResponse(resp, { pretty, quiet });
       } catch (err: any) {
         exitWithError(err.message);
@@ -114,11 +120,11 @@ export function registerShortcuts(program: Command): void {
     .command("text [selector]")
     .description("Get page text (shortcut for content.getText)")
     .action(async (selector: string | undefined, _opts: unknown, cmd: Command) => {
-      const { port, tab, pretty, quiet } = getOpts(cmd);
+      const { port, tab, frameId, pretty, quiet } = getOpts(cmd);
       try {
         const resp = await sendRequest(
           "content.getText",
-          { selector },
+          withFrameId({ selector }, frameId),
           { port, tabId: tab },
         );
         if (!pretty && !quiet && typeof resp.result === "string") {

@@ -2,13 +2,8 @@
 
 import { CaptureActions } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
-
-async function getActiveTabId(tabId?: number): Promise<number> {
-  if (tabId) return tabId;
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
-  return tab.id;
-}
+import type { DebuggerManager } from "../lib/debugger-manager.js";
+import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 
 // GIF 录制状态
 interface GifSession {
@@ -47,7 +42,10 @@ async function captureTab(
   return chrome.tabs.captureVisibleTab(tab.windowId, options);
 }
 
-export function registerCaptureHandlers(router: ActionRouter): void {
+export function registerCaptureHandlers(
+  router: ActionRouter,
+  debuggerMgr: DebuggerManager,
+): void {
   router.registerAll({
     [CaptureActions.SCREENSHOT]: async (args, tabId) => {
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
@@ -67,62 +65,85 @@ export function registerCaptureHandlers(router: ActionRouter): void {
       const selector = args.selector as string;
       if (!selector) throw new Error("Missing required param: selector");
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
+      const frameId = args.frameId as number | undefined;
 
-      // 获取元素位置
+      // 1. 在目标 frame 内取元素 rect
       const rectResults = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
           const el = document.querySelector(sel);
           if (!el) return { error: `Element not found: ${sel}` };
-          const rect = el.getBoundingClientRect();
+          const r = el.getBoundingClientRect();
           return {
             result: {
-              x: rect.x,
-              y: rect.y,
-              width: rect.width,
-              height: rect.height,
-              dpr: window.devicePixelRatio,
+              x: r.left, y: r.top, width: r.width, height: r.height,
             },
           };
         },
         args: [selector],
         world: "MAIN",
       });
-
       const rectRes = rectResults[0]?.result as { result?: any; error?: string };
       if (rectRes?.error) throw new Error(rectRes.error);
       const rect = rectRes.result;
 
-      // 截全屏
-      const fullDataUrl = await captureTab(tid, "png");
-
-      // 通过 offscreen document 裁剪
-      // 如果 offscreen 还没准备好，先创建
-      try {
-        await chrome.offscreen.createDocument({
-          url: "offscreen.html",
-          reasons: [chrome.offscreen.Reason.CANVAS as any],
-          justification: "Crop screenshot",
-        });
-      } catch {
-        // 已存在则忽略
+      // 2. iframe 坐标偏移：如果 frameId 非 0，找 iframe 在父文档的位置
+      let offsetX = 0, offsetY = 0;
+      if (frameId != null && frameId !== 0) {
+        const frames = await chrome.webNavigation.getAllFrames({ tabId: tid });
+        const frameInfo = frames?.find((f) => f.frameId === frameId);
+        if (frameInfo) {
+          const parentFrameId = frameInfo.parentFrameId ?? 0;
+          const iframeRect = await chrome.scripting.executeScript({
+            target: buildExecuteTarget(tid, parentFrameId),
+            func: (frameUrl: string) => {
+              const frameOrigin = new URL(frameUrl).origin;
+              const iframes = Array.from(document.querySelectorAll("iframe"));
+              // 优先 src 完全匹配，其次 origin 匹配（应对重定向后 src 不更新）
+              let iframe = iframes.find((f) => f.src === frameUrl);
+              if (!iframe) {
+                iframe = iframes.find((f) => {
+                  try { return new URL(f.src).origin === frameOrigin; }
+                  catch { return false; }
+                });
+              }
+              // 最后兜底：只有一个 iframe 就是它
+              if (!iframe && iframes.length === 1) iframe = iframes[0];
+              if (!iframe) return null;
+              const r = iframe.getBoundingClientRect();
+              return { x: r.left, y: r.top };
+            },
+            args: [frameInfo.url],
+            world: "MAIN",
+          });
+          const offset = iframeRect[0]?.result as { x: number; y: number } | null;
+          if (offset) { offsetX = offset.x; offsetY = offset.y; }
+        }
       }
 
-      const cropResult = await chrome.runtime.sendMessage({
-        type: "crop-image",
-        dataUrl: fullDataUrl,
-        x: Math.round(rect.x * rect.dpr),
-        y: Math.round(rect.y * rect.dpr),
-        width: Math.round(rect.width * rect.dpr),
-        height: Math.round(rect.height * rect.dpr),
-      });
-
-      if (cropResult?.error) throw new Error(cropResult.error);
+      // 3. CDP 裁剪截图
+      await debuggerMgr.enableDomain(tid, "Page");
+      const screenshot = await debuggerMgr.sendCommand(tid, "Page.captureScreenshot", {
+        format: "png",
+        clip: {
+          x: rect.x + offsetX,
+          y: rect.y + offsetY,
+          width: rect.width,
+          height: rect.height,
+          scale: 1,
+        },
+        captureBeyondViewport: true,
+      }) as { data: string };
 
       return {
-        dataUrl: cropResult.dataUrl,
+        dataUrl: `data:image/png;base64,${screenshot.data}`,
         selector,
-        rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+        rect: {
+          x: rect.x + offsetX,
+          y: rect.y + offsetY,
+          width: rect.width,
+          height: rect.height,
+        },
         timestamp: Date.now(),
       };
     },

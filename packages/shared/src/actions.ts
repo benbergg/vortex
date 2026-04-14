@@ -83,6 +83,11 @@ export const KeyboardActions = {
   SHORTCUT: "keyboard.shortcut",
 } as const;
 
+export const FramesActions = {
+  LIST: "frames.list",
+  FIND: "frames.find",
+} as const;
+
 export const FileActions = {
   UPLOAD: "file.upload",
   DOWNLOAD: "file.download",
@@ -101,4 +106,5 @@ export type ActionString =
   | (typeof CaptureActions)[keyof typeof CaptureActions]
   | (typeof StorageActions)[keyof typeof StorageActions]
   | (typeof KeyboardActions)[keyof typeof KeyboardActions]
+  | (typeof FramesActions)[keyof typeof FramesActions]
   | (typeof FileActions)[keyof typeof FileActions];

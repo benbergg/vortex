@@ -1,12 +1,6 @@
 import { DomActions } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
-
-async function getActiveTabId(tabId?: number): Promise<number> {
-  if (tabId) return tabId;
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
-  return tab.id;
-}
+import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 
 export function registerDomHandlers(router: ActionRouter): void {
   router.registerAll({
@@ -14,8 +8,9 @@ export function registerDomHandlers(router: ActionRouter): void {
       const selector = args.selector as string;
       if (!selector) throw new Error("Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
           try {
             const el = document.querySelector(sel);
@@ -49,8 +44,9 @@ export function registerDomHandlers(router: ActionRouter): void {
       const selector = args.selector as string;
       if (!selector) throw new Error("Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
           try {
             const elements = Array.from(document.querySelectorAll(sel)).slice(0, 100);
@@ -85,8 +81,9 @@ export function registerDomHandlers(router: ActionRouter): void {
       const selector = args.selector as string;
       if (!selector) throw new Error("Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
           try {
             const el = document.querySelector(sel) as HTMLElement | null;
@@ -121,8 +118,9 @@ export function registerDomHandlers(router: ActionRouter): void {
       if (!selector) throw new Error("Missing required param: selector");
       if (text == null) throw new Error("Missing required param: text");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: async (sel: string, txt: string, delayMs: number) => {
           try {
             const el = document.querySelector(sel) as HTMLElement | null;
@@ -160,8 +158,9 @@ export function registerDomHandlers(router: ActionRouter): void {
       if (!selector) throw new Error("Missing required param: selector");
       if (value == null) throw new Error("Missing required param: value");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string, val: string) => {
           try {
             const el = document.querySelector(sel) as HTMLInputElement | null;
@@ -196,8 +195,9 @@ export function registerDomHandlers(router: ActionRouter): void {
       if (!selector) throw new Error("Missing required param: selector");
       if (value == null) throw new Error("Missing required param: value");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string, val: string) => {
           try {
             const el = document.querySelector(sel) as HTMLSelectElement | null;
@@ -224,8 +224,9 @@ export function registerDomHandlers(router: ActionRouter): void {
       const x = args.x as number | undefined;
       const y = args.y as number | undefined;
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (
           sel: string | undefined,
           cont: string | undefined,
@@ -295,8 +296,9 @@ export function registerDomHandlers(router: ActionRouter): void {
       const selector = args.selector as string;
       if (!selector) throw new Error("Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
           try {
             const el = document.querySelector(sel) as HTMLElement | null;
@@ -322,8 +324,9 @@ export function registerDomHandlers(router: ActionRouter): void {
       if (!selector) throw new Error("Missing required param: selector");
       if (!attribute) throw new Error("Missing required param: attribute");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string, attr: string) => {
           try {
             const el = document.querySelector(sel);
@@ -344,8 +347,9 @@ export function registerDomHandlers(router: ActionRouter): void {
     [DomActions.GET_SCROLL_INFO]: async (args, tabId) => {
       const selector = args.selector as string | undefined;
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string | undefined) => {
           try {
             if (sel) {
@@ -389,8 +393,9 @@ export function registerDomHandlers(router: ActionRouter): void {
       const timeout = (args.timeout as number | undefined) ?? 10000;
       if (!selector) throw new Error("Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
+      const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
-        target: { tabId: tid },
+        target: buildExecuteTarget(tid, frameId),
         func: (sel: string, timeoutMs: number) => {
           return new Promise<{ result?: unknown; error?: string }>((resolve) => {
             try {

@@ -39,11 +39,11 @@ export function registerCaptureCommands(program: Command): void {
     .description("Screenshot an element")
     .option("--output <file>", "save to file")
     .action(async (selector: string, opts: any, cmd: Command) => {
-      const { port, tab } = getGlobalOpts(cmd);
+      const { port, tab, frameId } = getGlobalOpts(cmd);
       try {
         const resp = await sendRequest(
           "capture.element",
-          { selector },
+          frameId != null ? { selector, frameId } : { selector },
           { port, tabId: tab },
         );
         if (opts.output && resp.result) {
