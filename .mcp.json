@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "vortex": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["packages/mcp/dist/src/server.js"]
+    }
+  }
+}
