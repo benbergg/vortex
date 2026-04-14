@@ -1,65 +1,155 @@
 import WebSocket from "ws";
 import type { VtxRequest, VtxResponse } from "@bytenew/vortex-shared";
 
-let requestCounter = 0;
+interface PendingRequest {
+  resolve: (resp: VtxResponse) => void;
+  reject: (err: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
 
-/**
- * 发送请求到 vortex-server 并等待响应。
- * 每次请求建立新连接（简单可靠，MCP tool 调用频率不高）。
- */
-export function sendRequest(
-  action: string,
-  params: Record<string, unknown>,
-  port: number,
-  tabId?: number,
-): Promise<VtxResponse> {
-  return new Promise((resolve, reject) => {
-    const id = `mcp-${++requestCounter}-${Date.now()}`;
-    const ws = new WebSocket(`ws://localhost:${port}/ws`);
-    let settled = false;
+// 瞬态错误白名单（请求未触达场景，可安全重试）
+const TRANSIENT_PATTERNS = [
+  "Cannot access contents",
+  "No tab with id",
+  "Connection closed",
+  "Failed to connect",
+];
 
-    const timeout = setTimeout(() => {
-      if (!settled) {
-        settled = true;
+function isTransient(err: unknown): boolean {
+  const msg = String((err as any)?.message ?? err);
+  return TRANSIENT_PATTERNS.some((p) => msg.includes(p));
+}
+
+class VortexClient {
+  private ws: WebSocket | null = null;
+  private connecting: Promise<void> | null = null;
+  private pending = new Map<string, PendingRequest>();
+  private requestCounter = 0;
+  private port: number;
+
+  constructor(port: number) {
+    this.port = port;
+  }
+
+  private async ensureConnected(): Promise<void> {
+    if (this.ws?.readyState === WebSocket.OPEN) return;
+    if (this.connecting) return this.connecting;
+
+    this.connecting = new Promise<void>((resolve, reject) => {
+      const ws = new WebSocket(`ws://localhost:${this.port}/ws`);
+      const connectTimeout = setTimeout(() => {
         ws.close();
-        reject(new Error(`Timeout: no response for ${action} after 30s`));
-      }
-    }, 30_000);
+        reject(new Error(`Failed to connect to vortex-server at localhost:${this.port} (timeout)`));
+      }, 5000);
 
-    ws.on("open", () => {
+      ws.on("open", () => {
+        clearTimeout(connectTimeout);
+        this.ws = ws;
+        this.connecting = null;
+        resolve();
+      });
+
+      ws.on("message", (data) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          if (msg.id && this.pending.has(msg.id)) {
+            const p = this.pending.get(msg.id)!;
+            this.pending.delete(msg.id);
+            clearTimeout(p.timer);
+            p.resolve(msg as VtxResponse);
+          }
+        } catch (err) {
+          console.error("[vortex-mcp] message parse error:", err);
+        }
+      });
+
+      ws.on("error", (err) => {
+        clearTimeout(connectTimeout);
+        if (this.connecting) {
+          this.connecting = null;
+          reject(new Error(`Failed to connect to vortex-server at localhost:${this.port}: ${err.message}`));
+        }
+      });
+
+      ws.on("close", () => {
+        this.ws = null;
+        this.connecting = null;
+        // reject all pending
+        for (const [, p] of this.pending) {
+          clearTimeout(p.timer);
+          p.reject(new Error("Connection closed before response"));
+        }
+        this.pending.clear();
+      });
+    });
+
+    return this.connecting;
+  }
+
+  private async requestOnce(
+    action: string,
+    params: Record<string, unknown>,
+    tabId: number | undefined,
+    timeoutMs: number,
+  ): Promise<VtxResponse> {
+    await this.ensureConnected();
+    const id = `mcp-${++this.requestCounter}-${Date.now()}`;
+    return new Promise<VtxResponse>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`Timeout: no response for ${action} after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      this.pending.set(id, { resolve, reject, timer });
+
       const req: VtxRequest = {
         action,
         params,
         id,
         ...(tabId != null ? { tabId } : {}),
       };
-      ws.send(JSON.stringify(req));
+      this.ws!.send(JSON.stringify(req));
     });
+  }
 
-    ws.on("message", (data) => {
-      const msg = JSON.parse(data.toString());
-      if (msg.id === id) {
-        clearTimeout(timeout);
-        settled = true;
-        ws.close();
-        resolve(msg as VtxResponse);
+  /**
+   * 发送请求（含瞬态错误自动重试 1 次）。
+   */
+  async request(
+    action: string,
+    params: Record<string, unknown>,
+    tabId?: number,
+    timeoutMs = 30000,
+    maxRetries = 1,
+  ): Promise<VtxResponse> {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.requestOnce(action, params, tabId, timeoutMs);
+      } catch (err) {
+        lastErr = err;
+        if (attempt === maxRetries || !isTransient(err)) throw err;
+        // 指数退避：500ms, 1000ms, ...
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
       }
-    });
+    }
+    throw lastErr;
+  }
+}
 
-    ws.on("error", (err) => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeout);
-        reject(new Error(`WebSocket error: ${err.message}. Is vortex-server running on port ${port}?`));
-      }
-    });
+// 单例
+let singleton: VortexClient | null = null;
 
-    ws.on("close", () => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeout);
-        reject(new Error("Connection closed before response"));
-      }
-    });
-  });
+/**
+ * 发送请求到 vortex-server 并等待响应（复用长连接 + 自动重试）。
+ */
+export function sendRequest(
+  action: string,
+  params: Record<string, unknown>,
+  port: number,
+  tabId?: number,
+  timeoutMs?: number,
+): Promise<VtxResponse> {
+  if (!singleton) singleton = new VortexClient(port);
+  return singleton.request(action, params, tabId, timeoutMs);
 }

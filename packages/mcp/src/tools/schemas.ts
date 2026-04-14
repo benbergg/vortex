@@ -16,6 +16,15 @@ const optionalFrameId = {
   frameId: { type: "number" as const, description: "Target frame ID (for iframes). Use vortex_frames_list/find to discover frame IDs." },
 };
 
+const screenshotReturnMode = {
+  returnMode: {
+    type: "string" as const,
+    enum: ["inline", "file"],
+    description: "inline: return image for AI to see (large images >500KB auto-fallback to file). file: save to /tmp/vortex-screenshots/ and return path (use Read tool to view).",
+    default: "inline",
+  },
+};
+
 function tabTools(): ToolDef[] {
   return [
     { name: "vortex_tab_list", action: "tab.list", description: "List all open browser tabs with their IDs, URLs, and titles. Use this first to find tab IDs for other commands.", schema: { type: "object", properties: {}, required: [] } },
@@ -129,8 +138,8 @@ function mouseTools(): ToolDef[] {
 
 function captureTools(): ToolDef[] {
   return [
-    { name: "vortex_capture_screenshot", action: "capture.screenshot", description: "Take a screenshot of the visible page area. Returns the image for visual inspection. Use this to verify page state, check layouts, or debug visual issues.", schema: { type: "object", properties: { format: { type: "string", enum: ["png", "jpeg"], default: "png" }, fullPage: { type: "boolean", description: "Capture the full scrollable page (max 8000px height). Useful for long pages." }, clip: { type: "object", description: "Custom clip region (overrides fullPage)", properties: { x: { type: "number" }, y: { type: "number" }, width: { type: "number" }, height: { type: "number" } } }, ...optionalTabId }, required: [] }, returnsImage: true },
-    { name: "vortex_capture_element", action: "capture.element", description: "Take a screenshot of a specific element. The tab must be active.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] }, returnsImage: true },
+    { name: "vortex_capture_screenshot", action: "capture.screenshot", description: "Take a screenshot of the visible page area. Use to verify page state, check layouts, or debug visual issues. Large images (>500KB) auto-save to file to conserve tokens.", schema: { type: "object", properties: { format: { type: "string", enum: ["png", "jpeg"], default: "png" }, fullPage: { type: "boolean", description: "Capture the full scrollable page (max 8000px height). Useful for long pages." }, clip: { type: "object", description: "Custom clip region (overrides fullPage)", properties: { x: { type: "number" }, y: { type: "number" }, width: { type: "number" }, height: { type: "number" } } }, ...screenshotReturnMode, ...optionalTabId }, required: [] }, returnsImage: true },
+    { name: "vortex_capture_element", action: "capture.element", description: "Take a screenshot of a specific element. Supports iframe content via frameId.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...screenshotReturnMode, ...optionalTabId, ...optionalFrameId }, required: ["selector"] }, returnsImage: true },
     { name: "vortex_capture_gif_start", action: "capture.gifStart", description: "Start collecting GIF frames.", schema: { type: "object", properties: { fps: { type: "number", description: "Frames per second", default: 2 }, ...optionalTabId }, required: [] } },
     { name: "vortex_capture_gif_frame", action: "capture.gifFrame", description: "Manually capture a GIF frame.", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
     { name: "vortex_capture_gif_stop", action: "capture.gifStop", description: "Stop GIF recording and return collected frames.", schema: { type: "object", properties: {}, required: [] } },
@@ -225,8 +234,20 @@ function framesTools(): ToolDef[] {
   ];
 }
 
+function diagnosticsTools(): ToolDef[] {
+  return [
+    {
+      name: "vortex_ping",
+      action: "__mcp_ping__",
+      description: "Check if vortex-server is reachable and report connection status. Use this FIRST if other vortex tools fail — returns 'ok' with tab count, or a clear error with instructions if the server is not running.",
+      schema: { type: "object", properties: {}, required: [] },
+    },
+  ];
+}
+
 export function getAllToolDefs(): ToolDef[] {
   return [
+    ...diagnosticsTools(),
     ...tabTools(),
     ...pageTools(),
     ...domTools(),
