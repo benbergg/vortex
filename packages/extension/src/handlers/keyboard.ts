@@ -75,7 +75,7 @@ export function registerKeyboardHandlers(
       const key = args.key as string;
       if (!key) throw new Error("key is required");
 
-      await debuggerMgr.enableDomain(tid, "Input");
+      await debuggerMgr.attach(tid);
       await dispatchKey(debuggerMgr, tid, key, 0);
       return { success: true, key };
     },
@@ -85,7 +85,7 @@ export function registerKeyboardHandlers(
       const keys = args.keys as string[];
       if (!keys || keys.length < 2) throw new Error("keys must be an array of at least 2 keys");
 
-      await debuggerMgr.enableDomain(tid, "Input");
+      await debuggerMgr.attach(tid);
 
       // 计算修饰键标志位
       let modifiers = 0;

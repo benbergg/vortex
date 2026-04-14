@@ -69,6 +69,17 @@ export class DebuggerManager {
   }
 
   /**
+   * 确保 tab 已 attach debugger（不启用任何 domain）。
+   * 适用于 Input 等无需 enable 命令的 domain。
+   */
+  async attach(tabId: number): Promise<void> {
+    if (!this.attachedTabs.has(tabId)) {
+      await chrome.debugger.attach({ tabId }, "1.3");
+      this.attachedTabs.set(tabId, { domains: new Set() });
+    }
+  }
+
+  /**
    * 确保 tab 已 attach debugger，并启用指定 domain。
    * 如果已经 attach + enable 过，直接返回。
    */
