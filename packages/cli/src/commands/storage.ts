@@ -1,5 +1,8 @@
 import type { Command } from "commander";
-import { makeAction } from "./helpers.js";
+import { makeAction, getGlobalOpts } from "./helpers.js";
+import { sendRequest } from "../client.js";
+import { printResponse, exitWithError } from "../output.js";
+import { writeFileSync, readFileSync } from "fs";
 
 export function registerStorageCommands(program: Command): void {
   const storage = program.command("storage").description("Cookie and storage management");
@@ -60,4 +63,45 @@ export function registerStorageCommands(program: Command): void {
     .action(makeAction("storage.setSessionStorage", (_args, opts) => ({
       key: opts.key, value: opts.value,
     })));
+
+  storage.command("exportSession")
+    .description("Export cookies + localStorage + sessionStorage for a domain")
+    .requiredOption("--domain <d>", "Domain (e.g. example.com)")
+    .option("--output <file>", "Save to JSON file (default: print to stdout)")
+    .action(async (opts: any, cmd: Command) => {
+      const { port, tab, pretty, quiet } = getGlobalOpts(cmd);
+      try {
+        const resp = await sendRequest(
+          "storage.exportSession",
+          { domain: opts.domain },
+          { port, tabId: tab },
+        );
+        if (opts.output && resp.result) {
+          writeFileSync(opts.output, JSON.stringify(resp.result, null, 2));
+          console.log(`Session exported to ${opts.output}`);
+        } else {
+          printResponse(resp, { pretty, quiet });
+        }
+      } catch (err: any) {
+        exitWithError(err.message);
+      }
+    });
+
+  storage.command("importSession")
+    .description("Import session from a JSON file (written by exportSession)")
+    .requiredOption("--input <file>", "Session JSON file")
+    .action(async (opts: any, cmd: Command) => {
+      const { port, tab, pretty, quiet } = getGlobalOpts(cmd);
+      try {
+        const data = JSON.parse(readFileSync(opts.input, "utf8"));
+        const resp = await sendRequest(
+          "storage.importSession",
+          { data },
+          { port, tabId: tab },
+        );
+        printResponse(resp, { pretty, quiet });
+      } catch (err: any) {
+        exitWithError(err.message);
+      }
+    });
 }

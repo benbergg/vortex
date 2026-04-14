@@ -22,10 +22,22 @@ interface NetworkEntry {
   requestBody?: string;
 }
 
-const networkLogs = new Map<number, NetworkEntry[]>();
+const API_TYPES = new Set(["XHR", "Fetch"]);
+const apiLogs = new Map<number, NetworkEntry[]>();
+const resourceLogs = new Map<number, NetworkEntry[]>();
+const MAX_API_LOGS = 5000;
+const MAX_RESOURCE_LOGS = 500;
+
+interface SubscribeConfig {
+  urlPattern?: string;
+  types?: Set<string>;
+  maxApiLogs?: number;
+  maxResourceLogs?: number;
+}
+const tabConfigs = new Map<number, SubscribeConfig>();
+
 // 请求进行中的临时存储（等待 response）
 const pendingRequests = new Map<string, NetworkEntry>();
-const MAX_LOGS = 500;
 const subscribedTabs = new Set<number>();
 const MAX_RESPONSE_BODIES = 100;
 const responseBodies = new Map<string, { tabId: number; body: string; encoding: string }>();
@@ -38,12 +50,17 @@ async function getActiveTabId(tabId?: number): Promise<number> {
 }
 
 function addLog(tabId: number, entry: NetworkEntry): void {
-  if (!networkLogs.has(tabId)) {
-    networkLogs.set(tabId, []);
-  }
-  const logs = networkLogs.get(tabId)!;
+  const isApi = API_TYPES.has(entry.type ?? "");
+  const store = isApi ? apiLogs : resourceLogs;
+  const config = tabConfigs.get(tabId);
+  const max = isApi
+    ? (config?.maxApiLogs ?? MAX_API_LOGS)
+    : (config?.maxResourceLogs ?? MAX_RESOURCE_LOGS);
+
+  if (!store.has(tabId)) store.set(tabId, []);
+  const logs = store.get(tabId)!;
   logs.push(entry);
-  if (logs.length > MAX_LOGS) {
+  if (logs.length > max) {
     logs.shift();
   }
 }
@@ -57,6 +74,10 @@ export function registerNetworkHandlers(
     if (!subscribedTabs.has(tabId)) return;
 
     if (method === "Network.requestWillBeSent") {
+      const config = tabConfigs.get(tabId);
+      // URL 过滤
+      if (config?.urlPattern && !params.request.url.includes(config.urlPattern)) return;
+
       const entry: NetworkEntry = {
         requestId: params.requestId,
         url: params.request.url,
@@ -66,6 +87,10 @@ export function registerNetworkHandlers(
         requestHeaders: params.request.headers,
       };
       entry.requestBody = params.request?.postData;
+
+      // type 过滤
+      if (config?.types && !config.types.has(entry.type ?? "")) return;
+
       // 暂存，等待 response
       pendingRequests.set(params.requestId, entry);
 
@@ -160,8 +185,10 @@ export function registerNetworkHandlers(
 
   // tab 关闭时清理
   chrome.tabs.onRemoved.addListener((tabId) => {
-    networkLogs.delete(tabId);
+    apiLogs.delete(tabId);
+    resourceLogs.delete(tabId);
     subscribedTabs.delete(tabId);
+    tabConfigs.delete(tabId);
     // 清理该 tab 的 responseBodies
     for (const [reqId, entry] of responseBodies) {
       if (entry.tabId === tabId) responseBodies.delete(reqId);
@@ -173,37 +200,66 @@ export function registerNetworkHandlers(
       const tid = await getActiveTabId(
         (args.tabId as number | undefined) ?? tabId,
       );
+      const urlPattern = args.urlPattern as string | undefined;
+      const types = args.types as string[] | undefined;
+      const maxApiLogs = args.maxApiLogs as number | undefined;
+      const maxResourceLogs = args.maxResourceLogs as number | undefined;
+
+      tabConfigs.set(tid, {
+        urlPattern,
+        types: types ? new Set(types) : undefined,
+        maxApiLogs,
+        maxResourceLogs,
+      });
+
       await debuggerMgr.enableDomain(tid, "Network");
       subscribedTabs.add(tid);
-      return { subscribed: true, tabId: tid };
+      return {
+        subscribed: true,
+        tabId: tid,
+        config: { urlPattern, types, maxApiLogs, maxResourceLogs },
+      };
     },
 
     [NetworkActions.GET_LOGS]: async (args, tabId) => {
       const tid = await getActiveTabId(
         (args.tabId as number | undefined) ?? tabId,
       );
-      return networkLogs.get(tid) ?? [];
+      const includeResources = args.includeResources as boolean | undefined;
+      const apis = apiLogs.get(tid) ?? [];
+      if (!includeResources) return apis;
+      const resources = resourceLogs.get(tid) ?? [];
+      return [...apis, ...resources].sort((a, b) => a.startTime - b.startTime);
     },
 
     [NetworkActions.GET_ERRORS]: async (args, tabId) => {
       const tid = await getActiveTabId(
         (args.tabId as number | undefined) ?? tabId,
       );
-      const logs = networkLogs.get(tid) ?? [];
-      return logs.filter((l) => l.error || (l.status && l.status >= 400));
+      const includeResources = args.includeResources as boolean | undefined;
+      const apis = apiLogs.get(tid) ?? [];
+      const source = includeResources
+        ? [...apis, ...(resourceLogs.get(tid) ?? [])].sort((a, b) => a.startTime - b.startTime)
+        : apis;
+      return source.filter((l) => l.error || (l.status && l.status >= 400));
     },
 
     [NetworkActions.FILTER]: async (args, tabId) => {
       const tid = await getActiveTabId(
         (args.tabId as number | undefined) ?? tabId,
       );
-      const logs = networkLogs.get(tid) ?? [];
+      const includeResources = args.includeResources as boolean | undefined;
       const urlPattern = args.url as string | undefined;
       const methodFilter = args.method as string | undefined;
       const statusMin = args.statusMin as number | undefined;
       const statusMax = args.statusMax as number | undefined;
 
-      return logs.filter((l) => {
+      const apis = apiLogs.get(tid) ?? [];
+      const source = includeResources
+        ? [...apis, ...(resourceLogs.get(tid) ?? [])].sort((a, b) => a.startTime - b.startTime)
+        : apis;
+
+      return source.filter((l) => {
         if (urlPattern && !l.url.includes(urlPattern)) return false;
         if (methodFilter && l.method !== methodFilter.toUpperCase())
           return false;
@@ -219,7 +275,8 @@ export function registerNetworkHandlers(
       const tid = await getActiveTabId(
         (args.tabId as number | undefined) ?? tabId,
       );
-      networkLogs.delete(tid);
+      apiLogs.delete(tid);
+      resourceLogs.delete(tid);
       return { cleared: true, tabId: tid };
     },
 

@@ -76,6 +76,8 @@ export const StorageActions = {
   SET_LOCAL_STORAGE: "storage.setLocalStorage",
   GET_SESSION_STORAGE: "storage.getSessionStorage",
   SET_SESSION_STORAGE: "storage.setSessionStorage",
+  EXPORT_SESSION: "storage.exportSession",
+  IMPORT_SESSION: "storage.importSession",
 } as const;
 
 export const KeyboardActions = {

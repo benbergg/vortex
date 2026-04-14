@@ -147,9 +147,9 @@ function consoleTools(): ToolDef[] {
 
 function networkTools(): ToolDef[] {
   return [
-    { name: "vortex_network_get_logs", action: "network.getLogs", description: "Get network request logs (URL, method, status, timing, request body).", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
-    { name: "vortex_network_get_errors", action: "network.getErrors", description: "Get failed network requests (HTTP status >= 400 or connection errors).", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
-    { name: "vortex_network_filter", action: "network.filter", description: "Filter network logs by URL pattern, HTTP method, or status code range.", schema: { type: "object", properties: { url: { type: "string", description: "URL substring to match" }, method: { type: "string", description: "HTTP method (GET, POST, etc.)" }, statusMin: { type: "number", description: "Minimum status code" }, statusMax: { type: "number", description: "Maximum status code" }, ...optionalTabId }, required: [] } },
+    { name: "vortex_network_get_logs", action: "network.getLogs", description: "Get network request logs (URL, method, status, timing, request body).", schema: { type: "object", properties: { includeResources: { type: "boolean", description: "Include static resources (scripts, stylesheets, images). Default: only API requests (XHR/Fetch)." }, ...optionalTabId }, required: [] } },
+    { name: "vortex_network_get_errors", action: "network.getErrors", description: "Get failed network requests (HTTP status >= 400 or connection errors).", schema: { type: "object", properties: { includeResources: { type: "boolean", description: "Include static resources (scripts, stylesheets, images). Default: only API requests (XHR/Fetch)." }, ...optionalTabId }, required: [] } },
+    { name: "vortex_network_filter", action: "network.filter", description: "Filter network logs by URL pattern, HTTP method, or status code range.", schema: { type: "object", properties: { url: { type: "string", description: "URL substring to match" }, method: { type: "string", description: "HTTP method (GET, POST, etc.)" }, statusMin: { type: "number", description: "Minimum status code" }, statusMax: { type: "number", description: "Maximum status code" }, includeResources: { type: "boolean", description: "Include static resources (scripts, stylesheets, images). Default: only API requests (XHR/Fetch)." }, ...optionalTabId }, required: [] } },
     { name: "vortex_network_get_response_body", action: "network.getResponseBody", description: "Get the full response body of a specific network request. Use requestId from network.getLogs or network.filter results.", schema: { type: "object", properties: { requestId: { type: "string", description: "Request ID from network logs" }, ...optionalTabId }, required: ["requestId"] } },
     { name: "vortex_network_clear", action: "network.clear", description: "Clear the cached network logs.", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
   ];
@@ -164,6 +164,32 @@ function storageTools(): ToolDef[] {
     { name: "vortex_storage_set_local_storage", action: "storage.setLocalStorage", description: "Set a localStorage key-value pair.", schema: { type: "object", properties: { key: { type: "string" }, value: { type: "string" }, ...optionalTabId }, required: ["key", "value"] } },
     { name: "vortex_storage_get_session_storage", action: "storage.getSessionStorage", description: "Read sessionStorage values.", schema: { type: "object", properties: { key: { type: "string" }, ...optionalTabId }, required: [] } },
     { name: "vortex_storage_set_session_storage", action: "storage.setSessionStorage", description: "Set a sessionStorage key-value pair.", schema: { type: "object", properties: { key: { type: "string" }, value: { type: "string" }, ...optionalTabId }, required: ["key", "value"] } },
+    {
+      name: "vortex_storage_export_session",
+      action: "storage.exportSession",
+      description: "Export all cookies, localStorage, and sessionStorage for a domain as JSON. Use to save login state. Note: localStorage/sessionStorage are only captured if the active tab is on the target domain.",
+      schema: {
+        type: "object",
+        properties: {
+          domain: { type: "string", description: "Domain (e.g. 'example.com' or '.example.com' for subdomains)" },
+          ...optionalTabId,
+        },
+        required: ["domain"],
+      },
+    },
+    {
+      name: "vortex_storage_import_session",
+      action: "storage.importSession",
+      description: "Restore cookies, localStorage, and sessionStorage from a previously exported session JSON. Before calling, navigate the tab to the target domain if you want localStorage/sessionStorage restored.",
+      schema: {
+        type: "object",
+        properties: {
+          data: { type: "object", description: "Session data object from export_session (must contain cookies, domain, etc.)" },
+          ...optionalTabId,
+        },
+        required: ["data"],
+      },
+    },
   ];
 }
 

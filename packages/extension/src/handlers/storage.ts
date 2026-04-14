@@ -179,5 +179,149 @@ export function registerStorageHandlers(router: ActionRouter): void {
       if (res?.error) throw new Error(res.error);
       return res?.result;
     },
+
+    // ===== Session 导入/导出（cookies + localStorage + sessionStorage）=====
+
+    [StorageActions.EXPORT_SESSION]: async (args, tabId) => {
+      const domain = args.domain as string;
+      if (!domain) throw new Error("domain is required");
+
+      // 1. 获取 cookies
+      const cookies = await chrome.cookies.getAll({ domain });
+
+      // 2. 获取 localStorage/sessionStorage（需要 tab 在匹配 domain）
+      const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
+      const tab = await chrome.tabs.get(tid);
+      const tabUrl = tab.url ?? "";
+      let tabDomain = "";
+      try { tabDomain = new URL(tabUrl).hostname; } catch {}
+
+      const cleanDomain = domain.replace(/^\./, "");
+      const domainMatches = tabDomain === cleanDomain || tabDomain.endsWith("." + cleanDomain);
+
+      let localStorageData: Record<string, string> = {};
+      let sessionStorageData: Record<string, string> = {};
+      let note: string | undefined;
+
+      if (domainMatches) {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId: tid },
+          func: () => ({
+            local: Object.fromEntries(Object.entries(localStorage)) as Record<string, string>,
+            session: Object.fromEntries(Object.entries(sessionStorage)) as Record<string, string>,
+          }),
+          world: "MAIN",
+        });
+        const data = results[0]?.result as { local: Record<string, string>; session: Record<string, string> } | undefined;
+        localStorageData = data?.local ?? {};
+        sessionStorageData = data?.session ?? {};
+      } else {
+        note = `Tab ${tid} (${tabDomain}) doesn't match domain ${domain}, localStorage/sessionStorage skipped. Navigate to the domain first to include them.`;
+      }
+
+      return {
+        version: 1,
+        exportedAt: Date.now(),
+        domain,
+        cookies: cookies.map((c) => ({
+          name: c.name, value: c.value, domain: c.domain,
+          path: c.path, secure: c.secure, httpOnly: c.httpOnly,
+          sameSite: c.sameSite, expirationDate: c.expirationDate,
+        })),
+        localStorage: localStorageData,
+        sessionStorage: sessionStorageData,
+        ...(note ? { note } : {}),
+      };
+    },
+
+    [StorageActions.IMPORT_SESSION]: async (args, tabId) => {
+      const data = args.data as any;
+      if (!data?.cookies || !Array.isArray(data.cookies)) {
+        throw new Error("Invalid session data: missing cookies array");
+      }
+      if (!data.domain) throw new Error("Invalid session data: missing domain");
+
+      const cleanDomain = data.domain.replace(/^\./, "");
+      const cookieUrl = `https://${cleanDomain}`;
+
+      let cookieCount = 0;
+      const cookieErrors: string[] = [];
+      for (const c of data.cookies) {
+        try {
+          // 按 cookie 自身的 domain 构造 URL；host-only cookie 用 domain 值
+          const cookieHost = (c.domain ?? cleanDomain).replace(/^\./, "");
+          const scheme = c.secure ? "https" : "https"; // 统一用 https 避免 secure cookie 被拒
+          const urlForCookie = `${scheme}://${cookieHost}${c.path ?? "/"}`;
+
+          const setPayload: chrome.cookies.SetDetails = {
+            url: urlForCookie,
+            name: c.name,
+            value: c.value ?? "",
+            path: c.path ?? "/",
+            secure: c.secure ?? false,
+            httpOnly: c.httpOnly ?? false,
+          };
+          // 只有 domain 以 "." 开头时才传（cross-subdomain），否则让它成为 host-only cookie
+          if (c.domain && c.domain.startsWith(".")) {
+            setPayload.domain = c.domain;
+          }
+          if (c.sameSite && c.sameSite !== "unspecified" && c.sameSite !== "no_restriction") {
+            setPayload.sameSite = c.sameSite as chrome.cookies.SameSiteStatus;
+          }
+          if (c.expirationDate) setPayload.expirationDate = c.expirationDate;
+
+          // chrome.cookies.set 返回 Promise<Cookie | null>
+          const result = await chrome.cookies.set(setPayload);
+          if (result) {
+            cookieCount++;
+          } else {
+            const lastError = chrome.runtime.lastError?.message ?? "unknown";
+            cookieErrors.push(`${c.name} (${cookieHost}): ${lastError}`);
+          }
+        } catch (err) {
+          cookieErrors.push(`${c.name}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      // localStorage / sessionStorage 写入（需要 tab 匹配 domain）
+      const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
+      const tab = await chrome.tabs.get(tid);
+      const tabUrl = tab.url ?? "";
+      let tabDomain = "";
+      try { tabDomain = new URL(tabUrl).hostname; } catch {}
+      const domainMatches = tabDomain === cleanDomain || tabDomain.endsWith("." + cleanDomain);
+
+      let storageApplied = false;
+      let storageNote: string | undefined;
+
+      if (domainMatches) {
+        await chrome.scripting.executeScript({
+          target: { tabId: tid },
+          func: (local: Record<string, string>, session: Record<string, string>) => {
+            for (const [k, v] of Object.entries(local)) {
+              try { localStorage.setItem(k, v); } catch {}
+            }
+            for (const [k, v] of Object.entries(session)) {
+              try { sessionStorage.setItem(k, v); } catch {}
+            }
+          },
+          args: [data.localStorage ?? {}, data.sessionStorage ?? {}],
+          world: "MAIN",
+        });
+        storageApplied = true;
+      } else {
+        storageNote = `Tab ${tid} (${tabDomain}) doesn't match ${data.domain}, storage skipped. Navigate to ${cookieUrl} first.`;
+      }
+
+      return {
+        success: true,
+        cookieCount,
+        cookieErrors: cookieErrors.length > 0 ? cookieErrors : undefined,
+        storageApplied,
+        localStorageCount: Object.keys(data.localStorage ?? {}).length,
+        sessionStorageCount: Object.keys(data.sessionStorage ?? {}).length,
+        ...(storageNote ? { note: storageNote } : {}),
+      };
+    },
   });
 }
