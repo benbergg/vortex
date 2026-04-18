@@ -1,6 +1,7 @@
 import { writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
+import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 
 const TMP_DIR = join(tmpdir(), "vortex-screenshots");
 let sessionCounter = 0;
@@ -16,7 +17,7 @@ export function ensureTmpDir(): string {
 export function saveBase64Image(dataUrl: string, prefix: string = "screenshot"): { path: string; bytes: number } {
   ensureTmpDir();
   const match = dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
-  if (!match) throw new Error("Invalid data URL");
+  if (!match) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Invalid data URL (expected data:image/<type>;base64,<data>)");
   const ext = match[1];
   const buf = Buffer.from(match[2], "base64");
   const path = join(TMP_DIR, `${prefix}-${Date.now()}-${++sessionCounter}.${ext}`);
