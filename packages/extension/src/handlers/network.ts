@@ -1,9 +1,10 @@
 // packages/extension/src/handlers/network.ts
 
-import { NetworkActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { NetworkActions, VtxErrorCode, vtxError, VtxEventType } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import type { NativeMessagingClient } from "../lib/native-messaging.js";
+import type { EventDispatcher } from "../events/dispatcher.js";
 
 interface NetworkEntry {
   requestId: string;
@@ -69,6 +70,7 @@ export function registerNetworkHandlers(
   router: ActionRouter,
   debuggerMgr: DebuggerManager,
   nm: NativeMessagingClient,
+  dispatcher: EventDispatcher,
 ): void {
   debuggerMgr.onEvent((tabId, method, params: any) => {
     if (!subscribedTabs.has(tabId)) return;
@@ -134,6 +136,22 @@ export function registerNetworkHandlers(
           },
           tabId,
         });
+
+        // 4xx/5xx 作为 NETWORK_ERROR_DETECTED 上报（notice 级）
+        if (pending.status && pending.status >= 400) {
+          dispatcher.emit(
+            VtxEventType.NETWORK_ERROR_DETECTED,
+            {
+              requestId: pending.requestId,
+              url: pending.url,
+              method: pending.method,
+              status: pending.status,
+              statusText: pending.statusText,
+              duration: pending.duration,
+            },
+            { tabId },
+          );
+        }
       }
     }
 
@@ -179,6 +197,19 @@ export function registerNetworkHandlers(
           },
           tabId,
         });
+
+        // 加载失败（DNS / connection / abort 等）亦作为 NETWORK_ERROR_DETECTED
+        dispatcher.emit(
+          VtxEventType.NETWORK_ERROR_DETECTED,
+          {
+            requestId: pending.requestId,
+            url: pending.url,
+            method: pending.method,
+            error: pending.error,
+            duration: pending.duration,
+          },
+          { tabId },
+        );
       }
     }
   });

@@ -1,8 +1,9 @@
 // packages/extension/src/handlers/file.ts
 
-import { FileActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { FileActions, VtxErrorCode, vtxError, VtxEventType } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { NativeMessagingClient } from "../lib/native-messaging.js";
+import type { EventDispatcher } from "../events/dispatcher.js";
 
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
@@ -11,13 +12,27 @@ async function getActiveTabId(tabId?: number): Promise<number> {
   return tab.id;
 }
 
-// 跟踪已订阅下载完成事件的状态
-let downloadSubscribed = false;
-
 export function registerFileHandlers(
   router: ActionRouter,
   nm: NativeMessagingClient,
+  dispatcher: EventDispatcher,
 ): void {
+  // 下载完成事件：模块加载即挂载（订阅不再必要）
+  chrome.downloads.onChanged.addListener((delta) => {
+    if (delta.state?.current !== "complete") return;
+    chrome.downloads.search({ id: delta.id }, (items) => {
+      if (items.length === 0) return;
+      const it = items[0];
+      dispatcher.emit(VtxEventType.DOWNLOAD_COMPLETED, {
+        id: it.id,
+        url: it.url,
+        filename: it.filename,
+        totalBytes: it.totalBytes,
+        mime: it.mime,
+      });
+    });
+  });
+
   router.registerAll({
     [FileActions.UPLOAD]: async (args, tabId) => {
       const selector = args.selector as string;
@@ -111,29 +126,12 @@ export function registerFileHandlers(
     },
 
     [FileActions.ON_DOWNLOAD_COMPLETE]: async () => {
-      if (!downloadSubscribed) {
-        chrome.downloads.onChanged.addListener((delta) => {
-          if (delta.state?.current === "complete") {
-            chrome.downloads.search({ id: delta.id }, (items) => {
-              if (items.length > 0) {
-                nm.send({
-                  type: "event",
-                  event: "file.downloadComplete",
-                  data: {
-                    id: items[0].id,
-                    url: items[0].url,
-                    filename: items[0].filename,
-                    totalBytes: items[0].totalBytes,
-                    mime: items[0].mime,
-                  },
-                });
-              }
-            });
-          }
-        });
-        downloadSubscribed = true;
-      }
-      return { subscribed: true };
+      // 保持向后兼容：download.completed 事件已默认由 dispatcher 广播，
+      // 无需显式订阅。客户端通过 vortex_events_subscribe 订阅。
+      return {
+        subscribed: true,
+        note: "download.completed events are now always broadcast. Subscribe via vortex_events_subscribe.",
+      };
     },
   });
 }

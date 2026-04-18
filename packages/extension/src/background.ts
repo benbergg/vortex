@@ -45,16 +45,17 @@ const nm = new NativeMessagingClient(
   },
 );
 
-// 需要 debugger + nm 的 handler（必须在 nm 创建后）
-registerConsoleHandlers(router, debuggerMgr, nm);
-registerNetworkHandlers(router, debuggerMgr, nm);
-registerKeyboardHandlers(router, debuggerMgr);
-registerMouseHandlers(router, debuggerMgr);
-registerFileHandlers(router, nm);
-
-// 事件分发器：监听 chrome.* 事件并通过 NM 推送
+// 事件分发器：需要 nm，后续 handler 都可借它上报事件
 const eventDispatcher = new EventDispatcher(nm);
 registerEventSources(eventDispatcher);
+
+// 需要 debugger / nm / dispatcher 的 handler（必须在 nm + dispatcher 之后）
+registerConsoleHandlers(router, debuggerMgr, nm, eventDispatcher);
+registerNetworkHandlers(router, debuggerMgr, nm, eventDispatcher);
+registerKeyboardHandlers(router, debuggerMgr);
+registerMouseHandlers(router, debuggerMgr);
+registerFileHandlers(router, nm, eventDispatcher);
+
 
 console.log("[vortex] registered actions:", router.getRegisteredActions());
 nm.connect();

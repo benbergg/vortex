@@ -36,9 +36,9 @@ export class EventDispatcher {
 }
 
 /**
- * 注册 chrome.* 事件监听到 dispatcher。
- * 当前覆盖 urgent 级的浏览器级事件（user.switched_tab / user.closed_tab）。
- * 页面级事件（DOM mutation / dialog / form submit 等）在 W5 补全。
+ * 注册 chrome.* 层的事件监听到 dispatcher。
+ * 页面内事件（console/network 过滤、form submit、DOM mutation 等）
+ * 在各 handler 内通过依赖注入的 dispatcher 上报。
  */
 export function registerEventSources(dispatcher: EventDispatcher): void {
   chrome.tabs.onActivated.addListener((info) => {
@@ -54,6 +54,16 @@ export function registerEventSources(dispatcher: EventDispatcher): void {
       VtxEventType.USER_CLOSED_TAB,
       { windowId: removeInfo.windowId, isWindowClosing: removeInfo.isWindowClosing },
       { tabId },
+    );
+  });
+
+  chrome.webNavigation.onCompleted.addListener((details) => {
+    // 仅主 frame 的导航完成才作为"页面跳转"事件
+    if (details.frameId !== 0) return;
+    dispatcher.emit(
+      VtxEventType.PAGE_NAVIGATED,
+      { url: details.url },
+      { tabId: details.tabId },
     );
   });
 }
