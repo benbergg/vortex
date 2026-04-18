@@ -90,17 +90,17 @@ export function registerConsoleHandlers(
 
       addLog(tabId, entry);
 
-      // 推送事件给中间件（legacy: console.message 保留供已有消费者）
-      nm.send({
-        type: "event",
-        event: "console.message",
-        data: entry,
-        tabId,
-      });
-
-      // error 级单独以 VtxEventType.CONSOLE_ERROR 推出（notice 级）
+      // 去重分流（F3）：error 级仅走 CONSOLE_ERROR，
+      // 非 error 级保留 legacy console.message 兼容已有消费者。
       if (entry.level === "error") {
         dispatcher.emit(VtxEventType.CONSOLE_ERROR, entry, { tabId });
+      } else {
+        nm.send({
+          type: "event",
+          event: "console.message",
+          data: entry,
+          tabId,
+        });
       }
     }
 
@@ -120,12 +120,7 @@ export function registerConsoleHandlers(
 
       addLog(tabId, entry);
 
-      nm.send({
-        type: "event",
-        event: "console.message",
-        data: entry,
-        tabId,
-      });
+      // 异常一定是 error 级：仅走 CONSOLE_ERROR，不再重发 legacy。
       dispatcher.emit(VtxEventType.CONSOLE_ERROR, entry, { tabId });
     }
   });
