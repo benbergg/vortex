@@ -1,0 +1,1 @@
+Use the browser's active tab. Navigate to `https://httpbin.org/forms/post`. Fill in the Customer name field with "Alice" and the Telephone field with "555-0101". Then submit the form. The response page will echo your submission as JSON. In your final text confirm that the submitted name and phone appear in the server response. Stop when done.
