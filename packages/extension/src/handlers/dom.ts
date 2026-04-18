@@ -139,13 +139,68 @@ export function registerDomHandlers(
         };
       }
 
-      // 普通 element.click() 路径
+      // 普通 element.click() 路径（含失败探测）
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
           try {
-            const el = document.querySelector(sel) as HTMLElement | null;
-            if (!el) return { error: `Element not found: ${sel}` };
+            // 探测阶段：逐项检查失败原因，细化错误码
+            const els = document.querySelectorAll(sel);
+            if (els.length === 0) {
+              return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
+            }
+            if (els.length > 1) {
+              return {
+                errorCode: "SELECTOR_AMBIGUOUS",
+                error: `Selector "${sel}" matched ${els.length} elements`,
+                extras: { matchCount: els.length },
+              };
+            }
+            const el = els[0] as HTMLElement;
+            if ((el as HTMLInputElement).disabled === true) {
+              return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
+            }
+            const rect0 = el.getBoundingClientRect();
+            if (rect0.width === 0 || rect0.height === 0) {
+              return {
+                errorCode: "ELEMENT_DETACHED",
+                error: `Element ${sel} has zero dimensions (detached or hidden)`,
+              };
+            }
+            // offscreen 检查（滚入视口之前）
+            const inView =
+              rect0.top < window.innerHeight &&
+              rect0.bottom > 0 &&
+              rect0.left < window.innerWidth &&
+              rect0.right > 0;
+            if (!inView) {
+              return {
+                errorCode: "ELEMENT_OFFSCREEN",
+                error: `Element ${sel} is outside the viewport`,
+              };
+            }
+            // 滚入视口后做 occlusion 检查
+            el.scrollIntoView({ block: "center", inline: "center" });
+            const rect = el.getBoundingClientRect();
+            const cx = rect.left + rect.width / 2;
+            const cy = rect.top + rect.height / 2;
+            const topEl = document.elementFromPoint(cx, cy);
+            if (topEl && topEl !== el && !el.contains(topEl) && !topEl.contains(el)) {
+              const classStr =
+                typeof topEl.className === "string" && topEl.className
+                  ? "." + topEl.className.split(" ").filter(Boolean).join(".")
+                  : "";
+              const desc =
+                topEl.tagName.toLowerCase() +
+                (topEl.id ? "#" + topEl.id : "") +
+                classStr;
+              return {
+                errorCode: "ELEMENT_OCCLUDED",
+                error: `Element ${sel} is covered by <${desc}>`,
+                extras: { blocker: desc },
+              };
+            }
+            // 通过所有检查，执行 click
             el.click();
             return {
               result: {
@@ -164,8 +219,21 @@ export function registerDomHandlers(
         args: [selector],
         world: "MAIN",
       });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+      const res = results[0]?.result as {
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      };
+      if (res?.error) {
+        const code: VtxErrorCode =
+          res.errorCode && res.errorCode in VtxErrorCode
+            ? (res.errorCode as VtxErrorCode)
+            : res.error.startsWith("Element not found:")
+              ? VtxErrorCode.ELEMENT_NOT_FOUND
+              : VtxErrorCode.JS_EXECUTION_ERROR;
+        throw vtxError(code, res.error, { selector, extras: res.extras });
+      }
       return res?.result;
     },
 
