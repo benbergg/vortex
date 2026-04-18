@@ -1,7 +1,9 @@
+import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+
 export async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
+  if (!tab?.id) throw vtxError(VtxErrorCode.TAB_NOT_FOUND, "No active tab found");
   return tab.id;
 }
 

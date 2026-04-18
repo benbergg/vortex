@@ -15,6 +15,8 @@ import { registerCaptureHandlers } from "./handlers/capture.js";
 import { registerKeyboardHandlers } from "./handlers/keyboard.js";
 import { registerMouseHandlers } from "./handlers/mouse.js";
 import { registerFileHandlers } from "./handlers/file.js";
+import { registerObserveHandlers } from "./handlers/observe.js";
+import { EventDispatcher, registerEventSources } from "./events/dispatcher.js";
 
 const router = new ActionRouter();
 const debuggerMgr = new DebuggerManager();
@@ -28,6 +30,7 @@ registerDomHandlers(router, debuggerMgr);
 registerContentHandlers(router);
 registerStorageHandlers(router);
 registerCaptureHandlers(router, debuggerMgr);
+registerObserveHandlers(router);
 
 // NM 客户端
 const nm = new NativeMessagingClient(
@@ -42,12 +45,17 @@ const nm = new NativeMessagingClient(
   },
 );
 
-// 需要 debugger + nm 的 handler（必须在 nm 创建后）
-registerConsoleHandlers(router, debuggerMgr, nm);
-registerNetworkHandlers(router, debuggerMgr, nm);
+// 事件分发器：需要 nm，后续 handler 都可借它上报事件
+const eventDispatcher = new EventDispatcher(nm);
+registerEventSources(eventDispatcher);
+
+// 需要 debugger / nm / dispatcher 的 handler（必须在 nm + dispatcher 之后）
+registerConsoleHandlers(router, debuggerMgr, nm, eventDispatcher);
+registerNetworkHandlers(router, debuggerMgr, nm, eventDispatcher);
 registerKeyboardHandlers(router, debuggerMgr);
 registerMouseHandlers(router, debuggerMgr);
-registerFileHandlers(router, nm);
+registerFileHandlers(router, nm, eventDispatcher);
+
 
 console.log("[vortex] registered actions:", router.getRegisteredActions());
 nm.connect();

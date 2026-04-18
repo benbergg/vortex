@@ -1,9 +1,10 @@
 // packages/extension/src/handlers/console.ts
 
-import { ConsoleActions } from "@bytenew/vortex-shared";
+import { ConsoleActions, VtxErrorCode, vtxError, VtxEventType } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import type { NativeMessagingClient } from "../lib/native-messaging.js";
+import type { EventDispatcher } from "../events/dispatcher.js";
 
 interface ConsoleEntry {
   level: string; // "log" | "warn" | "error" | "info" | "debug"
@@ -24,7 +25,7 @@ const subscribedTabs = new Set<number>();
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
+  if (!tab?.id) throw vtxError(VtxErrorCode.TAB_NOT_FOUND, "No active tab found");
   return tab.id;
 }
 
@@ -66,6 +67,7 @@ export function registerConsoleHandlers(
   router: ActionRouter,
   debuggerMgr: DebuggerManager,
   nm: NativeMessagingClient,
+  dispatcher: EventDispatcher,
 ): void {
   // 监听 CDP Runtime 事件
   debuggerMgr.onEvent((tabId, method, params: any) => {
@@ -88,13 +90,18 @@ export function registerConsoleHandlers(
 
       addLog(tabId, entry);
 
-      // 推送事件给中间件
+      // 推送事件给中间件（legacy: console.message 保留供已有消费者）
       nm.send({
         type: "event",
         event: "console.message",
         data: entry,
         tabId,
       });
+
+      // error 级单独以 VtxEventType.CONSOLE_ERROR 推出（notice 级）
+      if (entry.level === "error") {
+        dispatcher.emit(VtxEventType.CONSOLE_ERROR, entry, { tabId });
+      }
     }
 
     if (method === "Runtime.exceptionThrown") {
@@ -119,6 +126,7 @@ export function registerConsoleHandlers(
         data: entry,
         tabId,
       });
+      dispatcher.emit(VtxEventType.CONSOLE_ERROR, entry, { tabId });
     }
   });
 

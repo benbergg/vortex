@@ -1,23 +1,38 @@
 // packages/extension/src/handlers/file.ts
 
-import { FileActions } from "@bytenew/vortex-shared";
+import { FileActions, VtxErrorCode, vtxError, VtxEventType } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { NativeMessagingClient } from "../lib/native-messaging.js";
+import type { EventDispatcher } from "../events/dispatcher.js";
 
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
+  if (!tab?.id) throw vtxError(VtxErrorCode.TAB_NOT_FOUND, "No active tab found");
   return tab.id;
 }
-
-// 跟踪已订阅下载完成事件的状态
-let downloadSubscribed = false;
 
 export function registerFileHandlers(
   router: ActionRouter,
   nm: NativeMessagingClient,
+  dispatcher: EventDispatcher,
 ): void {
+  // 下载完成事件：模块加载即挂载（订阅不再必要）
+  chrome.downloads.onChanged.addListener((delta) => {
+    if (delta.state?.current !== "complete") return;
+    chrome.downloads.search({ id: delta.id }, (items) => {
+      if (items.length === 0) return;
+      const it = items[0];
+      dispatcher.emit(VtxEventType.DOWNLOAD_COMPLETED, {
+        id: it.id,
+        url: it.url,
+        filename: it.filename,
+        totalBytes: it.totalBytes,
+        mime: it.mime,
+      });
+    });
+  });
+
   router.registerAll({
     [FileActions.UPLOAD]: async (args, tabId) => {
       const selector = args.selector as string;
@@ -25,7 +40,7 @@ export function registerFileHandlers(
       const fileContent = args.fileContent as string; // base64
       const mimeType = (args.mimeType as string) ?? "application/octet-stream";
       if (!selector || !fileName || !fileContent) {
-        throw new Error("Missing required params: selector, fileName, fileContent (base64)");
+        throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required params: selector, fileName, fileContent (base64)");
       }
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
 
@@ -63,13 +78,18 @@ export function registerFileHandlers(
       });
 
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) {
+        let code: VtxErrorCode = VtxErrorCode.JS_EXECUTION_ERROR;
+        if (res.error.startsWith("Element not found:")) code = VtxErrorCode.ELEMENT_NOT_FOUND;
+        else if (res.error === "Element is not a file input") code = VtxErrorCode.INVALID_PARAMS;
+        throw vtxError(code, res.error, { selector });
+      }
       return res?.result;
     },
 
     [FileActions.DOWNLOAD]: async (args) => {
       const url = args.url as string;
-      if (!url) throw new Error("Missing required param: url");
+      if (!url) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: url");
       const filename = args.filename as string | undefined;
       const saveAs = (args.saveAs as boolean) ?? false;
 
@@ -106,29 +126,12 @@ export function registerFileHandlers(
     },
 
     [FileActions.ON_DOWNLOAD_COMPLETE]: async () => {
-      if (!downloadSubscribed) {
-        chrome.downloads.onChanged.addListener((delta) => {
-          if (delta.state?.current === "complete") {
-            chrome.downloads.search({ id: delta.id }, (items) => {
-              if (items.length > 0) {
-                nm.send({
-                  type: "event",
-                  event: "file.downloadComplete",
-                  data: {
-                    id: items[0].id,
-                    url: items[0].url,
-                    filename: items[0].filename,
-                    totalBytes: items[0].totalBytes,
-                    mime: items[0].mime,
-                  },
-                });
-              }
-            });
-          }
-        });
-        downloadSubscribed = true;
-      }
-      return { subscribed: true };
+      // 保持向后兼容：download.completed 事件已默认由 dispatcher 广播，
+      // 无需显式订阅。客户端通过 vortex_events_subscribe 订阅。
+      return {
+        subscribed: true,
+        note: "download.completed events are now always broadcast. Subscribe via vortex_events_subscribe.",
+      };
     },
   });
 }

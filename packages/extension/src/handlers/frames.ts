@@ -1,4 +1,4 @@
-import { FramesActions } from "@bytenew/vortex-shared";
+import { FramesActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import { getActiveTabId } from "../lib/tab-utils.js";
 
@@ -23,7 +23,7 @@ export function registerFramesHandlers(router: ActionRouter): void {
         (args.tabId as number | undefined) ?? tabId,
       );
       const urlPattern = args.urlPattern as string;
-      if (!urlPattern) throw new Error("urlPattern is required");
+      if (!urlPattern) throw vtxError(VtxErrorCode.INVALID_PARAMS, "urlPattern is required");
 
       const frames = await chrome.webNavigation.getAllFrames({ tabId: tid });
       if (!frames) return null;

@@ -103,6 +103,10 @@ export const FileActions = {
   ON_DOWNLOAD_COMPLETE: "file.onDownloadComplete",
 } as const;
 
+export const ObserveActions = {
+  SNAPSHOT: "observe.snapshot",
+} as const;
+
 export type ActionString =
   | (typeof TabActions)[keyof typeof TabActions]
   | (typeof PageActions)[keyof typeof PageActions]
@@ -116,4 +120,5 @@ export type ActionString =
   | (typeof KeyboardActions)[keyof typeof KeyboardActions]
   | (typeof MouseActions)[keyof typeof MouseActions]
   | (typeof FramesActions)[keyof typeof FramesActions]
-  | (typeof FileActions)[keyof typeof FileActions];
+  | (typeof FileActions)[keyof typeof FileActions]
+  | (typeof ObserveActions)[keyof typeof ObserveActions];

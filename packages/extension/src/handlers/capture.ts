@@ -1,6 +1,6 @@
 // packages/extension/src/handlers/capture.ts
 
-import { CaptureActions } from "@bytenew/vortex-shared";
+import { CaptureActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
@@ -88,7 +88,7 @@ export function registerCaptureHandlers(
 
     [CaptureActions.ELEMENT]: async (args, tabId) => {
       const selector = args.selector as string;
-      if (!selector) throw new Error("Missing required param: selector");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
 
@@ -107,7 +107,7 @@ export function registerCaptureHandlers(
         world: "MAIN",
       });
       const rectRes = rectResults[0]?.result as { result?: any; error?: string };
-      if (rectRes?.error) throw new Error(rectRes.error);
+      if (rectRes?.error) throw vtxError(rectRes.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, rectRes.error, { selector });
       const rect = rectRes.result;
 
       // 2. iframe 坐标偏移（复用共享工具）
@@ -138,7 +138,7 @@ export function registerCaptureHandlers(
     },
 
     [CaptureActions.GIF_START]: async (args, tabId) => {
-      if (activeGifSession) throw new Error("GIF recording already in progress");
+      if (activeGifSession) throw vtxError(VtxErrorCode.INVALID_PARAMS, "GIF recording already in progress", { extras: { state: "already_recording" } }, { hint: "Stop the current recording with vortex_capture_gif_stop before starting a new one." });
 
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const fps = (args.fps as number) ?? 2;
@@ -163,7 +163,7 @@ export function registerCaptureHandlers(
     },
 
     [CaptureActions.GIF_FRAME]: async () => {
-      if (!activeGifSession) throw new Error("No GIF recording in progress");
+      if (!activeGifSession) throw vtxError(VtxErrorCode.INVALID_PARAMS, "No GIF recording in progress", { extras: { state: "not_recording" } }, { hint: "Call vortex_capture_gif_start first." });
 
       const dataUrl = await captureTab(debuggerMgr, activeGifSession.tabId, { format: "png" });
       activeGifSession.frames.push(dataUrl);
@@ -172,7 +172,7 @@ export function registerCaptureHandlers(
     },
 
     [CaptureActions.GIF_STOP]: async () => {
-      if (!activeGifSession) throw new Error("No GIF recording in progress");
+      if (!activeGifSession) throw vtxError(VtxErrorCode.INVALID_PARAMS, "No GIF recording in progress", { extras: { state: "not_recording" } }, { hint: "Call vortex_capture_gif_start first." });
 
       clearInterval(activeGifSession.interval);
       const session = activeGifSession;

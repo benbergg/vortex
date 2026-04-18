@@ -1,3 +1,6 @@
+import type { VtxErrorPayload } from "./errors.js";
+import type { VtxEventLevel } from "./events.js";
+
 // ========== 客户端 <-> 中间件 ==========
 
 export interface VtxRequest {
@@ -11,16 +14,15 @@ export interface VtxResponse {
   action: string;
   id: string;
   result?: unknown;
-  error?: {
-    code: string;
-    message: string;
-  };
+  error?: VtxErrorPayload;
 }
 
 export interface VtxEvent {
   event: string;
   data: unknown;
   tabId?: number;
+  frameId?: number;
+  level?: VtxEventLevel;
   timestamp: number;
 }
 
@@ -38,10 +40,7 @@ export interface NmResponse {
   type: "tool_response";
   requestId: string;
   result?: unknown;
-  error?: {
-    code: string;
-    message: string;
-  };
+  error?: VtxErrorPayload;
 }
 
 export interface NmEvent {
@@ -49,6 +48,8 @@ export interface NmEvent {
   event: string;
   data: unknown;
   tabId?: number;
+  frameId?: number;
+  level?: VtxEventLevel;
 }
 
 export interface NmResponseChunk {

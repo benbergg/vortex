@@ -1,0 +1,145 @@
+import { VtxError, VtxErrorCode } from "./errors.js";
+import type { VtxErrorContext, VtxErrorExtra } from "./errors.js";
+
+/**
+ * 错误元信息：给上游 LLM Agent 的恢复提示。
+ *
+ * `recoverable` 语义：
+ * - `true`：同一动作带参数调整后重试可能成功（如 ELEMENT_OCCLUDED 清理遮挡后重试）
+ * - `false`：同一动作重试无意义，但 hint 可能指引换一个动作达成目标
+ *   （如 TAB_CLOSED 需要换 tab，不是动作本身的重试）
+ */
+export interface VtxErrorMeta {
+  hint: string;
+  recoverable: boolean;
+}
+
+export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
+  // -- 元素定位 --
+  ELEMENT_NOT_FOUND: {
+    hint: "Element not found. Verify the selector, or call vortex_observe to list visible interactive elements.",
+    recoverable: true,
+  },
+  ELEMENT_OCCLUDED: {
+    hint: "Element is covered by another (modal/overlay/cookie banner). Dismiss the overlay first, then retry.",
+    recoverable: true,
+  },
+  ELEMENT_OFFSCREEN: {
+    hint: "Element is outside the viewport. Call vortex_dom_scroll to bring it into view, then retry.",
+    recoverable: true,
+  },
+  ELEMENT_DISABLED: {
+    hint: "Element has disabled attribute. Fill required prior fields or satisfy prerequisites to enable it.",
+    recoverable: true,
+  },
+  ELEMENT_DETACHED: {
+    hint: "Element was removed from the DOM. Call vortex_observe again to get the current state.",
+    recoverable: true,
+  },
+  SELECTOR_AMBIGUOUS: {
+    hint: "Selector matched multiple elements. Use a more specific selector, or call vortex_observe to get indexes.",
+    recoverable: true,
+  },
+
+  // -- 页面状态 --
+  NAVIGATION_IN_PROGRESS: {
+    hint: "A page navigation is in progress. Call vortex_page_wait_for_network_idle before retrying.",
+    recoverable: true,
+  },
+  PAGE_NOT_READY: {
+    hint: "Page DOM not ready. Wait for load, or call vortex_page_wait before retrying.",
+    recoverable: true,
+  },
+  DIALOG_BLOCKING: {
+    hint: "A native browser dialog (alert/confirm/prompt) is blocking. Handle or dismiss it first.",
+    recoverable: true,
+  },
+  IFRAME_NOT_READY: {
+    hint: "Target iframe is not ready or not yet loaded. Call vortex_frames_list after a short wait.",
+    recoverable: true,
+  },
+
+  // -- Snapshot --
+  STALE_SNAPSHOT: {
+    hint: "Page has changed since the snapshot. Call vortex_observe to get a fresh snapshot, then retry.",
+    recoverable: true,
+  },
+  INVALID_INDEX: {
+    hint: "Index does not exist in this snapshot. Call vortex_observe to list valid indexes.",
+    recoverable: true,
+  },
+
+  // -- 网络与标签 --
+  NAVIGATION_FAILED: {
+    hint: "Navigation failed (network error, blocked URL, or invalid URL). Verify the URL and retry.",
+    recoverable: true,
+  },
+  TAB_NOT_FOUND: {
+    hint: "Tab id does not exist. Call vortex_tab_list to find valid tab ids.",
+    recoverable: false,
+  },
+  TAB_CLOSED: {
+    hint: "The target tab was closed during execution. Select another tab or create a new one.",
+    recoverable: false,
+  },
+
+  // -- 执行与权限 --
+  TIMEOUT: {
+    hint: "Action timed out. Increase the timeout parameter, or check if the page is stuck.",
+    recoverable: true,
+  },
+  JS_EXECUTION_ERROR: {
+    hint: "Injected JavaScript threw an error. Inspect the error message and adjust the code.",
+    recoverable: false,
+  },
+  PERMISSION_DENIED: {
+    hint: "Operation blocked by browser permission (cross-origin, file access, or extension permission).",
+    recoverable: false,
+  },
+  CSP_BLOCKED: {
+    hint: "Action blocked by Content-Security-Policy. Try a CDP-based alternative (e.g. vortex_dom_click with useRealMouse=true).",
+    recoverable: true,
+  },
+  INTERNAL_ERROR: {
+    hint: "Unexpected error in the vortex runtime (server/relay/mcp). Check logs; retry may work if transient.",
+    recoverable: true,
+  },
+
+  // -- 传输层 --
+  NATIVE_MESSAGING_ERROR: {
+    hint: "Native messaging channel error. Verify the vortex host is installed and the extension is reloaded.",
+    recoverable: false,
+  },
+  EXTENSION_NOT_CONNECTED: {
+    hint: "Vortex extension is not connected. Ensure Chrome is open and the extension is enabled.",
+    recoverable: false,
+  },
+  INVALID_PARAMS: {
+    hint: "Invalid parameters. Check the tool schema and retry with correct arguments.",
+    recoverable: false,
+  },
+  UNKNOWN_ACTION: {
+    hint: "Unknown action. Check spelling or verify the action is supported in this vortex version.",
+    recoverable: false,
+  },
+};
+
+/**
+ * 便捷构造 VtxError：自动注入 DEFAULT_ERROR_META 的 hint 与 recoverable。
+ * 调用方只需传 code / message / context。
+ * 如需覆盖默认 hint 或 recoverable，传 `override` 参数。
+ */
+export function vtxError(
+  code: VtxErrorCode,
+  message: string,
+  context?: VtxErrorContext,
+  override?: Partial<VtxErrorMeta>,
+): VtxError {
+  const meta = DEFAULT_ERROR_META[code];
+  const extra: VtxErrorExtra = {
+    hint: override?.hint ?? meta.hint,
+    recoverable: override?.recoverable ?? meta.recoverable,
+  };
+  if (context !== undefined) extra.context = context;
+  return new VtxError(code, message, extra);
+}

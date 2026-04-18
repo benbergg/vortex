@@ -16,6 +16,11 @@ const optionalFrameId = {
   frameId: { type: "number" as const, description: "Target frame ID (for iframes). Use vortex_frames_list/find to discover frame IDs." },
 };
 
+const targetSpec = {
+  index: { type: "number" as const, description: "Interactive element index from vortex_observe (alternative to selector). Requires snapshotId." },
+  snapshotId: { type: "string" as const, description: "Snapshot id from vortex_observe (pair with index). When provided, the snapshot's tab/frame overrides tabId/frameId." },
+};
+
 const screenshotReturnMode = {
   returnMode: {
     type: "string" as const,
@@ -29,55 +34,55 @@ function tabTools(): ToolDef[] {
   return [
     { name: "vortex_tab_list", action: "tab.list", description: "List all open browser tabs with their IDs, URLs, and titles. Use this first to find tab IDs for other commands.", schema: { type: "object", properties: {}, required: [] } },
     { name: "vortex_tab_create", action: "tab.create", description: "Create a new browser tab, optionally navigating to a URL.", schema: { type: "object", properties: { url: { type: "string", description: "URL to open in the new tab" }, active: { type: "boolean", description: "Whether to make the tab active", default: true } }, required: [] } },
-    { name: "vortex_tab_close", action: "tab.close", description: "Close a browser tab by its ID.", schema: { type: "object", properties: { tabId: { type: "number", description: "Tab ID to close" } }, required: ["tabId"] } },
-    { name: "vortex_tab_activate", action: "tab.activate", description: "Bring a tab to the foreground and focus its window.", schema: { type: "object", properties: { tabId: { type: "number", description: "Tab ID to activate" } }, required: ["tabId"] } },
-    { name: "vortex_tab_get_info", action: "tab.getInfo", description: "Get detailed information about a tab (URL, title, status, favicon).", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
+    { name: "vortex_tab_close", action: "tab.close", description: "Close a browser tab by its ID. Failures: TAB_NOT_FOUND, TAB_CLOSED (tab already closed — list with vortex_tab_list).", schema: { type: "object", properties: { tabId: { type: "number", description: "Tab ID to close" } }, required: ["tabId"] } },
+    { name: "vortex_tab_activate", action: "tab.activate", description: "Bring a tab to the foreground and focus its window. Failures: TAB_NOT_FOUND.", schema: { type: "object", properties: { tabId: { type: "number", description: "Tab ID to activate" } }, required: ["tabId"] } },
+    { name: "vortex_tab_get_info", action: "tab.getInfo", description: "Get detailed information about a tab (URL, title, status, favicon). Failures: TAB_NOT_FOUND.", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
   ];
 }
 
 function pageTools(): ToolDef[] {
   return [
-    { name: "vortex_page_navigate", action: "page.navigate", description: "Navigate to a URL and wait for the page to finish loading.", schema: { type: "object", properties: { url: { type: "string", description: "URL to navigate to" }, waitForLoad: { type: "boolean", description: "Wait for page load to complete", default: true }, timeout: { type: "number", description: "Navigation timeout in ms", default: 30000 }, ...optionalTabId }, required: ["url"] } },
+    { name: "vortex_page_navigate", action: "page.navigate", description: "Navigate to a URL and wait for the page to finish loading. Failures: TIMEOUT (raise timeout or verify URL reachable), NAVIGATION_FAILED.", schema: { type: "object", properties: { url: { type: "string", description: "URL to navigate to" }, waitForLoad: { type: "boolean", description: "Wait for page load to complete", default: true }, timeout: { type: "number", description: "Navigation timeout in ms", default: 30000 }, ...optionalTabId }, required: ["url"] } },
     { name: "vortex_page_reload", action: "page.reload", description: "Reload the current page.", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
     { name: "vortex_page_back", action: "page.back", description: "Go back in browser history.", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
     { name: "vortex_page_forward", action: "page.forward", description: "Go forward in browser history.", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
-    { name: "vortex_page_wait", action: "page.wait", description: "Wait for a CSS selector to appear on the page, or wait for a fixed timeout.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector to wait for" }, timeout: { type: "number", description: "Timeout in ms", default: 10000 }, ...optionalTabId, ...optionalFrameId }, required: [] } },
+    { name: "vortex_page_wait", action: "page.wait", description: "Wait for a CSS selector to appear on the page, or wait for a fixed timeout. Failures: TIMEOUT (selector did not appear — verify selector or raise timeout).", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector to wait for" }, timeout: { type: "number", description: "Timeout in ms", default: 10000 }, ...optionalTabId, ...optionalFrameId }, required: [] } },
     { name: "vortex_page_info", action: "page.info", description: "Get the current page URL, title, and load status.", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
-    { name: "vortex_page_wait_for_network_idle", action: "page.waitForNetworkIdle", description: "Wait until all network requests are complete. Useful after navigating to AJAX-heavy pages or triggering actions that load data.", schema: { type: "object", properties: { timeout: { type: "number", description: "Max wait time in ms", default: 30000 }, idleTime: { type: "number", description: "Duration with no requests to confirm idle (ms)", default: 500 }, ...optionalTabId }, required: [] } },
+    { name: "vortex_page_wait_for_network_idle", action: "page.waitForNetworkIdle", description: "Wait until all network requests are complete. Useful after navigating to AJAX-heavy pages or triggering actions that load data. Failures: TIMEOUT (requests never settled — inspect with vortex_network_get_logs).", schema: { type: "object", properties: { timeout: { type: "number", description: "Max wait time in ms", default: 30000 }, idleTime: { type: "number", description: "Duration with no requests to confirm idle (ms)", default: 500 }, ...optionalTabId }, required: [] } },
   ];
 }
 
 function domTools(): ToolDef[] {
   return [
-    { name: "vortex_dom_query", action: "dom.query", description: "Find a single element by CSS selector. Returns its tag, text, classes, and attributes.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
-    { name: "vortex_dom_query_all", action: "dom.queryAll", description: "Find all elements matching a CSS selector.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
-    { name: "vortex_dom_click", action: "dom.click", description: "Click an element by CSS selector. Scrolls into view if needed.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of element to click" }, useRealMouse: { type: "boolean", description: "Use CDP real mouse events (mousedown+mouseup) instead of element.click(). Try this when normal click doesn't trigger React onClick handlers or when blocked by anti-bot detection." }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
-    { name: "vortex_dom_type", action: "dom.type", description: "Type text into an input element character by character. Use dom.fill for faster value setting.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of input element" }, text: { type: "string", description: "Text to type" }, delay: { type: "number", description: "Delay between keystrokes in ms" }, ...optionalTabId, ...optionalFrameId }, required: ["selector", "text"] } },
-    { name: "vortex_dom_fill", action: "dom.fill", description: "Set the value of a form field directly (faster than type, but doesn't trigger key events).", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of form field" }, value: { type: "string", description: "Value to set" }, ...optionalTabId, ...optionalFrameId }, required: ["selector", "value"] } },
-    { name: "vortex_dom_select", action: "dom.select", description: "Select an option in a dropdown/select element by value.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of select element" }, value: { type: "string", description: "Option value to select" }, ...optionalTabId, ...optionalFrameId }, required: ["selector", "value"] } },
-    { name: "vortex_dom_scroll", action: "dom.scroll", description: "Scroll the page or a specific container element.", schema: { type: "object", properties: { selector: { type: "string", description: "Element to scroll to" }, container: { type: "string", description: "Scroll container selector" }, position: { type: "string", enum: ["top", "bottom", "left", "right"], description: "Scroll to position" }, x: { type: "number", description: "Scroll to x coordinate" }, y: { type: "number", description: "Scroll to y coordinate" }, ...optionalTabId, ...optionalFrameId }, required: [] } },
-    { name: "vortex_dom_hover", action: "dom.hover", description: "Move the mouse over an element to trigger hover effects.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
-    { name: "vortex_dom_get_attribute", action: "dom.getAttribute", description: "Get the value of a specific HTML attribute of an element.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, attribute: { type: "string", description: "Attribute name (e.g. href, src, class)" }, ...optionalTabId, ...optionalFrameId }, required: ["selector", "attribute"] } },
-    { name: "vortex_dom_get_scroll_info", action: "dom.getScrollInfo", description: "Get scroll position, viewport size, and total scrollable dimensions.", schema: { type: "object", properties: { selector: { type: "string", description: "Element selector (omit for page)" }, ...optionalTabId, ...optionalFrameId }, required: [] } },
-    { name: "vortex_dom_wait_for_mutation", action: "dom.waitForMutation", description: "Wait for DOM changes on an element. Useful for detecting lazy-loaded or dynamically inserted content.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector to observe" }, timeout: { type: "number", description: "Timeout in ms", default: 10000 }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
+    { name: "vortex_dom_query", action: "dom.query", description: "Find a single element by CSS selector, or by vortex_observe index. Returns its tag, text, classes, and attributes. Failures: ELEMENT_NOT_FOUND, STALE_SNAPSHOT, INVALID_INDEX.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (alternative: index + snapshotId)" }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: [] } },
+    { name: "vortex_dom_query_all", action: "dom.queryAll", description: "Find all elements matching a CSS selector, or by vortex_observe index. Failures: ELEMENT_NOT_FOUND, STALE_SNAPSHOT, INVALID_INDEX.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (alternative: index + snapshotId)" }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: [] } },
+    { name: "vortex_dom_click", action: "dom.click", description: "Click an element by CSS selector OR by index from vortex_observe (prefer index — more stable, no selector guessing). Scrolls into view if needed. Failures: ELEMENT_OCCLUDED (dismiss overlays/modals first), ELEMENT_OFFSCREEN (scroll into view), ELEMENT_DISABLED (fill prior fields), SELECTOR_AMBIGUOUS (narrow selector), ELEMENT_NOT_FOUND, STALE_SNAPSHOT (re-call vortex_observe), INVALID_INDEX.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of element to click (alternative: index + snapshotId)" }, useRealMouse: { type: "boolean", description: "Use CDP real mouse events (mousedown+mouseup) instead of element.click(). Try this when normal click doesn't trigger React onClick handlers or when blocked by anti-bot detection." }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: [] } },
+    { name: "vortex_dom_type", action: "dom.type", description: "Type text into an input element character by character. Use dom.fill for faster value setting. Target by selector or by vortex_observe index. Failures: ELEMENT_NOT_FOUND, STALE_SNAPSHOT, INVALID_INDEX, JS_EXECUTION_ERROR (target must accept keyboard events).", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (alternative: index + snapshotId)" }, text: { type: "string", description: "Text to type" }, delay: { type: "number", description: "Delay between keystrokes in ms" }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: ["text"] } },
+    { name: "vortex_dom_fill", action: "dom.fill", description: "Set the value of a form field directly (faster than type, but doesn't trigger key events). Target by selector or by vortex_observe index. Failures: ELEMENT_NOT_FOUND, STALE_SNAPSHOT, INVALID_INDEX, JS_EXECUTION_ERROR (element must be an input/textarea).", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (alternative: index + snapshotId)" }, value: { type: "string", description: "Value to set" }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: ["value"] } },
+    { name: "vortex_dom_select", action: "dom.select", description: "Select an option in a dropdown/select element by value. Target by selector or by vortex_observe index. Failures: ELEMENT_NOT_FOUND, STALE_SNAPSHOT, INVALID_INDEX, JS_EXECUTION_ERROR (value not in options — use dom.queryAll on 'option' to list values first).", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (alternative: index + snapshotId)" }, value: { type: "string", description: "Option value to select" }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: ["value"] } },
+    { name: "vortex_dom_scroll", action: "dom.scroll", description: "Scroll the page or a specific container element. Target element by selector or by vortex_observe index. Failures: ELEMENT_NOT_FOUND (verify selector/container), STALE_SNAPSHOT, INVALID_INDEX, JS_EXECUTION_ERROR (must specify selector/index, position, or x/y).", schema: { type: "object", properties: { selector: { type: "string", description: "Element to scroll to (alternative: index + snapshotId)" }, container: { type: "string", description: "Scroll container selector" }, position: { type: "string", enum: ["top", "bottom", "left", "right"], description: "Scroll to position" }, x: { type: "number", description: "Scroll to x coordinate" }, y: { type: "number", description: "Scroll to y coordinate" }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: [] } },
+    { name: "vortex_dom_hover", action: "dom.hover", description: "Move the mouse over an element to trigger hover effects. Target by selector or by vortex_observe index. Failures: ELEMENT_NOT_FOUND, STALE_SNAPSHOT, INVALID_INDEX.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (alternative: index + snapshotId)" }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: [] } },
+    { name: "vortex_dom_get_attribute", action: "dom.getAttribute", description: "Get the value of a specific HTML attribute of an element. Target by selector or by vortex_observe index. Failures: ELEMENT_NOT_FOUND, STALE_SNAPSHOT, INVALID_INDEX.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (alternative: index + snapshotId)" }, attribute: { type: "string", description: "Attribute name (e.g. href, src, class)" }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: ["attribute"] } },
+    { name: "vortex_dom_get_scroll_info", action: "dom.getScrollInfo", description: "Get scroll position, viewport size, and total scrollable dimensions. Target element by selector or vortex_observe index (omit both for page).", schema: { type: "object", properties: { selector: { type: "string", description: "Element selector (alternative: index + snapshotId; omit both for page)" }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: [] } },
+    { name: "vortex_dom_wait_for_mutation", action: "dom.waitForMutation", description: "Wait for DOM changes on an element. Useful for detecting lazy-loaded or dynamically inserted content. Target by selector or by vortex_observe index. Failures: ELEMENT_NOT_FOUND, STALE_SNAPSHOT, INVALID_INDEX.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector to observe (alternative: index + snapshotId)" }, timeout: { type: "number", description: "Timeout in ms", default: 10000 }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: [] } },
   ];
 }
 
 function contentTools(): ToolDef[] {
   return [
-    { name: "vortex_content_get_text", action: "content.getText", description: "Get all visible text from the page or a specific element. Useful for reading page content.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (omit for entire page)" }, ...optionalTabId, ...optionalFrameId }, required: [] } },
-    { name: "vortex_content_get_html", action: "content.getHTML", description: "Get the outer HTML of the page or a specific element.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (omit for entire page)" }, ...optionalTabId, ...optionalFrameId }, required: [] } },
+    { name: "vortex_content_get_text", action: "content.getText", description: "Get all visible text from the page or a specific element. Useful for reading page content. Failures: ELEMENT_NOT_FOUND (when selector is provided).", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (omit for entire page)" }, ...optionalTabId, ...optionalFrameId }, required: [] } },
+    { name: "vortex_content_get_html", action: "content.getHTML", description: "Get the outer HTML of the page or a specific element. Failures: ELEMENT_NOT_FOUND (when selector is provided).", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (omit for entire page)" }, ...optionalTabId, ...optionalFrameId }, required: [] } },
     { name: "vortex_content_get_accessibility_tree", action: "content.getAccessibilityTree", description: "Get the accessibility tree of the page. Useful for understanding page structure and interactive elements.", schema: { type: "object", properties: { ...optionalTabId, ...optionalFrameId }, required: [] } },
-    { name: "vortex_content_get_element_text", action: "content.getElementText", description: "Get the text content of a specific element.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
-    { name: "vortex_content_get_computed_style", action: "content.getComputedStyle", description: "Get the computed CSS properties of an element.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, properties: { type: "array", items: { type: "string" }, description: "CSS property names to read" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
+    { name: "vortex_content_get_element_text", action: "content.getElementText", description: "Get the text content of a specific element. Failures: ELEMENT_NOT_FOUND.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
+    { name: "vortex_content_get_computed_style", action: "content.getComputedStyle", description: "Get the computed CSS properties of an element. Failures: ELEMENT_NOT_FOUND.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, properties: { type: "array", items: { type: "string" }, description: "CSS property names to read" }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
   ];
 }
 
 function jsTools(): ToolDef[] {
   return [
-    { name: "vortex_js_evaluate", action: "js.evaluate", description: "Execute JavaScript in the page context and return the result.", schema: { type: "object", properties: { code: { type: "string", description: "JavaScript code to execute" }, ...optionalTabId, ...optionalFrameId }, required: ["code"] } },
-    { name: "vortex_js_evaluate_async", action: "js.evaluateAsync", description: "Execute async JavaScript (can use 'await') and return the result.", schema: { type: "object", properties: { code: { type: "string", description: "Async JavaScript code" }, ...optionalTabId, ...optionalFrameId }, required: ["code"] } },
-    { name: "vortex_js_call_function", action: "js.callFunction", description: "Call a named function defined on the page with arguments.", schema: { type: "object", properties: { name: { type: "string", description: "Function name" }, args: { type: "array", items: {}, description: "Arguments to pass" }, ...optionalTabId, ...optionalFrameId }, required: ["name"] } },
+    { name: "vortex_js_evaluate", action: "js.evaluate", description: "Execute JavaScript in the page context and return the result. Failures: JS_EXECUTION_ERROR (page-side exception — inspect message).", schema: { type: "object", properties: { code: { type: "string", description: "JavaScript code to execute" }, ...optionalTabId, ...optionalFrameId }, required: ["code"] } },
+    { name: "vortex_js_evaluate_async", action: "js.evaluateAsync", description: "Execute async JavaScript (can use 'await') and return the result. Failures: JS_EXECUTION_ERROR (page-side exception — inspect message).", schema: { type: "object", properties: { code: { type: "string", description: "Async JavaScript code" }, ...optionalTabId, ...optionalFrameId }, required: ["code"] } },
+    { name: "vortex_js_call_function", action: "js.callFunction", description: "Call a named function defined on the page with arguments. Failures: INVALID_PARAMS (function not found on window — verify name).", schema: { type: "object", properties: { name: { type: "string", description: "Function name" }, args: { type: "array", items: {}, description: "Arguments to pass" }, ...optionalTabId, ...optionalFrameId }, required: ["name"] } },
   ];
 }
 
@@ -139,10 +144,10 @@ function mouseTools(): ToolDef[] {
 function captureTools(): ToolDef[] {
   return [
     { name: "vortex_capture_screenshot", action: "capture.screenshot", description: "Take a screenshot of the visible page area. Use to verify page state, check layouts, or debug visual issues. Large images (>500KB) auto-save to file to conserve tokens.", schema: { type: "object", properties: { format: { type: "string", enum: ["png", "jpeg"], default: "png" }, fullPage: { type: "boolean", description: "Capture the full scrollable page (max 8000px height). Useful for long pages." }, clip: { type: "object", description: "Custom clip region (overrides fullPage)", properties: { x: { type: "number" }, y: { type: "number" }, width: { type: "number" }, height: { type: "number" } } }, ...screenshotReturnMode, ...optionalTabId }, required: [] }, returnsImage: true },
-    { name: "vortex_capture_element", action: "capture.element", description: "Take a screenshot of a specific element. Supports iframe content via frameId.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...screenshotReturnMode, ...optionalTabId, ...optionalFrameId }, required: ["selector"] }, returnsImage: true },
-    { name: "vortex_capture_gif_start", action: "capture.gifStart", description: "Start collecting GIF frames.", schema: { type: "object", properties: { fps: { type: "number", description: "Frames per second", default: 2 }, ...optionalTabId }, required: [] } },
-    { name: "vortex_capture_gif_frame", action: "capture.gifFrame", description: "Manually capture a GIF frame.", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
-    { name: "vortex_capture_gif_stop", action: "capture.gifStop", description: "Stop GIF recording and return collected frames.", schema: { type: "object", properties: {}, required: [] } },
+    { name: "vortex_capture_element", action: "capture.element", description: "Take a screenshot of a specific element. Supports iframe content via frameId. Failures: ELEMENT_NOT_FOUND.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector" }, ...screenshotReturnMode, ...optionalTabId, ...optionalFrameId }, required: ["selector"] }, returnsImage: true },
+    { name: "vortex_capture_gif_start", action: "capture.gifStart", description: "Start collecting GIF frames. Failures: INVALID_PARAMS (recording already in progress — call gif_stop first).", schema: { type: "object", properties: { fps: { type: "number", description: "Frames per second", default: 2 }, ...optionalTabId }, required: [] } },
+    { name: "vortex_capture_gif_frame", action: "capture.gifFrame", description: "Manually capture a GIF frame. Failures: INVALID_PARAMS (no recording — call gif_start first).", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
+    { name: "vortex_capture_gif_stop", action: "capture.gifStop", description: "Stop GIF recording and return collected frames. Failures: INVALID_PARAMS (no recording — call gif_start first).", schema: { type: "object", properties: {}, required: [] } },
   ];
 }
 
@@ -159,7 +164,7 @@ function networkTools(): ToolDef[] {
     { name: "vortex_network_get_logs", action: "network.getLogs", description: "Get network request logs (URL, method, status, timing, request body).", schema: { type: "object", properties: { includeResources: { type: "boolean", description: "Include static resources (scripts, stylesheets, images). Default: only API requests (XHR/Fetch)." }, ...optionalTabId }, required: [] } },
     { name: "vortex_network_get_errors", action: "network.getErrors", description: "Get failed network requests (HTTP status >= 400 or connection errors).", schema: { type: "object", properties: { includeResources: { type: "boolean", description: "Include static resources (scripts, stylesheets, images). Default: only API requests (XHR/Fetch)." }, ...optionalTabId }, required: [] } },
     { name: "vortex_network_filter", action: "network.filter", description: "Filter network logs by URL pattern, HTTP method, or status code range.", schema: { type: "object", properties: { url: { type: "string", description: "URL substring to match" }, method: { type: "string", description: "HTTP method (GET, POST, etc.)" }, statusMin: { type: "number", description: "Minimum status code" }, statusMax: { type: "number", description: "Maximum status code" }, includeResources: { type: "boolean", description: "Include static resources (scripts, stylesheets, images). Default: only API requests (XHR/Fetch)." }, ...optionalTabId }, required: [] } },
-    { name: "vortex_network_get_response_body", action: "network.getResponseBody", description: "Get the full response body of a specific network request. Use requestId from network.getLogs or network.filter results.", schema: { type: "object", properties: { requestId: { type: "string", description: "Request ID from network logs" }, ...optionalTabId }, required: ["requestId"] } },
+    { name: "vortex_network_get_response_body", action: "network.getResponseBody", description: "Get the full response body of a specific network request. Use requestId from network.getLogs or network.filter results. Failures: INTERNAL_ERROR (body 204/redirect/evicted — re-subscribe and retry).", schema: { type: "object", properties: { requestId: { type: "string", description: "Request ID from network logs" }, ...optionalTabId }, required: ["requestId"] } },
     { name: "vortex_network_clear", action: "network.clear", description: "Clear the cached network logs.", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
   ];
 }
@@ -204,7 +209,7 @@ function storageTools(): ToolDef[] {
 
 function fileTools(): ToolDef[] {
   return [
-    { name: "vortex_file_upload", action: "file.upload", description: "Upload a file to a file input element. The file content must be base64 encoded.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of file input" }, fileName: { type: "string", description: "File name" }, fileContent: { type: "string", description: "Base64 encoded file content" }, mimeType: { type: "string", description: "MIME type" }, ...optionalTabId }, required: ["selector", "fileName", "fileContent"] } },
+    { name: "vortex_file_upload", action: "file.upload", description: "Upload a file to a file input element. The file content must be base64 encoded. Failures: ELEMENT_NOT_FOUND, INVALID_PARAMS (selector must target <input type=file>).", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector of file input" }, fileName: { type: "string", description: "File name" }, fileContent: { type: "string", description: "Base64 encoded file content" }, mimeType: { type: "string", description: "MIME type" }, ...optionalTabId }, required: ["selector", "fileName", "fileContent"] } },
     { name: "vortex_file_download", action: "file.download", description: "Trigger a file download by URL.", schema: { type: "object", properties: { url: { type: "string", description: "URL to download" }, filename: { type: "string", description: "Save as filename" } }, required: ["url"] } },
     { name: "vortex_file_get_downloads", action: "file.getDownloads", description: "List recent downloads.", schema: { type: "object", properties: { limit: { type: "number", description: "Max results", default: 20 } }, required: [] } },
   ];
@@ -234,6 +239,98 @@ function framesTools(): ToolDef[] {
   ];
 }
 
+function eventsTools(): ToolDef[] {
+  return [
+    {
+      name: "vortex_events_subscribe",
+      action: "__mcp_events_subscribe__",
+      description:
+        "Subscribe to browser events (user tab switch/close, dialogs, downloads, page navigation, console errors, ...). Events are delivered piggybacked to subsequent tool responses as a [vortex-events] text item. Returns a subscription id. Default subscribes to all `urgent` level events.",
+      schema: {
+        type: "object",
+        properties: {
+          types: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Event types to subscribe to. Omit to subscribe to all events at/above minLevel. Known: user.switched_tab, user.closed_tab, dialog.opened, download.completed, page.navigated, console.error, network.error_detected, form.submitted, dom.mutated, network.request.",
+          },
+          minLevel: {
+            type: "string",
+            enum: ["info", "notice", "urgent"],
+            description:
+              "Minimum level to deliver. Default: 'urgent' (only user-interruptible events).",
+            default: "urgent",
+          },
+          tabId: {
+            type: "number",
+            description: "Filter events to this tab only.",
+          },
+        },
+        required: [],
+      },
+    },
+    {
+      name: "vortex_events_unsubscribe",
+      action: "__mcp_events_unsubscribe__",
+      description: "Cancel an event subscription by id.",
+      schema: {
+        type: "object",
+        properties: {
+          subscriptionId: {
+            type: "string",
+            description: "Subscription id from vortex_events_subscribe.",
+          },
+        },
+        required: ["subscriptionId"],
+      },
+    },
+  ];
+}
+
+function observeTools(): ToolDef[] {
+  return [
+    {
+      name: "vortex_observe",
+      action: "observe.snapshot",
+      description:
+        "Get an LLM-friendly snapshot of the page in ONE call: indexed interactive elements (button/link/input/select/etc.) with role, accessible name, bbox, occlusion status (visible/occludedBy), and key attributes. Prefer this over multiple dom.query calls when exploring what the page can do. Returns a snapshotId; pair with `index` in dom.* tools to operate on elements without guessing CSS selectors. Snapshot TTL: 60s. Failures: TAB_NOT_FOUND, JS_EXECUTION_ERROR.",
+      schema: {
+        type: "object",
+        properties: {
+          viewport: {
+            type: "string",
+            enum: ["visible", "full"],
+            description:
+              "visible: only elements within the current viewport (default). full: all interactive elements in the page.",
+            default: "visible",
+          },
+          maxElements: {
+            type: "number",
+            description: "Max elements to return (default 200).",
+            default: 200,
+          },
+          includeAX: {
+            type: "boolean",
+            description:
+              "Infer ARIA role (default true). Set false for raw tag names only.",
+            default: true,
+          },
+          includeText: {
+            type: "boolean",
+            description:
+              "Compute accessible name from aria-label/labels/innerText (default true).",
+            default: true,
+          },
+          ...optionalTabId,
+          ...optionalFrameId,
+        },
+        required: [],
+      },
+    },
+  ];
+}
+
 function diagnosticsTools(): ToolDef[] {
   return [
     {
@@ -248,6 +345,8 @@ function diagnosticsTools(): ToolDef[] {
 export function getAllToolDefs(): ToolDef[] {
   return [
     ...diagnosticsTools(),
+    ...eventsTools(),
+    ...observeTools(),
     ...tabTools(),
     ...pageTools(),
     ...domTools(),

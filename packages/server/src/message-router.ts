@@ -118,6 +118,8 @@ export class MessageRouter {
         event: msg.event,
         data: msg.data,
         tabId: msg.tabId,
+        frameId: msg.frameId,
+        level: msg.level,
         timestamp: Date.now(),
       };
       this.sendEventToClient(vtxEvent);

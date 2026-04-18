@@ -1,4 +1,4 @@
-import { ContentActions } from "@bytenew/vortex-shared";
+import { ContentActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 
@@ -26,7 +26,7 @@ export function registerContentHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error);
       return res?.result;
     },
 
@@ -52,7 +52,7 @@ export function registerContentHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error);
       return res?.result;
     },
 
@@ -144,13 +144,13 @@ export function registerContentHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error);
       return res?.result;
     },
 
     [ContentActions.GET_ELEMENT_TEXT]: async (args, tabId) => {
       const selector = args.selector as string;
-      if (!selector) throw new Error("Missing required param: selector");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -168,14 +168,14 @@ export function registerContentHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error);
       return res?.result;
     },
 
     [ContentActions.GET_COMPUTED_STYLE]: async (args, tabId) => {
       const selector = args.selector as string;
       const properties = args.properties as string[] | undefined;
-      if (!selector) throw new Error("Missing required param: selector");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -213,7 +213,7 @@ export function registerContentHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error);
       return res?.result;
     },
   });

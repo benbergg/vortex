@@ -1,5 +1,6 @@
 import WebSocket from "ws";
-import type { VtxRequest, VtxResponse } from "@bytenew/vortex-shared";
+import type { VtxEvent, VtxRequest, VtxResponse } from "@bytenew/vortex-shared";
+import { eventStore } from "./lib/event-store.js";
 
 interface PendingRequest {
   resolve: (resp: VtxResponse) => void;
@@ -52,11 +53,17 @@ class VortexClient {
       ws.on("message", (data) => {
         try {
           const msg = JSON.parse(data.toString());
+          // tool response：按 id 路由到 pending
           if (msg.id && this.pending.has(msg.id)) {
             const p = this.pending.get(msg.id)!;
             this.pending.delete(msg.id);
             clearTimeout(p.timer);
             p.resolve(msg as VtxResponse);
+            return;
+          }
+          // 事件：无 id，有 event 字段（来自 vortex-server 透传的 VtxEvent）
+          if (typeof msg.event === "string" && typeof msg.timestamp === "number") {
+            eventStore.ingest(msg as VtxEvent);
           }
         } catch (err) {
           console.error("[vortex-mcp] message parse error:", err);

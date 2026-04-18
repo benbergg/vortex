@@ -1,5 +1,5 @@
 import type { NmRequest, NmResponse } from "@bytenew/vortex-shared";
-import { VtxErrorCode } from "@bytenew/vortex-shared";
+import { VtxError, VtxErrorCode } from "@bytenew/vortex-shared";
 
 type Handler = (args: Record<string, unknown>, tabId?: number) => Promise<unknown>;
 
@@ -30,6 +30,15 @@ export class ActionRouter {
       const result = await handler(request.args, request.tabId);
       return { type: "tool_response", requestId: request.requestId, result };
     } catch (err) {
+      // VtxError 走优先通道：保留完整 payload（code + hint + recoverable + context）
+      if (err instanceof VtxError) {
+        return {
+          type: "tool_response",
+          requestId: request.requestId,
+          error: err.toJSON(),
+        };
+      }
+      // 非 VtxError 的兜底：按 message 粗粒度推断 code（legacy 兼容）
       const message = err instanceof Error ? err.message : String(err);
       const code =
         message.includes("No tab") ? VtxErrorCode.TAB_NOT_FOUND :

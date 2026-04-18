@@ -1,4 +1,4 @@
-import { JsActions } from "@bytenew/vortex-shared";
+import { JsActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 
@@ -6,7 +6,7 @@ export function registerJsHandlers(router: ActionRouter): void {
   router.registerAll({
     [JsActions.EVALUATE]: async (args, tabId) => {
       const code = args.code as string;
-      if (!code) throw new Error("Missing required param: code");
+      if (!code) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: code");
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -19,13 +19,13 @@ export function registerJsHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(VtxErrorCode.JS_EXECUTION_ERROR, res.error);
       return res?.result;
     },
 
     [JsActions.EVALUATE_ASYNC]: async (args, tabId) => {
       const code = args.code as string;
-      if (!code) throw new Error("Missing required param: code");
+      if (!code) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: code");
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -40,14 +40,14 @@ export function registerJsHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(VtxErrorCode.JS_EXECUTION_ERROR, res.error);
       return res?.result;
     },
 
     [JsActions.CALL_FUNCTION]: async (args, tabId) => {
       const name = args.name as string;
       const fnArgs = (args.args as unknown[]) ?? [];
-      if (!name) throw new Error("Missing required param: name");
+      if (!name) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: name");
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -63,7 +63,12 @@ export function registerJsHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) {
+        const code = res.error.endsWith("is not a function")
+          ? VtxErrorCode.INVALID_PARAMS
+          : VtxErrorCode.JS_EXECUTION_ERROR;
+        throw vtxError(code, res.error);
+      }
       return res?.result;
     },
   });

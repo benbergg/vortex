@@ -13,6 +13,24 @@ import {
   getImageSize,
   estimateImageBytes,
 } from "./lib/image-utils.js";
+import { eventStore } from "./lib/event-store.js";
+import type { VtxEventLevel } from "@bytenew/vortex-shared";
+
+type ContentItem =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string };
+
+/** 普通 tool response 附加 piggyback 事件 */
+function withEvents(content: ContentItem[]): { content: ContentItem[] } {
+  const events = eventStore.drain();
+  if (events.length > 0) {
+    content.push({
+      type: "text",
+      text: `[vortex-events] ${events.length} event(s) delivered:\n${JSON.stringify(events, null, 2)}`,
+    });
+  }
+  return { content };
+}
 
 const PORT = parseInt(process.env.VORTEX_PORT ?? "6800");
 const DEFAULT_TIMEOUT = parseInt(process.env.VORTEX_TIMEOUT_MS ?? "30000");
@@ -47,6 +65,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   const params = (args ?? {}) as Record<string, unknown>;
+
+  // 特殊 tool: events 订阅管理（MCP 本地状态，不经过 vortex-server）
+  if (toolDef.action === "__mcp_events_subscribe__") {
+    const subId = eventStore.subscribe({
+      types: params.types as string[] | undefined,
+      minLevel: params.minLevel as VtxEventLevel | undefined,
+      tabId: params.tabId as number | undefined,
+    });
+    return {
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify({
+          subscriptionId: subId,
+          note: "Events will be piggybacked to subsequent tool responses in a `[vortex-events]` text item.",
+        }, null, 2),
+      }],
+    };
+  }
+
+  if (toolDef.action === "__mcp_events_unsubscribe__") {
+    const ok = eventStore.unsubscribe(params.subscriptionId as string);
+    return {
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify({ unsubscribed: ok }, null, 2),
+      }],
+    };
+  }
 
   // 特殊 tool: vortex_ping（MCP 自身诊断）
   if (toolDef.action === "__mcp_ping__") {
@@ -114,30 +160,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (mode === "file") {
           const prefix = toolDef.action.replace(/\./g, "-");
           const { path, bytes: savedBytes } = saveBase64Image(result.dataUrl, prefix);
-          return {
-            content: [{
-              type: "text" as const,
-              text: JSON.stringify({
-                savedTo: path,
-                width,
-                height,
-                bytes: savedBytes,
-                note: "Image saved to file to conserve tokens. Use the Read tool with the savedTo path to view it.",
-              }, null, 2),
-            }],
-          };
+          return withEvents([{
+            type: "text" as const,
+            text: JSON.stringify({
+              savedTo: path,
+              width,
+              height,
+              bytes: savedBytes,
+              note: "Image saved to file to conserve tokens. Use the Read tool with the savedTo path to view it.",
+            }, null, 2),
+          }]);
         }
 
         // inline 模式
         const m = result.dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
         if (m) {
-          return {
-            content: [{
-              type: "image" as const,
-              data: m[2],
-              mimeType: `image/${m[1]}`,
-            }],
-          };
+          return withEvents([{
+            type: "image" as const,
+            data: m[2],
+            mimeType: `image/${m[1]}`,
+          }]);
         }
       }
     }
@@ -146,17 +188,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const resultText = JSON.stringify(resp.result ?? resp, null, 2);
     if (resultText.length > RESPONSE_SIZE_LIMIT) {
       const truncated = resultText.slice(0, RESPONSE_SIZE_LIMIT);
-      return {
-        content: [{
-          type: "text" as const,
-          text: truncated + `\n\n[TRUNCATED: response was ${resultText.length} bytes, showing first ${RESPONSE_SIZE_LIMIT}. Use filter/pagination parameters for smaller responses.]`,
-        }],
-      };
+      return withEvents([{
+        type: "text" as const,
+        text: truncated + `\n\n[TRUNCATED: response was ${resultText.length} bytes, showing first ${RESPONSE_SIZE_LIMIT}. Use filter/pagination parameters for smaller responses.]`,
+      }]);
     }
 
-    return {
-      content: [{ type: "text" as const, text: resultText }],
-    };
+    return withEvents([{ type: "text" as const, text: resultText }]);
   } catch (err: any) {
     const msg = err?.message ?? String(err);
     let friendly = msg;

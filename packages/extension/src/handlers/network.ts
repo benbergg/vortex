@@ -1,9 +1,10 @@
 // packages/extension/src/handlers/network.ts
 
-import { NetworkActions } from "@bytenew/vortex-shared";
+import { NetworkActions, VtxErrorCode, vtxError, VtxEventType } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import type { NativeMessagingClient } from "../lib/native-messaging.js";
+import type { EventDispatcher } from "../events/dispatcher.js";
 
 interface NetworkEntry {
   requestId: string;
@@ -45,7 +46,7 @@ const responseBodies = new Map<string, { tabId: number; body: string; encoding: 
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
+  if (!tab?.id) throw vtxError(VtxErrorCode.TAB_NOT_FOUND, "No active tab found");
   return tab.id;
 }
 
@@ -69,6 +70,7 @@ export function registerNetworkHandlers(
   router: ActionRouter,
   debuggerMgr: DebuggerManager,
   nm: NativeMessagingClient,
+  dispatcher: EventDispatcher,
 ): void {
   debuggerMgr.onEvent((tabId, method, params: any) => {
     if (!subscribedTabs.has(tabId)) return;
@@ -134,6 +136,22 @@ export function registerNetworkHandlers(
           },
           tabId,
         });
+
+        // 4xx/5xx 作为 NETWORK_ERROR_DETECTED 上报（notice 级）
+        if (pending.status && pending.status >= 400) {
+          dispatcher.emit(
+            VtxEventType.NETWORK_ERROR_DETECTED,
+            {
+              requestId: pending.requestId,
+              url: pending.url,
+              method: pending.method,
+              status: pending.status,
+              statusText: pending.statusText,
+              duration: pending.duration,
+            },
+            { tabId },
+          );
+        }
       }
     }
 
@@ -179,6 +197,19 @@ export function registerNetworkHandlers(
           },
           tabId,
         });
+
+        // 加载失败（DNS / connection / abort 等）亦作为 NETWORK_ERROR_DETECTED
+        dispatcher.emit(
+          VtxEventType.NETWORK_ERROR_DETECTED,
+          {
+            requestId: pending.requestId,
+            url: pending.url,
+            method: pending.method,
+            error: pending.error,
+            duration: pending.duration,
+          },
+          { tabId },
+        );
       }
     }
   });
@@ -282,7 +313,7 @@ export function registerNetworkHandlers(
 
     [NetworkActions.GET_RESPONSE_BODY]: async (args, tabId) => {
       const requestId = args.requestId as string;
-      if (!requestId) throw new Error("requestId is required");
+      if (!requestId) throw vtxError(VtxErrorCode.INVALID_PARAMS, "requestId is required");
       const cached = responseBodies.get(requestId);
       if (cached) {
         return { requestId, body: cached.body, encoding: cached.encoding };
@@ -293,10 +324,20 @@ export function registerNetworkHandlers(
           const result = await debuggerMgr.sendCommand(tid, "Network.getResponseBody", { requestId }) as any;
           return { requestId, body: result.body, encoding: result.base64Encoded ? "base64" : "text" };
         } catch {
-          throw new Error(`Response body not available for ${requestId}`);
+          throw vtxError(
+            VtxErrorCode.INTERNAL_ERROR,
+            `Response body not available for ${requestId}`,
+            { extras: { requestId } },
+            { hint: "Response body may have been 204/redirect or evicted from cache. Re-subscribe and retry." },
+          );
         }
       }
-      throw new Error(`Response body not found for ${requestId}`);
+      throw vtxError(
+        VtxErrorCode.INTERNAL_ERROR,
+        `Response body not found for ${requestId}`,
+        { extras: { requestId } },
+        { hint: "Subscribe to network events before capturing requests (vortex_network_subscribe)." },
+      );
     },
   });
 }

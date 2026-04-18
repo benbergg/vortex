@@ -1,4 +1,4 @@
-import { MouseActions } from "@bytenew/vortex-shared";
+import { MouseActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId } from "../lib/tab-utils.js";
@@ -31,7 +31,7 @@ export function registerMouseHandlers(
       const x = args.x as number;
       const y = args.y as number;
       const button = (args.button as "left" | "right" | "middle") ?? "left";
-      if (x == null || y == null) throw new Error("x and y are required");
+      if (x == null || y == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "x and y are required");
 
       await debuggerMgr.attach(tid);
       await dispatchMouse(debuggerMgr, tid, "mouseMoved", x, y, button);
@@ -45,7 +45,7 @@ export function registerMouseHandlers(
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const x = args.x as number;
       const y = args.y as number;
-      if (x == null || y == null) throw new Error("x and y are required");
+      if (x == null || y == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "x and y are required");
 
       await debuggerMgr.attach(tid);
       await dispatchMouse(debuggerMgr, tid, "mouseMoved", x, y);
@@ -61,7 +61,7 @@ export function registerMouseHandlers(
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const x = args.x as number;
       const y = args.y as number;
-      if (x == null || y == null) throw new Error("x and y are required");
+      if (x == null || y == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "x and y are required");
 
       await debuggerMgr.attach(tid);
       await dispatchMouse(debuggerMgr, tid, "mouseMoved", x, y);

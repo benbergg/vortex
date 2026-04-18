@@ -1,4 +1,4 @@
-import { KeyboardActions } from "@bytenew/vortex-shared";
+import { KeyboardActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 
@@ -34,7 +34,7 @@ const MODIFIERS: Record<string, number> = {
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
+  if (!tab?.id) throw vtxError(VtxErrorCode.TAB_NOT_FOUND, "No active tab found");
   return tab.id;
 }
 
@@ -73,7 +73,7 @@ export function registerKeyboardHandlers(
     [KeyboardActions.PRESS]: async (args, tabId) => {
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const key = args.key as string;
-      if (!key) throw new Error("key is required");
+      if (!key) throw vtxError(VtxErrorCode.INVALID_PARAMS, "key is required");
 
       await debuggerMgr.attach(tid);
       await dispatchKey(debuggerMgr, tid, key, 0);
@@ -83,7 +83,7 @@ export function registerKeyboardHandlers(
     [KeyboardActions.SHORTCUT]: async (args, tabId) => {
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const keys = args.keys as string[];
-      if (!keys || keys.length < 2) throw new Error("keys must be an array of at least 2 keys");
+      if (!keys || keys.length < 2) throw vtxError(VtxErrorCode.INVALID_PARAMS, "keys must be an array of at least 2 keys");
 
       await debuggerMgr.attach(tid);
 
