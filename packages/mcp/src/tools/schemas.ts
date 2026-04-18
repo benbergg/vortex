@@ -234,6 +234,49 @@ function framesTools(): ToolDef[] {
   ];
 }
 
+function observeTools(): ToolDef[] {
+  return [
+    {
+      name: "vortex_observe",
+      action: "observe.snapshot",
+      description:
+        "Get an LLM-friendly snapshot of the page in ONE call: indexed interactive elements (button/link/input/select/etc.) with role, accessible name, bbox, and key attributes. Prefer this over multiple dom.query calls when exploring what the page can do. Returns a snapshotId for future dom.* calls that accept `index` (coming in W3). Failures: TAB_NOT_FOUND, JS_EXECUTION_ERROR.",
+      schema: {
+        type: "object",
+        properties: {
+          viewport: {
+            type: "string",
+            enum: ["visible", "full"],
+            description:
+              "visible: only elements within the current viewport (default). full: all interactive elements in the page.",
+            default: "visible",
+          },
+          maxElements: {
+            type: "number",
+            description: "Max elements to return (default 200).",
+            default: 200,
+          },
+          includeAX: {
+            type: "boolean",
+            description:
+              "Infer ARIA role (default true). Set false for raw tag names only.",
+            default: true,
+          },
+          includeText: {
+            type: "boolean",
+            description:
+              "Compute accessible name from aria-label/labels/innerText (default true).",
+            default: true,
+          },
+          ...optionalTabId,
+          ...optionalFrameId,
+        },
+        required: [],
+      },
+    },
+  ];
+}
+
 function diagnosticsTools(): ToolDef[] {
   return [
     {
@@ -248,6 +291,7 @@ function diagnosticsTools(): ToolDef[] {
 export function getAllToolDefs(): ToolDef[] {
   return [
     ...diagnosticsTools(),
+    ...observeTools(),
     ...tabTools(),
     ...pageTools(),
     ...domTools(),

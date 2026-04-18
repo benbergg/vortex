@@ -15,6 +15,7 @@ import { registerCaptureHandlers } from "./handlers/capture.js";
 import { registerKeyboardHandlers } from "./handlers/keyboard.js";
 import { registerMouseHandlers } from "./handlers/mouse.js";
 import { registerFileHandlers } from "./handlers/file.js";
+import { registerObserveHandlers } from "./handlers/observe.js";
 
 const router = new ActionRouter();
 const debuggerMgr = new DebuggerManager();
@@ -28,6 +29,7 @@ registerDomHandlers(router, debuggerMgr);
 registerContentHandlers(router);
 registerStorageHandlers(router);
 registerCaptureHandlers(router, debuggerMgr);
+registerObserveHandlers(router);
 
 // NM 客户端
 const nm = new NativeMessagingClient(
