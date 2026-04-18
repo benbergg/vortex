@@ -3,14 +3,19 @@ import type { ActionRouter } from "../lib/router.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 
 /**
- * Snapshot 索引到 tab/frame 的映射，供后续 dom.* 工具按 index 操作使用。
- * 当前 MVP 只存 tab/frame/时间戳，不存 per-element selector；
- * dom.* index 支持在 W3 阶段接入时会扩展此结构。
+ * Snapshot 的每个 index 与定位 selector 的映射，
+ * 供 W3 dom.* 工具 `{ snapshotId, index }` 参数用来反查元素。
  */
+interface SnapshotElement {
+  index: number;
+  selector: string;
+}
+
 interface SnapshotEntry {
   tabId: number;
   frameId?: number;
   capturedAt: number;
+  elements: SnapshotElement[];
 }
 
 const snapshots = new Map<string, SnapshotEntry>();
@@ -28,9 +33,25 @@ function gcSnapshots(): void {
   }
 }
 
-/** 供 W3 dom.* index 接入使用 */
 export function getSnapshotEntry(snapshotId: string): SnapshotEntry | undefined {
   return snapshots.get(snapshotId);
+}
+
+/**
+ * W3 dom.* 工具按 index 回查 element 的入口。
+ * 返回定位该元素所需的 tab/frame/selector。
+ * snapshotId 过期或 index 不存在时返回 undefined，调用方据此抛
+ * STALE_SNAPSHOT / INVALID_INDEX。
+ */
+export function resolveSnapshotIndex(
+  snapshotId: string,
+  index: number,
+): { tabId: number; frameId?: number; selector: string } | undefined {
+  const entry = snapshots.get(snapshotId);
+  if (!entry) return undefined;
+  const hit = entry.elements.find((e) => e.index === index);
+  if (!hit) return undefined;
+  return { tabId: entry.tabId, frameId: entry.frameId, selector: hit.selector };
 }
 
 export function registerObserveHandlers(router: ActionRouter): void {
@@ -128,6 +149,63 @@ export function registerObserveHandlers(router: ActionRouter): void {
             return (el.innerText || "").trim().slice(0, 80);
           }
 
+          /**
+           * 生成稳定的 CSS selector：id > data-testid > path。
+           * path 路径最多 8 层，含 nth-of-type 消歧义。
+           */
+          function buildSelector(el: Element): string {
+            if (el.id && /^[a-zA-Z][\w-]*$/.test(el.id)) return `#${CSS.escape(el.id)}`;
+            const testId =
+              el.getAttribute("data-testid") || el.getAttribute("data-test");
+            if (testId) {
+              const attr = el.getAttribute("data-testid") ? "data-testid" : "data-test";
+              return `[${attr}="${testId.replace(/"/g, '\\"')}"]`;
+            }
+            const parts: string[] = [];
+            let cur: Element | null = el;
+            let depth = 0;
+            while (cur && cur.nodeType === 1 && depth < 8) {
+              const parent = cur.parentElement;
+              if (!parent) {
+                parts.unshift(cur.tagName.toLowerCase());
+                break;
+              }
+              const sameTagSiblings = Array.from(parent.children).filter(
+                (c) => c.tagName === cur!.tagName,
+              );
+              const tag = cur.tagName.toLowerCase();
+              if (sameTagSiblings.length > 1) {
+                const idx = sameTagSiblings.indexOf(cur) + 1;
+                parts.unshift(`${tag}:nth-of-type(${idx})`);
+              } else {
+                parts.unshift(tag);
+              }
+              if (parent.tagName === "BODY" || parent.tagName === "HTML") {
+                parts.unshift(parent.tagName.toLowerCase());
+                break;
+              }
+              cur = parent;
+              depth++;
+            }
+            return parts.join(" > ");
+          }
+
+          /**
+           * 描述用于 occludedBy 字段的简要 selector，
+           * 格式 "tag#id.class1.class2"。不用于定位，仅供 LLM 识别遮挡者。
+           */
+          function describeElement(el: Element): string {
+            const classStr =
+              typeof el.className === "string" && el.className
+                ? "." + el.className.split(" ").filter(Boolean).join(".")
+                : "";
+            return (
+              el.tagName.toLowerCase() +
+              (el.id ? `#${el.id}` : "") +
+              classStr
+            );
+          }
+
           const nodeList = document.querySelectorAll(INTERACTIVE_SELECTORS);
           const elements: Array<{
             index: number;
@@ -137,7 +215,9 @@ export function registerObserveHandlers(router: ActionRouter): void {
             bbox: { x: number; y: number; w: number; h: number };
             visible: boolean;
             inViewport: boolean;
+            occludedBy?: string;
             attrs: Record<string, string>;
+            _sel: string;
           }> = [];
           let idx = 0;
 
@@ -153,6 +233,30 @@ export function registerObserveHandlers(router: ActionRouter): void {
               rect.left < window.innerWidth &&
               rect.right > 0;
             if (mode === "visible" && !inViewport) continue;
+
+            // Paint-order 遮挡检测（只在视口内执行 elementFromPoint）
+            let visible = true;
+            let occludedBy: string | undefined;
+            if (inViewport) {
+              const cx = Math.max(
+                0,
+                Math.min(window.innerWidth - 1, rect.left + rect.width / 2),
+              );
+              const cy = Math.max(
+                0,
+                Math.min(window.innerHeight - 1, rect.top + rect.height / 2),
+              );
+              const topEl = document.elementFromPoint(cx, cy);
+              if (
+                topEl &&
+                topEl !== htmlEl &&
+                !htmlEl.contains(topEl) &&
+                !topEl.contains(htmlEl)
+              ) {
+                visible = false;
+                occludedBy = describeElement(topEl);
+              }
+            }
 
             const attrs: Record<string, string> = {};
             for (const attrName of COLLECTED_ATTRS) {
@@ -174,9 +278,11 @@ export function registerObserveHandlers(router: ActionRouter): void {
                 w: Math.round(rect.width),
                 h: Math.round(rect.height),
               },
-              visible: true,
+              visible,
               inViewport,
+              occludedBy,
               attrs,
+              _sel: buildSelector(htmlEl),
             });
           }
 
@@ -207,8 +313,24 @@ export function registerObserveHandlers(router: ActionRouter): void {
             url: string;
             title: string;
             viewport: Record<string, number>;
-            elements: unknown[];
-            meta: { capturedAt: number; candidateCount: number; returnedCount: number; truncated: boolean };
+            elements: Array<{
+              index: number;
+              tag: string;
+              role: string;
+              name: string;
+              bbox: { x: number; y: number; w: number; h: number };
+              visible: boolean;
+              inViewport: boolean;
+              occludedBy?: string;
+              attrs: Record<string, string>;
+              _sel: string;
+            }>;
+            meta: {
+              capturedAt: number;
+              candidateCount: number;
+              returnedCount: number;
+              truncated: boolean;
+            };
           }
         | undefined;
 
@@ -220,16 +342,28 @@ export function registerObserveHandlers(router: ActionRouter): void {
         );
       }
 
+      // 剥离内部 selector（不回给 LLM），单独存进 snapshot entry
+      const elementsOut = pageResult.elements.map(({ _sel, ...rest }) => rest);
+      const elementMap: SnapshotElement[] = pageResult.elements.map((e) => ({
+        index: e.index,
+        selector: e._sel,
+      }));
+
       const snapshotId = newSnapshotId();
       snapshots.set(snapshotId, {
         tabId: tid,
         frameId,
         capturedAt: pageResult.meta.capturedAt,
+        elements: elementMap,
       });
 
       return {
         snapshotId,
-        ...pageResult,
+        url: pageResult.url,
+        title: pageResult.title,
+        viewport: pageResult.viewport,
+        elements: elementsOut,
+        meta: pageResult.meta,
       };
     },
   });
