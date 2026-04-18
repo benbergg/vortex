@@ -1,4 +1,4 @@
-import { DomActions } from "@bytenew/vortex-shared";
+import { DomActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
@@ -11,7 +11,7 @@ export function registerDomHandlers(
   router.registerAll({
     [DomActions.QUERY]: async (args, tabId) => {
       const selector = args.selector as string;
-      if (!selector) throw new Error("Missing required param: selector");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -41,13 +41,13 @@ export function registerDomHandlers(
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
     [DomActions.QUERY_ALL]: async (args, tabId) => {
       const selector = args.selector as string;
-      if (!selector) throw new Error("Missing required param: selector");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -78,13 +78,13 @@ export function registerDomHandlers(
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
     [DomActions.CLICK]: async (args, tabId) => {
       const selector = args.selector as string;
-      if (!selector) throw new Error("Missing required param: selector");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
       const useRealMouse = args.useRealMouse as boolean | undefined;
@@ -111,7 +111,7 @@ export function registerDomHandlers(
           world: "MAIN",
         });
         const rectRes = rectResults[0]?.result as { result?: any; error?: string };
-        if (rectRes?.error) throw new Error(rectRes.error);
+        if (rectRes?.error) throw vtxError(rectRes.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, rectRes.error, { selector });
         const { x: cx, y: cy, tag, text } = rectRes.result;
 
         // iframe 坐标偏移
@@ -165,7 +165,7 @@ export function registerDomHandlers(
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
@@ -173,8 +173,8 @@ export function registerDomHandlers(
       const selector = args.selector as string;
       const text = args.text as string;
       const delay = (args.delay as number | undefined) ?? 0;
-      if (!selector) throw new Error("Missing required param: selector");
-      if (text == null) throw new Error("Missing required param: text");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
+      if (text == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: text");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -206,15 +206,15 @@ export function registerDomHandlers(
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
     [DomActions.FILL]: async (args, tabId) => {
       const selector = args.selector as string;
       const value = args.value as string;
-      if (!selector) throw new Error("Missing required param: selector");
-      if (value == null) throw new Error("Missing required param: value");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
+      if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -243,15 +243,15 @@ export function registerDomHandlers(
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
     [DomActions.SELECT]: async (args, tabId) => {
       const selector = args.selector as string;
       const value = args.value as string;
-      if (!selector) throw new Error("Missing required param: selector");
-      if (value == null) throw new Error("Missing required param: value");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
+      if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -271,7 +271,7 @@ export function registerDomHandlers(
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
@@ -346,13 +346,13 @@ export function registerDomHandlers(
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
     [DomActions.HOVER]: async (args, tabId) => {
       const selector = args.selector as string;
-      if (!selector) throw new Error("Missing required param: selector");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -372,15 +372,15 @@ export function registerDomHandlers(
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
     [DomActions.GET_ATTRIBUTE]: async (args, tabId) => {
       const selector = args.selector as string;
       const attribute = args.attribute as string;
-      if (!selector) throw new Error("Missing required param: selector");
-      if (!attribute) throw new Error("Missing required param: attribute");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
+      if (!attribute) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: attribute");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -398,7 +398,7 @@ export function registerDomHandlers(
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
@@ -442,14 +442,14 @@ export function registerDomHandlers(
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
     [DomActions.WAIT_FOR_MUTATION]: async (args, tabId) => {
       const selector = args.selector as string;
       const timeout = (args.timeout as number | undefined) ?? 10000;
-      if (!selector) throw new Error("Missing required param: selector");
+      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
       const results = await chrome.scripting.executeScript({
@@ -488,7 +488,7 @@ export function registerDomHandlers(
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
   });
