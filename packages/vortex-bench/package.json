@@ -1,0 +1,30 @@
+{
+  "name": "@bytenew/vortex-bench",
+  "version": "0.2.0-beta.1",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "vortex-bench": "dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "bench": "node dist/index.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "@bytenew/vortex-shared": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.27.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  }
+}

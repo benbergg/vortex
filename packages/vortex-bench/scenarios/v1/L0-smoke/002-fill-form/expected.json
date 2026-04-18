@@ -1,0 +1,10 @@
+{
+  "layer": "L0",
+  "budgetSteps": 12,
+  "budgetTokens": 80000,
+  "assertions": [
+    { "type": "agent_success" },
+    { "type": "text_in_page", "value": "OK name=Alice email=alice@example.com" },
+    { "type": "no_error_codes" }
+  ]
+}

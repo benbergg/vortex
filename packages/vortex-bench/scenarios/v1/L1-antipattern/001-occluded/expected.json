@@ -1,0 +1,10 @@
+{
+  "layer": "L1",
+  "expectedErrorCode": "ELEMENT_OCCLUDED",
+  "budgetSteps": 15,
+  "budgetTokens": 120000,
+  "assertions": [
+    { "type": "agent_success" },
+    { "type": "url_contains", "value": "?done=1" }
+  ]
+}

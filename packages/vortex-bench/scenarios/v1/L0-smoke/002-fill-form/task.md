@@ -1,0 +1,1 @@
+Use the browser's active tab. Navigate to `{{FIXTURE_URL}}/smoke/fill-form`. Fill in the Name field with "Alice" and the Email field with "alice@example.com". Then click the Submit button. Stop when done.
