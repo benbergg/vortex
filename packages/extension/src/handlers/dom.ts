@@ -91,29 +91,87 @@ export function registerDomHandlers(
       const useRealMouse = args.useRealMouse as boolean | undefined;
 
       if (useRealMouse) {
-        // 取元素中心坐标
+        // 取元素中心坐标（含完整探测，与普通 CLICK 路径同步）
         const rectResults = await chrome.scripting.executeScript({
           target: buildExecuteTarget(tid, frameId),
           func: (sel: string) => {
-            const el = document.querySelector(sel) as HTMLElement | null;
-            if (!el) return { error: `Element not found: ${sel}` };
-            el.scrollIntoView({ block: "center", inline: "center" });
-            const r = el.getBoundingClientRect();
-            return {
-              result: {
-                x: r.left + r.width / 2,
-                y: r.top + r.height / 2,
-                tag: el.tagName.toLowerCase(),
-                text: el.innerText?.slice(0, 200),
-              },
-            };
+            try {
+              // === 探测 ===
+              const els = document.querySelectorAll(sel);
+              if (els.length === 0) {
+                return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
+              }
+              if (els.length > 1) {
+                return {
+                  errorCode: "SELECTOR_AMBIGUOUS",
+                  error: `Selector "${sel}" matched ${els.length} elements`,
+                  extras: { matchCount: els.length },
+                };
+              }
+              const el = els[0] as HTMLElement;
+              if ((el as HTMLInputElement).disabled === true) {
+                return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
+              }
+              const rect0 = el.getBoundingClientRect();
+              if (rect0.width === 0 || rect0.height === 0) {
+                return {
+                  errorCode: "ELEMENT_DETACHED",
+                  error: `Element ${sel} has zero dimensions (detached or hidden)`,
+                };
+              }
+              // useRealMouse 会 scrollIntoView，所以不做 offscreen 检查
+              el.scrollIntoView({ block: "center", inline: "center" });
+              const rect = el.getBoundingClientRect();
+              const cxInner = rect.left + rect.width / 2;
+              const cyInner = rect.top + rect.height / 2;
+              // occlusion 检查
+              const topEl = document.elementFromPoint(cxInner, cyInner);
+              if (topEl && topEl !== el && !el.contains(topEl) && !topEl.contains(el)) {
+                const classStr =
+                  typeof topEl.className === "string" && topEl.className
+                    ? "." + topEl.className.split(" ").filter(Boolean).join(".")
+                    : "";
+                const desc =
+                  topEl.tagName.toLowerCase() +
+                  (topEl.id ? "#" + topEl.id : "") +
+                  classStr;
+                return {
+                  errorCode: "ELEMENT_OCCLUDED",
+                  error: `Element ${sel} is covered by <${desc}>`,
+                  extras: { blocker: desc },
+                };
+              }
+              return {
+                result: {
+                  x: cxInner,
+                  y: cyInner,
+                  tag: el.tagName.toLowerCase(),
+                  text: el.innerText?.slice(0, 200),
+                },
+              };
+            } catch (err) {
+              return { error: err instanceof Error ? err.message : String(err) };
+            }
           },
           args: [selector],
           world: "MAIN",
         });
-        const rectRes = rectResults[0]?.result as { result?: any; error?: string };
-        if (rectRes?.error) throw vtxError(rectRes.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, rectRes.error, { selector });
-        const { x: cx, y: cy, tag, text } = rectRes.result;
+        const rectRes = rectResults[0]?.result as {
+          result?: { x: number; y: number; tag: string; text?: string };
+          error?: string;
+          errorCode?: string;
+          extras?: Record<string, unknown>;
+        };
+        if (rectRes?.error) {
+          const code: VtxErrorCode =
+            rectRes.errorCode && rectRes.errorCode in VtxErrorCode
+              ? (rectRes.errorCode as VtxErrorCode)
+              : rectRes.error.startsWith("Element not found:")
+                ? VtxErrorCode.ELEMENT_NOT_FOUND
+                : VtxErrorCode.JS_EXECUTION_ERROR;
+          throw vtxError(code, rectRes.error, { selector, extras: rectRes.extras });
+        }
+        const { x: cx, y: cy, tag, text } = rectRes.result!;
 
         // iframe 坐标偏移
         const { x: offsetX, y: offsetY } = await getIframeOffset(tid, frameId);
@@ -250,16 +308,47 @@ export function registerDomHandlers(
         target: buildExecuteTarget(tid, frameId),
         func: async (sel: string, txt: string, delayMs: number) => {
           try {
-            const el = document.querySelector(sel) as HTMLElement | null;
-            if (!el) return { error: `Element not found: ${sel}` };
+            // === 探测（与 CLICK 同步；见 CLICK 普通路径）===
+            const els = document.querySelectorAll(sel);
+            if (els.length === 0) {
+              return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
+            }
+            if (els.length > 1) {
+              return {
+                errorCode: "SELECTOR_AMBIGUOUS",
+                error: `Selector "${sel}" matched ${els.length} elements`,
+                extras: { matchCount: els.length },
+              };
+            }
+            const el = els[0] as HTMLInputElement;
+            if (el.disabled === true) {
+              return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
+            }
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+              return {
+                errorCode: "ELEMENT_DETACHED",
+                error: `Element ${sel} has zero dimensions (detached or hidden)`,
+              };
+            }
+            const inView =
+              rect.top < window.innerHeight &&
+              rect.bottom > 0 &&
+              rect.left < window.innerWidth &&
+              rect.right > 0;
+            if (!inView) {
+              return {
+                errorCode: "ELEMENT_OFFSCREEN",
+                error: `Element ${sel} is outside the viewport`,
+              };
+            }
+            // === type 操作 ===
             el.focus();
             for (const char of txt) {
               const eventInit = { key: char, bubbles: true, cancelable: true };
               el.dispatchEvent(new KeyboardEvent("keydown", eventInit));
               el.dispatchEvent(new KeyboardEvent("keypress", eventInit));
-              if ((el as HTMLInputElement).value !== undefined) {
-                (el as HTMLInputElement).value += char;
-              }
+              if (el.value !== undefined) el.value += char;
               el.dispatchEvent(new InputEvent("input", { bubbles: true, data: char }));
               el.dispatchEvent(new KeyboardEvent("keyup", eventInit));
               if (delayMs > 0) {
@@ -274,8 +363,21 @@ export function registerDomHandlers(
         args: [selector, text, delay ?? 0],
         world: "MAIN",
       });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+      const res = results[0]?.result as {
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      };
+      if (res?.error) {
+        const code: VtxErrorCode =
+          res.errorCode && res.errorCode in VtxErrorCode
+            ? (res.errorCode as VtxErrorCode)
+            : res.error.startsWith("Element not found:")
+              ? VtxErrorCode.ELEMENT_NOT_FOUND
+              : VtxErrorCode.JS_EXECUTION_ERROR;
+        throw vtxError(code, res.error, { selector, extras: res.extras });
+      }
       return res?.result;
     },
 
@@ -290,8 +392,41 @@ export function registerDomHandlers(
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string, val: string) => {
           try {
-            const el = document.querySelector(sel) as HTMLInputElement | null;
-            if (!el) return { error: `Element not found: ${sel}` };
+            // === 探测（与 CLICK 同步）===
+            const els = document.querySelectorAll(sel);
+            if (els.length === 0) {
+              return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
+            }
+            if (els.length > 1) {
+              return {
+                errorCode: "SELECTOR_AMBIGUOUS",
+                error: `Selector "${sel}" matched ${els.length} elements`,
+                extras: { matchCount: els.length },
+              };
+            }
+            const el = els[0] as HTMLInputElement;
+            if (el.disabled === true) {
+              return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
+            }
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+              return {
+                errorCode: "ELEMENT_DETACHED",
+                error: `Element ${sel} has zero dimensions (detached or hidden)`,
+              };
+            }
+            const inView =
+              rect.top < window.innerHeight &&
+              rect.bottom > 0 &&
+              rect.left < window.innerWidth &&
+              rect.right > 0;
+            if (!inView) {
+              return {
+                errorCode: "ELEMENT_OFFSCREEN",
+                error: `Element ${sel} is outside the viewport`,
+              };
+            }
+            // === fill 操作 ===
             const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
               window.HTMLInputElement.prototype,
               "value",
@@ -311,8 +446,21 @@ export function registerDomHandlers(
         args: [selector, value],
         world: "MAIN",
       });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+      const res = results[0]?.result as {
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      };
+      if (res?.error) {
+        const code: VtxErrorCode =
+          res.errorCode && res.errorCode in VtxErrorCode
+            ? (res.errorCode as VtxErrorCode)
+            : res.error.startsWith("Element not found:")
+              ? VtxErrorCode.ELEMENT_NOT_FOUND
+              : VtxErrorCode.JS_EXECUTION_ERROR;
+        throw vtxError(code, res.error, { selector, extras: res.extras });
+      }
       return res?.result;
     },
 
@@ -327,8 +475,41 @@ export function registerDomHandlers(
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string, val: string) => {
           try {
-            const el = document.querySelector(sel) as HTMLSelectElement | null;
-            if (!el) return { error: `Element not found: ${sel}` };
+            // === 探测（与 CLICK 同步）===
+            const els = document.querySelectorAll(sel);
+            if (els.length === 0) {
+              return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
+            }
+            if (els.length > 1) {
+              return {
+                errorCode: "SELECTOR_AMBIGUOUS",
+                error: `Selector "${sel}" matched ${els.length} elements`,
+                extras: { matchCount: els.length },
+              };
+            }
+            const el = els[0] as HTMLSelectElement;
+            if (el.disabled === true) {
+              return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
+            }
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+              return {
+                errorCode: "ELEMENT_DETACHED",
+                error: `Element ${sel} has zero dimensions (detached or hidden)`,
+              };
+            }
+            const inView =
+              rect.top < window.innerHeight &&
+              rect.bottom > 0 &&
+              rect.left < window.innerWidth &&
+              rect.right > 0;
+            if (!inView) {
+              return {
+                errorCode: "ELEMENT_OFFSCREEN",
+                error: `Element ${sel} is outside the viewport`,
+              };
+            }
+            // === select 操作 ===
             el.value = val;
             el.dispatchEvent(new Event("change", { bubbles: true }));
             return { result: { success: true, value: el.value } };
@@ -339,8 +520,21 @@ export function registerDomHandlers(
         args: [selector, value],
         world: "MAIN",
       });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+      const res = results[0]?.result as {
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      };
+      if (res?.error) {
+        const code: VtxErrorCode =
+          res.errorCode && res.errorCode in VtxErrorCode
+            ? (res.errorCode as VtxErrorCode)
+            : res.error.startsWith("Element not found:")
+              ? VtxErrorCode.ELEMENT_NOT_FOUND
+              : VtxErrorCode.JS_EXECUTION_ERROR;
+        throw vtxError(code, res.error, { selector, extras: res.extras });
+      }
       return res?.result;
     },
 
@@ -435,8 +629,27 @@ export function registerDomHandlers(
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
           try {
-            const el = document.querySelector(sel) as HTMLElement | null;
-            if (!el) return { error: `Element not found: ${sel}` };
+            // === 探测（与 CLICK 同步；HOVER 不检查 disabled，disabled 元素仍可收 hover 事件）===
+            const els = document.querySelectorAll(sel);
+            if (els.length === 0) {
+              return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
+            }
+            if (els.length > 1) {
+              return {
+                errorCode: "SELECTOR_AMBIGUOUS",
+                error: `Selector "${sel}" matched ${els.length} elements`,
+                extras: { matchCount: els.length },
+              };
+            }
+            const el = els[0] as HTMLElement;
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+              return {
+                errorCode: "ELEMENT_DETACHED",
+                error: `Element ${sel} has zero dimensions (detached or hidden)`,
+              };
+            }
+            // === hover 操作 ===
             el.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true, cancelable: true }));
             el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, cancelable: true }));
             return { result: { success: true } };
@@ -447,8 +660,21 @@ export function registerDomHandlers(
         args: [selector],
         world: "MAIN",
       });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+      const res = results[0]?.result as {
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      };
+      if (res?.error) {
+        const code: VtxErrorCode =
+          res.errorCode && res.errorCode in VtxErrorCode
+            ? (res.errorCode as VtxErrorCode)
+            : res.error.startsWith("Element not found:")
+              ? VtxErrorCode.ELEMENT_NOT_FOUND
+              : VtxErrorCode.JS_EXECUTION_ERROR;
+        throw vtxError(code, res.error, { selector, extras: res.extras });
+      }
       return res?.result;
     },
 
