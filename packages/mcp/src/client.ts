@@ -1,5 +1,6 @@
 import WebSocket from "ws";
 import type { VtxEvent, VtxRequest, VtxResponse } from "@bytenew/vortex-shared";
+import { VtxEventType } from "@bytenew/vortex-shared";
 import { eventStore } from "./lib/event-store.js";
 
 interface PendingRequest {
@@ -79,6 +80,7 @@ class VortexClient {
       });
 
       ws.on("close", () => {
+        const wasConnected = this.ws !== null;
         this.ws = null;
         this.connecting = null;
         // reject all pending
@@ -87,6 +89,16 @@ class VortexClient {
           p.reject(new Error("Connection closed before response"));
         }
         this.pending.clear();
+        // F5: 曾经成功连接过，则把意外断开作为 EXTENSION_DISCONNECTED 事件
+        // 注入 eventStore。首次连接失败（wasConnected=false）不推，避免误报。
+        if (wasConnected) {
+          eventStore.ingest({
+            event: VtxEventType.EXTENSION_DISCONNECTED,
+            data: { reason: "vortex-server WebSocket closed" },
+            level: "urgent",
+            timestamp: Date.now(),
+          });
+        }
       });
     });
 
