@@ -1,4 +1,5 @@
 import type { NmRequest } from "@bytenew/vortex-shared";
+import { VtxEventType } from "@bytenew/vortex-shared";
 import { NativeMessagingClient } from "./lib/native-messaging.js";
 import { ActionRouter } from "./lib/router.js";
 import { DebuggerManager } from "./lib/debugger-manager.js";
@@ -48,6 +49,20 @@ const nm = new NativeMessagingClient(
 // 事件分发器：需要 nm，后续 handler 都可借它上报事件
 const eventDispatcher = new EventDispatcher(nm);
 registerEventSources(eventDispatcher);
+
+// content script → background 的事件中继（F6/F7）
+chrome.runtime.onMessage.addListener((rawMsg, sender) => {
+  const msg = rawMsg as { source?: string; event?: string; data?: unknown } | null;
+  if (!msg || msg.source !== "vortex-content" || typeof msg.event !== "string") return;
+  const tabId = sender.tab?.id;
+  const frameId = sender.frameId;
+  // 仅中继已知事件类型，避免恶意页面通过 content bridge 注入假事件名
+  if (msg.event === VtxEventType.DIALOG_OPENED) {
+    eventDispatcher.emit(VtxEventType.DIALOG_OPENED, msg.data, { tabId, frameId });
+  } else if (msg.event === VtxEventType.FORM_SUBMITTED) {
+    eventDispatcher.emit(VtxEventType.FORM_SUBMITTED, msg.data, { tabId, frameId });
+  }
+});
 
 // 需要 debugger / nm / dispatcher 的 handler（必须在 nm + dispatcher 之后）
 registerConsoleHandlers(router, debuggerMgr, nm, eventDispatcher);
