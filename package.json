@@ -5,7 +5,9 @@
     "build": "pnpm -r build",
     "dev": "pnpm -r --parallel dev",
     "test": "pnpm -r test",
-    "clean": "pnpm -r clean"
+    "clean": "pnpm -r clean",
+    "lint:errors": "node scripts/check-throw-discipline.mjs",
+    "prebuild": "node scripts/check-throw-discipline.mjs"
   },
   "engines": {
     "node": ">=18"
