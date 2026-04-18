@@ -239,6 +239,55 @@ function framesTools(): ToolDef[] {
   ];
 }
 
+function eventsTools(): ToolDef[] {
+  return [
+    {
+      name: "vortex_events_subscribe",
+      action: "__mcp_events_subscribe__",
+      description:
+        "Subscribe to browser events (user tab switch/close, dialogs, downloads, page navigation, console errors, ...). Events are delivered piggybacked to subsequent tool responses as a [vortex-events] text item. Returns a subscription id. Default subscribes to all `urgent` level events.",
+      schema: {
+        type: "object",
+        properties: {
+          types: {
+            type: "array",
+            items: { type: "string" },
+            description:
+              "Event types to subscribe to. Omit to subscribe to all events at/above minLevel. Known: user.switched_tab, user.closed_tab, dialog.opened, download.completed, page.navigated, console.error, network.error_detected, form.submitted, dom.mutated, network.request.",
+          },
+          minLevel: {
+            type: "string",
+            enum: ["info", "notice", "urgent"],
+            description:
+              "Minimum level to deliver. Default: 'urgent' (only user-interruptible events).",
+            default: "urgent",
+          },
+          tabId: {
+            type: "number",
+            description: "Filter events to this tab only.",
+          },
+        },
+        required: [],
+      },
+    },
+    {
+      name: "vortex_events_unsubscribe",
+      action: "__mcp_events_unsubscribe__",
+      description: "Cancel an event subscription by id.",
+      schema: {
+        type: "object",
+        properties: {
+          subscriptionId: {
+            type: "string",
+            description: "Subscription id from vortex_events_subscribe.",
+          },
+        },
+        required: ["subscriptionId"],
+      },
+    },
+  ];
+}
+
 function observeTools(): ToolDef[] {
   return [
     {
@@ -296,6 +345,7 @@ function diagnosticsTools(): ToolDef[] {
 export function getAllToolDefs(): ToolDef[] {
   return [
     ...diagnosticsTools(),
+    ...eventsTools(),
     ...observeTools(),
     ...tabTools(),
     ...pageTools(),

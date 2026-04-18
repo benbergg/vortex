@@ -16,6 +16,7 @@ import { registerKeyboardHandlers } from "./handlers/keyboard.js";
 import { registerMouseHandlers } from "./handlers/mouse.js";
 import { registerFileHandlers } from "./handlers/file.js";
 import { registerObserveHandlers } from "./handlers/observe.js";
+import { EventDispatcher, registerEventSources } from "./events/dispatcher.js";
 
 const router = new ActionRouter();
 const debuggerMgr = new DebuggerManager();
@@ -50,6 +51,10 @@ registerNetworkHandlers(router, debuggerMgr, nm);
 registerKeyboardHandlers(router, debuggerMgr);
 registerMouseHandlers(router, debuggerMgr);
 registerFileHandlers(router, nm);
+
+// 事件分发器：监听 chrome.* 事件并通过 NM 推送
+const eventDispatcher = new EventDispatcher(nm);
+registerEventSources(eventDispatcher);
 
 console.log("[vortex] registered actions:", router.getRegisteredActions());
 nm.connect();
