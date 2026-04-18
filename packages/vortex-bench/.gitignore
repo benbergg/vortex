@@ -1,0 +1,9 @@
+.env
+.env.local
+dist/
+node_modules/
+
+# reports: keep baseline + gitignore dated runs
+reports/*.json
+!reports/baseline.json
+reports/*.md
