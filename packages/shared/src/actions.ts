@@ -109,6 +109,11 @@ export const ObserveActions = {
   SNAPSHOT: "observe.snapshot",
 } as const;
 
+export const EventsActions = {
+  /** 强制立即 flush dispatcher 的 notice+info buffer，绕过节流窗口 */
+  DRAIN: "events.drain",
+} as const;
+
 export type ActionString =
   | (typeof TabActions)[keyof typeof TabActions]
   | (typeof PageActions)[keyof typeof PageActions]
@@ -123,4 +128,5 @@ export type ActionString =
   | (typeof MouseActions)[keyof typeof MouseActions]
   | (typeof FramesActions)[keyof typeof FramesActions]
   | (typeof FileActions)[keyof typeof FileActions]
-  | (typeof ObserveActions)[keyof typeof ObserveActions];
+  | (typeof ObserveActions)[keyof typeof ObserveActions]
+  | (typeof EventsActions)[keyof typeof EventsActions];
