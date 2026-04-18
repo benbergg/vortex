@@ -22,11 +22,12 @@ export const VtxErrorCode = {
   TAB_NOT_FOUND: "TAB_NOT_FOUND",
   TAB_CLOSED: "TAB_CLOSED",
 
-  // -- 执行与权限（4 类）--
+  // -- 执行与权限（5 类）--
   TIMEOUT: "TIMEOUT",
   JS_EXECUTION_ERROR: "JS_EXECUTION_ERROR",
   PERMISSION_DENIED: "PERMISSION_DENIED",
   CSP_BLOCKED: "CSP_BLOCKED",
+  INTERNAL_ERROR: "INTERNAL_ERROR",
 
   // -- 传输层（4 类）--
   NATIVE_MESSAGING_ERROR: "NATIVE_MESSAGING_ERROR",
@@ -43,6 +44,8 @@ export interface VtxErrorContext {
   snapshotId?: string;
   tabId?: number;
   frameId?: number;
+  /** 兜底字段：存放 handler 场景特有的结构化信息（如遮挡元素 tag、目标 URL、action 名等） */
+  extras?: Record<string, unknown>;
 }
 
 export interface VtxErrorPayload {
@@ -74,5 +77,9 @@ export class VtxError extends Error {
     if (this.extra?.recoverable !== undefined) payload.recoverable = this.extra.recoverable;
     if (this.extra?.context !== undefined) payload.context = this.extra.context;
     return payload;
+  }
+
+  toString(): string {
+    return `VtxError[${this.code}]: ${this.message}`;
   }
 }

@@ -1,3 +1,4 @@
 export * from "./protocol.js";
 export * from "./errors.js";
+export * from "./errors.hints.js";
 export * from "./actions.js";
