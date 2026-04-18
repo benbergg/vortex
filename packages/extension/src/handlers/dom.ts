@@ -351,6 +351,12 @@ export function registerDomHandlers(
       const position = args.position as string | undefined;
       const x = args.x as number | undefined;
       const y = args.y as number | undefined;
+      if (!selector && !position && x === undefined && y === undefined) {
+        throw vtxError(
+          VtxErrorCode.INVALID_PARAMS,
+          "Must specify selector/index, position, or x/y coordinates",
+        );
+      }
       const tid = await getActiveTabId(__t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({

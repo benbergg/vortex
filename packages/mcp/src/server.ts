@@ -73,25 +73,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       minLevel: params.minLevel as VtxEventLevel | undefined,
       tabId: params.tabId as number | undefined,
     });
-    return {
-      content: [{
-        type: "text" as const,
-        text: JSON.stringify({
-          subscriptionId: subId,
-          note: "Events will be piggybacked to subsequent tool responses in a `[vortex-events]` text item.",
-        }, null, 2),
-      }],
-    };
+    return withEvents([{
+      type: "text" as const,
+      text: JSON.stringify({
+        subscriptionId: subId,
+        note: "Events will be piggybacked to subsequent tool responses in a `[vortex-events]` text item.",
+      }, null, 2),
+    }]);
   }
 
   if (toolDef.action === "__mcp_events_unsubscribe__") {
     const ok = eventStore.unsubscribe(params.subscriptionId as string);
-    return {
-      content: [{
-        type: "text" as const,
-        text: JSON.stringify({ unsubscribed: ok }, null, 2),
-      }],
-    };
+    return withEvents([{
+      type: "text" as const,
+      text: JSON.stringify({ unsubscribed: ok }, null, 2),
+    }]);
   }
 
   // 特殊 tool: vortex_ping（MCP 自身诊断）

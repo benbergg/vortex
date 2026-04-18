@@ -26,7 +26,7 @@ export function registerContentHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error);
+      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
@@ -52,7 +52,7 @@ export function registerContentHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error);
+      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
@@ -144,7 +144,15 @@ export function registerContentHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error);
+      // AX tree 无 selector 维度，仅透传错误
+      if (res?.error) {
+        throw vtxError(
+          res.error.startsWith("Element not found:")
+            ? VtxErrorCode.ELEMENT_NOT_FOUND
+            : VtxErrorCode.JS_EXECUTION_ERROR,
+          res.error,
+        );
+      }
       return res?.result;
     },
 
@@ -168,7 +176,7 @@ export function registerContentHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error);
+      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
 
@@ -213,7 +221,7 @@ export function registerContentHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error);
+      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
   });
