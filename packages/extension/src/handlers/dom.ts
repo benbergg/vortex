@@ -3,6 +3,7 @@ import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 import { getIframeOffset } from "../lib/iframe-offset.js";
+import { resolveTarget, resolveTargetOptional } from "../lib/resolve-target.js";
 
 export function registerDomHandlers(
   router: ActionRouter,
@@ -10,10 +11,10 @@ export function registerDomHandlers(
 ): void {
   router.registerAll({
     [DomActions.QUERY]: async (args, tabId) => {
-      const selector = args.selector as string;
-      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
-      const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      const __t = resolveTarget(args);
+      const selector = __t.selector;
+      const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
@@ -46,10 +47,10 @@ export function registerDomHandlers(
     },
 
     [DomActions.QUERY_ALL]: async (args, tabId) => {
-      const selector = args.selector as string;
-      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
-      const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      const __t = resolveTarget(args);
+      const selector = __t.selector;
+      const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
@@ -83,10 +84,10 @@ export function registerDomHandlers(
     },
 
     [DomActions.CLICK]: async (args, tabId) => {
-      const selector = args.selector as string;
-      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
-      const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      const __t = resolveTarget(args);
+      const selector = __t.selector;
+      const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       const useRealMouse = args.useRealMouse as boolean | undefined;
 
       if (useRealMouse) {
@@ -238,13 +239,13 @@ export function registerDomHandlers(
     },
 
     [DomActions.TYPE]: async (args, tabId) => {
-      const selector = args.selector as string;
+      const __t = resolveTarget(args);
+      const selector = __t.selector;
       const text = args.text as string;
       const delay = (args.delay as number | undefined) ?? 0;
-      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       if (text == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: text");
-      const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: async (sel: string, txt: string, delayMs: number) => {
@@ -279,12 +280,12 @@ export function registerDomHandlers(
     },
 
     [DomActions.FILL]: async (args, tabId) => {
-      const selector = args.selector as string;
+      const __t = resolveTarget(args);
+      const selector = __t.selector;
       const value = args.value as string;
-      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
-      const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string, val: string) => {
@@ -316,12 +317,12 @@ export function registerDomHandlers(
     },
 
     [DomActions.SELECT]: async (args, tabId) => {
-      const selector = args.selector as string;
+      const __t = resolveTarget(args);
+      const selector = __t.selector;
       const value = args.value as string;
-      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
-      const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string, val: string) => {
@@ -344,13 +345,14 @@ export function registerDomHandlers(
     },
 
     [DomActions.SCROLL]: async (args, tabId) => {
-      const selector = args.selector as string | undefined;
+      const __t = resolveTargetOptional(args);
+      const selector = __t?.selector;
       const container = args.container as string | undefined;
       const position = args.position as string | undefined;
       const x = args.x as number | undefined;
       const y = args.y as number | undefined;
-      const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      const tid = await getActiveTabId(__t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (
@@ -419,10 +421,10 @@ export function registerDomHandlers(
     },
 
     [DomActions.HOVER]: async (args, tabId) => {
-      const selector = args.selector as string;
-      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
-      const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      const __t = resolveTarget(args);
+      const selector = __t.selector;
+      const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
@@ -445,12 +447,12 @@ export function registerDomHandlers(
     },
 
     [DomActions.GET_ATTRIBUTE]: async (args, tabId) => {
-      const selector = args.selector as string;
+      const __t = resolveTarget(args);
+      const selector = __t.selector;
       const attribute = args.attribute as string;
-      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       if (!attribute) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: attribute");
-      const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string, attr: string) => {
@@ -471,9 +473,10 @@ export function registerDomHandlers(
     },
 
     [DomActions.GET_SCROLL_INFO]: async (args, tabId) => {
-      const selector = args.selector as string | undefined;
-      const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      const __t = resolveTargetOptional(args);
+      const selector = __t?.selector;
+      const tid = await getActiveTabId(__t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string | undefined) => {
@@ -515,11 +518,11 @@ export function registerDomHandlers(
     },
 
     [DomActions.WAIT_FOR_MUTATION]: async (args, tabId) => {
-      const selector = args.selector as string;
+      const __t = resolveTarget(args);
+      const selector = __t.selector;
       const timeout = (args.timeout as number | undefined) ?? 10000;
-      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
-      const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string, timeoutMs: number) => {

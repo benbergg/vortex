@@ -1,58 +1,12 @@
 import { ObserveActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
-
-/**
- * Snapshot 的每个 index 与定位 selector 的映射，
- * 供 W3 dom.* 工具 `{ snapshotId, index }` 参数用来反查元素。
- */
-interface SnapshotElement {
-  index: number;
-  selector: string;
-}
-
-interface SnapshotEntry {
-  tabId: number;
-  frameId?: number;
-  capturedAt: number;
-  elements: SnapshotElement[];
-}
-
-const snapshots = new Map<string, SnapshotEntry>();
-const SNAPSHOT_TTL_MS = 60_000;
-let snapshotCounter = 0;
-
-function newSnapshotId(): string {
-  return `snap_${Date.now().toString(36)}_${++snapshotCounter}`;
-}
-
-function gcSnapshots(): void {
-  const now = Date.now();
-  for (const [id, entry] of snapshots) {
-    if (now - entry.capturedAt > SNAPSHOT_TTL_MS) snapshots.delete(id);
-  }
-}
-
-export function getSnapshotEntry(snapshotId: string): SnapshotEntry | undefined {
-  return snapshots.get(snapshotId);
-}
-
-/**
- * W3 dom.* 工具按 index 回查 element 的入口。
- * 返回定位该元素所需的 tab/frame/selector。
- * snapshotId 过期或 index 不存在时返回 undefined，调用方据此抛
- * STALE_SNAPSHOT / INVALID_INDEX。
- */
-export function resolveSnapshotIndex(
-  snapshotId: string,
-  index: number,
-): { tabId: number; frameId?: number; selector: string } | undefined {
-  const entry = snapshots.get(snapshotId);
-  if (!entry) return undefined;
-  const hit = entry.elements.find((e) => e.index === index);
-  if (!hit) return undefined;
-  return { tabId: entry.tabId, frameId: entry.frameId, selector: hit.selector };
-}
+import {
+  gcSnapshots,
+  newSnapshotId,
+  setSnapshot,
+  type SnapshotElement,
+} from "../lib/snapshot-store.js";
 
 export function registerObserveHandlers(router: ActionRouter): void {
   router.registerAll({
@@ -149,10 +103,6 @@ export function registerObserveHandlers(router: ActionRouter): void {
             return (el.innerText || "").trim().slice(0, 80);
           }
 
-          /**
-           * 生成稳定的 CSS selector：id > data-testid > path。
-           * path 路径最多 8 层，含 nth-of-type 消歧义。
-           */
           function buildSelector(el: Element): string {
             if (el.id && /^[a-zA-Z][\w-]*$/.test(el.id)) return `#${CSS.escape(el.id)}`;
             const testId =
@@ -190,10 +140,6 @@ export function registerObserveHandlers(router: ActionRouter): void {
             return parts.join(" > ");
           }
 
-          /**
-           * 描述用于 occludedBy 字段的简要 selector，
-           * 格式 "tag#id.class1.class2"。不用于定位，仅供 LLM 识别遮挡者。
-           */
           function describeElement(el: Element): string {
             const classStr =
               typeof el.className === "string" && el.className
@@ -234,7 +180,6 @@ export function registerObserveHandlers(router: ActionRouter): void {
               rect.right > 0;
             if (mode === "visible" && !inViewport) continue;
 
-            // Paint-order 遮挡检测（只在视口内执行 elementFromPoint）
             let visible = true;
             let occludedBy: string | undefined;
             if (inViewport) {
@@ -342,7 +287,6 @@ export function registerObserveHandlers(router: ActionRouter): void {
         );
       }
 
-      // 剥离内部 selector（不回给 LLM），单独存进 snapshot entry
       const elementsOut = pageResult.elements.map(({ _sel, ...rest }) => rest);
       const elementMap: SnapshotElement[] = pageResult.elements.map((e) => ({
         index: e.index,
@@ -350,7 +294,7 @@ export function registerObserveHandlers(router: ActionRouter): void {
       }));
 
       const snapshotId = newSnapshotId();
-      snapshots.set(snapshotId, {
+      setSnapshot(snapshotId, {
         tabId: tid,
         frameId,
         capturedAt: pageResult.meta.capturedAt,
