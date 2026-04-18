@@ -12,6 +12,7 @@ import { loadScenario, type Scenario } from "./runner/scenario.js";
 import { resolveProvider, type ProviderConfig } from "./runner/provider.js";
 import { startFixtureServer, type FixtureServer } from "./runner/fixtures.js";
 import { runJudge, type JudgeReport } from "./runner/judge.js";
+import { runLlmJudge } from "./runner/judge-llm.js";
 import {
   computeScenarioMetrics,
   aggregateLayer,
@@ -113,10 +114,24 @@ async function runOneScenario(opts: {
     });
     const elapsedMs = Date.now() - started;
 
-    const judge = await runJudge(scenario.expected.assertions, {
+    let judge = await runJudge(scenario.expected.assertions, {
       agentResult: agent,
       mcp,
     });
+
+    // LLM judge 兜底（仅当 expected.llmRubric 存在）
+    if (scenario.expected.llmRubric) {
+      const llmCheck = await runLlmJudge({
+        task: scenario.task,
+        rubric: scenario.expected.llmRubric,
+        agent,
+        provider: opts.provider,
+      });
+      judge = {
+        pass: judge.pass && llmCheck.ok,
+        checks: [...judge.checks, llmCheck],
+      };
+    }
 
     const data = computeScenarioMetrics({ scenario, agent, judge, elapsedMs });
 

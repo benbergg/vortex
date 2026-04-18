@@ -16,6 +16,8 @@ export interface ExpectedSpec {
   expectedErrorCode?: string;
   /** 断言序列 */
   assertions: Assertion[];
+  /** LLM judge 兜底：提供 rubric 则跑一次 LLM judge，结果合并到 checks 最终 pass 为 AND */
+  llmRubric?: string;
 }
 
 export interface Scenario {

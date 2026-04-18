@@ -88,3 +88,34 @@ VB_Index = 0.25·L0 + 0.25·L1 + 0.30·L2 + 0.20·L3
 ```
 
 详见设计文档 §5.5。
+
+## LLM judge 兜底
+
+L0/L1 用纯声明式程序断言，零 LLM 费用。L2/L3 的文本类任务（如"提取商品名"）可以在 `expected.json` 加 `llmRubric` 字段：
+
+```json
+{
+  "layer": "L2",
+  "assertions": [{ "type": "agent_success" }],
+  "llmRubric": "The agent's final text must contain the product name and price, and explicitly state that the item is in stock."
+}
+```
+
+运行时会额外调 provider LLM 判定，`llm_judge` 作为一个 check 加到报告里，最终 pass 为 **程序 judge AND LLM judge**。
+
+## CI 与回归防护
+
+vortex-bench 依赖 **真实 Chrome + vortex 扩展 + vortex-server ws**，GitHub Actions 标准 runner 目前跑不起来（需要 Xvfb/持久化浏览器 profile/service worker 唤起策略）。v1 策略：
+
+- **本地 pre-push**：跑 `packages/vortex-bench/scripts/bench-ci.sh`
+  - 自动 build → 跑 L0+L1 → 对比 `reports/baseline.json` → 按阈值退出（0 OK / 2 critical）
+- **GitHub Actions**：`.github/workflows/bench.yml` 为 `workflow_dispatch` 占位，提醒手动走本地脚本。未来补 headless runner 后改为 PR 自动触发。
+
+### 回退阈值
+
+| 条件 | 级别 |
+|------|------|
+| `VB_Index ↓ > 3` | warning |
+| 任一层 score ↓ > 5 | **critical**（阻合并）|
+| 任一 ROI ↓ > 10 | **critical** |
+| tokens ↑ > 30% | warning |
