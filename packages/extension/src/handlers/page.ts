@@ -1,4 +1,4 @@
-import { PageActions } from "@bytenew/vortex-shared";
+import { PageActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { buildExecuteTarget } from "../lib/tab-utils.js";
@@ -6,7 +6,7 @@ import { buildExecuteTarget } from "../lib/tab-utils.js";
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
+  if (!tab?.id) throw vtxError(VtxErrorCode.TAB_NOT_FOUND, "No active tab found");
   return tab.id;
 }
 
@@ -14,7 +14,7 @@ function waitForTabLoad(tabId: number, timeoutMs: number = 30_000): Promise<void
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       chrome.tabs.onUpdated.removeListener(listener);
-      reject(new Error(`Navigation timeout after ${timeoutMs}ms`));
+      reject(vtxError(VtxErrorCode.TIMEOUT, `Navigation timeout after ${timeoutMs}ms`));
     }, timeoutMs);
 
     function listener(updatedTabId: number, changeInfo: chrome.tabs.TabChangeInfo) {
@@ -32,7 +32,7 @@ export function registerPageHandlers(router: ActionRouter, debuggerMgr: Debugger
   router.registerAll({
     [PageActions.NAVIGATE]: async (args, tabId) => {
       const url = args.url as string;
-      if (!url) throw new Error("Missing required param: url");
+      if (!url) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: url");
       const tid = await getActiveTabId(tabId);
       const waitForLoad = (args.waitForLoad as boolean) ?? true;
       await chrome.tabs.update(tid, { url });
@@ -89,7 +89,7 @@ export function registerPageHandlers(router: ActionRouter, debuggerMgr: Debugger
           args: [selector, timeout],
         });
         const found = result[0]?.result;
-        if (!found) throw new Error(`Selector "${selector}" not found within ${timeout}ms`);
+        if (!found) throw vtxError(VtxErrorCode.TIMEOUT, `Selector "${selector}" not found within ${timeout}ms`, { selector });
         return { found: true, selector };
       }
 
@@ -117,7 +117,7 @@ export function registerPageHandlers(router: ActionRouter, debuggerMgr: Debugger
 
         const timeoutTimer = setTimeout(() => {
           cleanup();
-          reject(new Error(`Network not idle after ${timeout}ms (${pending} requests pending)`));
+          reject(vtxError(VtxErrorCode.TIMEOUT, `Network not idle after ${timeout}ms (${pending} requests pending)`));
         }, timeout);
 
         function checkIdle(): void {

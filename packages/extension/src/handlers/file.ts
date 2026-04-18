@@ -1,13 +1,13 @@
 // packages/extension/src/handlers/file.ts
 
-import { FileActions } from "@bytenew/vortex-shared";
+import { FileActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { NativeMessagingClient } from "../lib/native-messaging.js";
 
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
+  if (!tab?.id) throw vtxError(VtxErrorCode.TAB_NOT_FOUND, "No active tab found");
   return tab.id;
 }
 
@@ -25,7 +25,7 @@ export function registerFileHandlers(
       const fileContent = args.fileContent as string; // base64
       const mimeType = (args.mimeType as string) ?? "application/octet-stream";
       if (!selector || !fileName || !fileContent) {
-        throw new Error("Missing required params: selector, fileName, fileContent (base64)");
+        throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required params: selector, fileName, fileContent (base64)");
       }
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
 
@@ -63,13 +63,13 @@ export function registerFileHandlers(
       });
 
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, { selector });
       return res?.result;
     },
 
     [FileActions.DOWNLOAD]: async (args) => {
       const url = args.url as string;
-      if (!url) throw new Error("Missing required param: url");
+      if (!url) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: url");
       const filename = args.filename as string | undefined;
       const saveAs = (args.saveAs as boolean) ?? false;
 

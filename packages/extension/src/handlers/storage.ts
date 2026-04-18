@@ -1,12 +1,12 @@
 // packages/extension/src/handlers/storage.ts
 
-import { StorageActions } from "@bytenew/vortex-shared";
+import { StorageActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
+  if (!tab?.id) throw vtxError(VtxErrorCode.TAB_NOT_FOUND, "No active tab found");
   return tab.id;
 }
 
@@ -15,7 +15,7 @@ async function getActiveTabId(tabId?: number): Promise<number> {
  */
 async function getTabUrl(tabId: number): Promise<string> {
   const tab = await chrome.tabs.get(tabId);
-  if (!tab.url) throw new Error("Cannot access tab URL");
+  if (!tab.url) throw vtxError(VtxErrorCode.PERMISSION_DENIED, "Cannot access tab URL (tab may be chrome:// or restricted)", { tabId });
   return tab.url;
 }
 
@@ -49,7 +49,7 @@ export function registerStorageHandlers(router: ActionRouter): void {
       const url = args.url as string;
       const name = args.name as string;
       const value = args.value as string;
-      if (!url || !name) throw new Error("Missing required params: url, name");
+      if (!url || !name) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required params: url, name");
 
       const details: chrome.cookies.SetDetails = {
         url,
@@ -70,7 +70,7 @@ export function registerStorageHandlers(router: ActionRouter): void {
     [StorageActions.DELETE_COOKIE]: async (args) => {
       const url = args.url as string;
       const name = args.name as string;
-      if (!url || !name) throw new Error("Missing required params: url, name");
+      if (!url || !name) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required params: url, name");
       await chrome.cookies.remove({ url, name });
       return { deleted: true, url, name };
     },
@@ -102,14 +102,14 @@ export function registerStorageHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(VtxErrorCode.JS_EXECUTION_ERROR, res.error);
       return res?.result;
     },
 
     [StorageActions.SET_LOCAL_STORAGE]: async (args, tabId) => {
       const key = args.key as string;
       const value = args.value as string;
-      if (!key) throw new Error("Missing required param: key");
+      if (!key) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: key");
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const results = await chrome.scripting.executeScript({
         target: { tabId: tid },
@@ -125,7 +125,7 @@ export function registerStorageHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(VtxErrorCode.JS_EXECUTION_ERROR, res.error);
       return res?.result;
     },
 
@@ -153,14 +153,14 @@ export function registerStorageHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(VtxErrorCode.JS_EXECUTION_ERROR, res.error);
       return res?.result;
     },
 
     [StorageActions.SET_SESSION_STORAGE]: async (args, tabId) => {
       const key = args.key as string;
       const value = args.value as string;
-      if (!key) throw new Error("Missing required param: key");
+      if (!key) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: key");
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const results = await chrome.scripting.executeScript({
         target: { tabId: tid },
@@ -176,7 +176,7 @@ export function registerStorageHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw new Error(res.error);
+      if (res?.error) throw vtxError(VtxErrorCode.JS_EXECUTION_ERROR, res.error);
       return res?.result;
     },
 
@@ -184,7 +184,7 @@ export function registerStorageHandlers(router: ActionRouter): void {
 
     [StorageActions.EXPORT_SESSION]: async (args, tabId) => {
       const domain = args.domain as string;
-      if (!domain) throw new Error("domain is required");
+      if (!domain) throw vtxError(VtxErrorCode.INVALID_PARAMS, "domain is required");
 
       // 1. 获取 cookies
       const cookies = await chrome.cookies.getAll({ domain });
@@ -237,9 +237,9 @@ export function registerStorageHandlers(router: ActionRouter): void {
     [StorageActions.IMPORT_SESSION]: async (args, tabId) => {
       const data = args.data as any;
       if (!data?.cookies || !Array.isArray(data.cookies)) {
-        throw new Error("Invalid session data: missing cookies array");
+        throw vtxError(VtxErrorCode.INVALID_PARAMS, "Invalid session data: missing cookies array");
       }
-      if (!data.domain) throw new Error("Invalid session data: missing domain");
+      if (!data.domain) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Invalid session data: missing domain");
 
       const cleanDomain = data.domain.replace(/^\./, "");
       const cookieUrl = `https://${cleanDomain}`;
