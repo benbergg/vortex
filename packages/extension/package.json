@@ -1,6 +1,6 @@
 {
   "name": "@bytenew/vortex-extension",
-  "version": "0.2.0-alpha.1",
+  "version": "0.2.0-beta.1",
   "type": "module",
   "scripts": {
     "build": "vite build",
