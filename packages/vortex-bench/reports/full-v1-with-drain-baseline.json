@@ -1,0 +1,954 @@
+{
+  "schema_version": 1,
+  "dataset_version": "v1",
+  "generated_at": "2026-04-18T14:45:12.708Z",
+  "git_commit": "4f6c395",
+  "provider": {
+    "name": "zhipu",
+    "model": "glm-4.7",
+    "baseURL": "https://open.bigmodel.cn/api/anthropic"
+  },
+  "scenarios": [
+    {
+      "id": "001-basic-click",
+      "layer": "L0",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.5,
+        "robustness": 1,
+        "utilization": 0.875,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 3
+      },
+      "agent": {
+        "steps": 4,
+        "inputTokens": 381,
+        "outputTokens": 92,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_dom_click"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 4164
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"?done=1\")"
+        },
+        {
+          "ok": true,
+          "name": "no_error_codes"
+        }
+      ]
+    },
+    {
+      "id": "002-fill-form",
+      "layer": "L0",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.33333333333333337,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 6
+      },
+      "agent": {
+        "steps": 8,
+        "inputTokens": 2725,
+        "outputTokens": 351,
+        "toolCalls": [
+          "vortex_tab_get_info",
+          "vortex_tab_list",
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_dom_fill",
+          "vortex_dom_fill",
+          "vortex_dom_click"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 11397
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "text_in_page(\"OK name=Alice email=alice@exam\")"
+        },
+        {
+          "ok": true,
+          "name": "no_error_codes"
+        }
+      ]
+    },
+    {
+      "id": "003-read-text",
+      "layer": "L0",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.5,
+        "robustness": 1,
+        "utilization": 0.25,
+        "encountered_expected_error": false,
+        "used_observe": false,
+        "used_events": false,
+        "unique_tool_count": 2
+      },
+      "agent": {
+        "steps": 3,
+        "inputTokens": 404,
+        "outputTokens": 74,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_content_get_text"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 3560
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"/smoke/read-text\")"
+        },
+        {
+          "ok": true,
+          "name": "text_in_page(\"VORTEX_SMOKE_42\")"
+        },
+        {
+          "ok": true,
+          "name": "no_error_codes"
+        }
+      ]
+    },
+    {
+      "id": "004-navigate",
+      "layer": "L0",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.4,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 5
+      },
+      "agent": {
+        "steps": 6,
+        "inputTokens": 1025,
+        "outputTokens": 214,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_dom_click",
+          "vortex_page_info",
+          "vortex_content_get_text"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 8397
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"/smoke/navigate/page2\")"
+        },
+        {
+          "ok": true,
+          "name": "text_in_page(\"REACHED\")"
+        },
+        {
+          "ok": true,
+          "name": "no_error_codes"
+        }
+      ]
+    },
+    {
+      "id": "005-wait-dynamic",
+      "layer": "L0",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.19999999999999996,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 6
+      },
+      "agent": {
+        "steps": 8,
+        "inputTokens": 1657,
+        "outputTokens": 273,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_page_wait",
+          "vortex_content_get_text",
+          "vortex_observe",
+          "vortex_content_get_html",
+          "vortex_page_wait",
+          "vortex_dom_query"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 32492
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"/smoke/wait-dynamic\")"
+        },
+        {
+          "ok": true,
+          "name": "text_in_page(\"LOADED\")"
+        },
+        {
+          "ok": true,
+          "name": "no_error_codes"
+        }
+      ]
+    },
+    {
+      "id": "001-occluded",
+      "layer": "L1",
+      "pass": true,
+      "expectedErrorCode": "ELEMENT_OCCLUDED",
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.5333333333333333,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 4
+      },
+      "agent": {
+        "steps": 7,
+        "inputTokens": 1852,
+        "outputTokens": 361,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_dom_click",
+          "vortex_observe",
+          "vortex_dom_click",
+          "vortex_page_info"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 12463
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"?done=1\")"
+        }
+      ]
+    },
+    {
+      "id": "002-ambiguous",
+      "layer": "L1",
+      "pass": true,
+      "expectedErrorCode": "SELECTOR_AMBIGUOUS",
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.6,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 5
+      },
+      "agent": {
+        "steps": 6,
+        "inputTokens": 889,
+        "outputTokens": 189,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_content_get_text",
+          "vortex_dom_click",
+          "vortex_page_info"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 5400
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"?done=1\")"
+        }
+      ]
+    },
+    {
+      "id": "003-disabled",
+      "layer": "L1",
+      "pass": true,
+      "expectedErrorCode": "ELEMENT_DISABLED",
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.4,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 6
+      },
+      "agent": {
+        "steps": 9,
+        "inputTokens": 1949,
+        "outputTokens": 374,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_dom_click",
+          "vortex_dom_query",
+          "vortex_dom_fill",
+          "vortex_dom_fill",
+          "vortex_dom_click",
+          "vortex_page_info"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 15115
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"?done=1\")"
+        }
+      ]
+    },
+    {
+      "id": "004-offscreen",
+      "layer": "L1",
+      "pass": true,
+      "expectedErrorCode": "ELEMENT_OFFSCREEN",
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.4666666666666667,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 6
+      },
+      "agent": {
+        "steps": 8,
+        "inputTokens": 1535,
+        "outputTokens": 261,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_content_get_text",
+          "vortex_dom_scroll",
+          "vortex_observe",
+          "vortex_dom_click",
+          "vortex_page_info"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 13544
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"?done=1\")"
+        }
+      ]
+    },
+    {
+      "id": "005-not-found",
+      "layer": "L1",
+      "pass": true,
+      "expectedErrorCode": "ELEMENT_NOT_FOUND",
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.6666666666666667,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 4
+      },
+      "agent": {
+        "steps": 5,
+        "inputTokens": 982,
+        "outputTokens": 133,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_dom_click",
+          "vortex_page_info"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 6105
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"?done=1\")"
+        }
+      ]
+    },
+    {
+      "id": "001-example-domain",
+      "layer": "L2",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.5,
+        "robustness": 1,
+        "utilization": 0.375,
+        "encountered_expected_error": false,
+        "used_observe": false,
+        "used_events": false,
+        "unique_tool_count": 3
+      },
+      "agent": {
+        "steps": 4,
+        "inputTokens": 376,
+        "outputTokens": 88,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_content_get_text",
+          "vortex_dom_query_all"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 4254
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"example.com\")"
+        },
+        {
+          "ok": true,
+          "name": "text_in_page(\"Example Domain\")"
+        },
+        {
+          "ok": true,
+          "name": "llm_judge",
+          "detail": "The agent correctly navigated to the URL and extracted the exact main heading 'Example Domain'."
+        }
+      ]
+    },
+    {
+      "id": "002-httpbin-json",
+      "layer": "L2",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.625,
+        "robustness": 1,
+        "utilization": 0.25,
+        "encountered_expected_error": false,
+        "used_observe": false,
+        "used_events": false,
+        "unique_tool_count": 2
+      },
+      "agent": {
+        "steps": 3,
+        "inputTokens": 401,
+        "outputTokens": 72,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_content_get_text"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 5453
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"httpbin.org/json\")"
+        },
+        {
+          "ok": true,
+          "name": "llm_judge",
+          "detail": "The agent successfully navigated to the URL, extracted the JSON, and correctly reported the author as 'Yours Truly' and the total number of slides as 2."
+        }
+      ]
+    },
+    {
+      "id": "003-httpbin-html",
+      "layer": "L2",
+      "pass": false,
+      "metrics": {
+        "correctness": 0,
+        "efficiency": 0.625,
+        "robustness": 1,
+        "utilization": 0.25,
+        "encountered_expected_error": false,
+        "used_observe": false,
+        "used_events": false,
+        "unique_tool_count": 2
+      },
+      "agent": {
+        "steps": 3,
+        "inputTokens": 1119,
+        "outputTokens": 61,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_content_get_text"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 3642
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"httpbin.org/html\")"
+        },
+        {
+          "ok": false,
+          "name": "llm_judge",
+          "detail": "The agent quoted 8 words, but the source text contains 'summer-cool' while the rubric requires 'clear, blue', and the word 'summer-cool' is not the correct start of the requested quote."
+        }
+      ]
+    },
+    {
+      "id": "004-github-repo",
+      "layer": "L2",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.6666666666666667,
+        "robustness": 1,
+        "utilization": 0.875,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 3
+      },
+      "agent": {
+        "steps": 4,
+        "inputTokens": 43251,
+        "outputTokens": 121,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_content_get_text"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 49902
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"anthropic-sdk-typescript\")"
+        },
+        {
+          "ok": true,
+          "name": "llm_judge",
+          "detail": "The agent correctly identified TypeScript as the primary programming language."
+        }
+      ]
+    },
+    {
+      "id": "005-httpbin-form",
+      "layer": "L2",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.4666666666666667,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 6
+      },
+      "agent": {
+        "steps": 8,
+        "inputTokens": 4234,
+        "outputTokens": 361,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_dom_fill",
+          "vortex_dom_fill",
+          "vortex_dom_click",
+          "vortex_page_wait_for_network_idle",
+          "vortex_content_get_text"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 14783
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"/post\")"
+        },
+        {
+          "ok": true,
+          "name": "llm_judge",
+          "detail": "The agent navigated to the URL, filled the name and phone fields correctly, submitted the form, and confirmed the response echoed back 'Alice' and '555-0101'."
+        }
+      ]
+    },
+    {
+      "id": "001-multi-tab-coordinate",
+      "layer": "L3",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.55,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 7
+      },
+      "agent": {
+        "steps": 9,
+        "inputTokens": 1976,
+        "outputTokens": 382,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_content_get_text",
+          "vortex_tab_create",
+          "vortex_page_info",
+          "vortex_observe",
+          "vortex_dom_fill",
+          "vortex_dom_click",
+          "vortex_page_info"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 20212
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "tool_called(vortex_tab_create)"
+        },
+        {
+          "ok": true,
+          "name": "llm_judge",
+          "detail": "The agent successfully read the secret from the source tab, opened a new tab to the sink, filled and submitted the form, and verified the URL ended with ?done=1."
+        }
+      ]
+    },
+    {
+      "id": "002-storage-cross-tabs",
+      "layer": "L3",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.6,
+        "robustness": 1,
+        "utilization": 0.5,
+        "encountered_expected_error": false,
+        "used_observe": false,
+        "used_events": false,
+        "unique_tool_count": 4
+      },
+      "agent": {
+        "steps": 6,
+        "inputTokens": 820,
+        "outputTokens": 252,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_content_get_text",
+          "vortex_tab_create",
+          "vortex_page_info",
+          "vortex_content_get_text"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 7585
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "tool_called(vortex_tab_create)"
+        },
+        {
+          "ok": true,
+          "name": "llm_judge",
+          "detail": "The agent navigated to the set page, opened a new tab to the read page, and correctly reported the token 'VORTEX_TOKEN_ABC123' as displayed."
+        }
+      ]
+    },
+    {
+      "id": "003-event-dom-mutated",
+      "layer": "L3",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.5333333333333333,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": true,
+        "unique_tool_count": 6
+      },
+      "agent": {
+        "steps": 7,
+        "inputTokens": 12100,
+        "outputTokens": 199,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_events_subscribe",
+          "vortex_dom_watch_mutations",
+          "vortex_observe",
+          "vortex_dom_click",
+          "vortex_events_drain"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 10559
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "tool_called(vortex_events_subscribe)"
+        },
+        {
+          "ok": true,
+          "name": "tool_called(vortex_dom_watch_mutations)"
+        },
+        {
+          "ok": true,
+          "name": "tool_called(vortex_events_drain)"
+        },
+        {
+          "ok": true,
+          "name": "llm_judge",
+          "detail": "The agent followed all steps correctly and explicitly confirmed observing a dom.mutated event after draining the dispatcher."
+        }
+      ]
+    }
+  ],
+  "aggregate": {
+    "layers": {
+      "L0": {
+        "layer": "L0",
+        "count": 5,
+        "pass": 5,
+        "correctness": 1,
+        "efficiency": 0.38666666666666666,
+        "robustness": 1,
+        "utilization": 0.825,
+        "score": 89.05
+      },
+      "L1": {
+        "layer": "L1",
+        "count": 5,
+        "pass": 5,
+        "correctness": 1,
+        "efficiency": 0.5333333333333334,
+        "robustness": 1,
+        "utilization": 1,
+        "score": 93
+      },
+      "L2": {
+        "layer": "L2",
+        "count": 5,
+        "pass": 4,
+        "correctness": 0.8,
+        "efficiency": 0.5766666666666668,
+        "robustness": 1,
+        "utilization": 0.55,
+        "score": 77.15
+      },
+      "L3": {
+        "layer": "L3",
+        "count": 3,
+        "pass": 3,
+        "correctness": 1,
+        "efficiency": 0.561111111111111,
+        "robustness": 1,
+        "utilization": 0.8333333333333334,
+        "score": 91.74999999999999
+      }
+    },
+    "roi": {
+      "observe": 68.20987654320987,
+      "errorHint": null,
+      "eventBus": 100
+    },
+    "vb_index": 87.0075,
+    "usage": {
+      "tokens_total": 81534,
+      "tokens_input": 77676,
+      "tokens_output": 3858,
+      "steps_p50": 6,
+      "steps_p95": 9,
+      "elapsed_ms_total": 229027,
+      "tool_usage": {
+        "vortex_page_navigate": 18,
+        "vortex_observe": 15,
+        "vortex_dom_click": 13,
+        "vortex_tab_get_info": 1,
+        "vortex_tab_list": 1,
+        "vortex_dom_fill": 7,
+        "vortex_content_get_text": 13,
+        "vortex_page_info": 9,
+        "vortex_page_wait": 2,
+        "vortex_content_get_html": 1,
+        "vortex_dom_query": 2,
+        "vortex_dom_scroll": 1,
+        "vortex_dom_query_all": 1,
+        "vortex_page_wait_for_network_idle": 1,
+        "vortex_tab_create": 2,
+        "vortex_events_subscribe": 1,
+        "vortex_dom_watch_mutations": 1,
+        "vortex_events_drain": 1
+      },
+      "unused_tools": [
+        "vortex_capture_element",
+        "vortex_capture_gif_frame",
+        "vortex_capture_gif_start",
+        "vortex_capture_gif_stop",
+        "vortex_capture_screenshot",
+        "vortex_console_clear",
+        "vortex_console_get_errors",
+        "vortex_console_get_logs",
+        "vortex_content_get_accessibility_tree",
+        "vortex_content_get_computed_style",
+        "vortex_content_get_element_text",
+        "vortex_dom_get_attribute",
+        "vortex_dom_get_scroll_info",
+        "vortex_dom_hover",
+        "vortex_dom_select",
+        "vortex_dom_type",
+        "vortex_dom_unwatch_mutations",
+        "vortex_dom_wait_for_mutation",
+        "vortex_events_unsubscribe",
+        "vortex_file_download",
+        "vortex_file_get_downloads",
+        "vortex_file_upload",
+        "vortex_frames_find",
+        "vortex_frames_list",
+        "vortex_js_call_function",
+        "vortex_js_evaluate",
+        "vortex_js_evaluate_async",
+        "vortex_keyboard_press",
+        "vortex_keyboard_shortcut",
+        "vortex_mouse_click",
+        "vortex_mouse_double_click",
+        "vortex_mouse_move",
+        "vortex_network_clear",
+        "vortex_network_filter",
+        "vortex_network_get_errors",
+        "vortex_network_get_logs",
+        "vortex_network_get_response_body",
+        "vortex_page_back",
+        "vortex_page_forward",
+        "vortex_page_reload",
+        "vortex_ping",
+        "vortex_storage_delete_cookie",
+        "vortex_storage_export_session",
+        "vortex_storage_get_cookies",
+        "vortex_storage_get_local_storage",
+        "vortex_storage_get_session_storage",
+        "vortex_storage_import_session",
+        "vortex_storage_set_cookie",
+        "vortex_storage_set_local_storage",
+        "vortex_storage_set_session_storage",
+        "vortex_tab_activate",
+        "vortex_tab_close"
+      ]
+    }
+  }
+}
