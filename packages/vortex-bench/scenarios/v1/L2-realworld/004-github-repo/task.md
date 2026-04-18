@@ -1,0 +1,1 @@
+Use the browser's active tab. Navigate to `https://github.com/anthropics/anthropic-sdk-typescript`. In your final text include the name of the primary programming language as shown on the repo page (e.g. the language bar on the right side / the "Languages" section). Stop when done.

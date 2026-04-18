@@ -1,0 +1,11 @@
+{
+  "layer": "L2",
+  "budgetSteps": 8,
+  "budgetTokens": 50000,
+  "assertions": [
+    { "type": "agent_success" },
+    { "type": "url_contains", "value": "example.com" },
+    { "type": "text_in_page", "value": "Example Domain" }
+  ],
+  "llmRubric": "The agent's final text must contain the exact main heading of example.com, which is 'Example Domain'."
+}

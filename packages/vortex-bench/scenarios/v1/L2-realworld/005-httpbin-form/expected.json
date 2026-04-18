@@ -1,0 +1,10 @@
+{
+  "layer": "L2",
+  "budgetSteps": 15,
+  "budgetTokens": 200000,
+  "assertions": [
+    { "type": "agent_success" },
+    { "type": "url_contains", "value": "/post" }
+  ],
+  "llmRubric": "The agent's final text must confirm that the submission succeeded and that the server echoed back the name 'Alice' and the phone '555-0101'. The agent must have actually filled both fields and submitted, not just navigated."
+}

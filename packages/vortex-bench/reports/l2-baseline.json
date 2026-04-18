@@ -1,0 +1,337 @@
+{
+  "schema_version": 1,
+  "dataset_version": "v1",
+  "generated_at": "2026-04-18T13:20:37.303Z",
+  "git_commit": "0d36167",
+  "provider": {
+    "name": "zhipu",
+    "model": "glm-4.7",
+    "baseURL": "https://open.bigmodel.cn/api/anthropic"
+  },
+  "scenarios": [
+    {
+      "id": "001-example-domain",
+      "layer": "L2",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.5,
+        "robustness": 1,
+        "utilization": 0.375,
+        "encountered_expected_error": false,
+        "used_observe": false,
+        "used_events": false,
+        "unique_tool_count": 3
+      },
+      "agent": {
+        "steps": 4,
+        "inputTokens": 277,
+        "outputTokens": 81,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_content_get_text",
+          "vortex_content_get_html"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 4717
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"example.com\")"
+        },
+        {
+          "ok": true,
+          "name": "text_in_page(\"Example Domain\")"
+        },
+        {
+          "ok": true,
+          "name": "llm_judge",
+          "detail": "The agent correctly navigated to the URL and included the exact main heading 'Example Domain' in the final text."
+        }
+      ]
+    },
+    {
+      "id": "002-httpbin-json",
+      "layer": "L2",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.625,
+        "robustness": 1,
+        "utilization": 0.25,
+        "encountered_expected_error": false,
+        "used_observe": false,
+        "used_events": false,
+        "unique_tool_count": 2
+      },
+      "agent": {
+        "steps": 3,
+        "inputTokens": 236,
+        "outputTokens": 70,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_content_get_text"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 49834
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"httpbin.org/json\")"
+        },
+        {
+          "ok": true,
+          "name": "llm_judge",
+          "detail": "The agent correctly identified the author as 'Yours Truly' and the total number of slides as 2."
+        }
+      ]
+    },
+    {
+      "id": "003-httpbin-html",
+      "layer": "L2",
+      "pass": false,
+      "metrics": {
+        "correctness": 0,
+        "efficiency": 0.625,
+        "robustness": 1,
+        "utilization": 0.25,
+        "encountered_expected_error": false,
+        "used_observe": false,
+        "used_events": false,
+        "unique_tool_count": 2
+      },
+      "agent": {
+        "steps": 3,
+        "inputTokens": 1136,
+        "outputTokens": 61,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_content_get_text"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 95961
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"httpbin.org/html\")"
+        },
+        {
+          "ok": false,
+          "name": "llm_judge",
+          "detail": "The quoted text deviates from the required words; it contains 'summer-cool weather that' instead of the correct sequence."
+        }
+      ]
+    },
+    {
+      "id": "004-github-repo",
+      "layer": "L2",
+      "pass": false,
+      "metrics": {
+        "correctness": 0,
+        "efficiency": 0.5,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 4
+      },
+      "agent": {
+        "steps": 6,
+        "inputTokens": 253775,
+        "outputTokens": 4192,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_content_get_text",
+          "vortex_content_get_text",
+          "vortex_capture_screenshot"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 991633
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"anthropic-sdk-typescript\")"
+        },
+        {
+          "ok": false,
+          "name": "llm_judge",
+          "detail": "The agent's final text contains only garbled script content and does not identify TypeScript as the programming language."
+        }
+      ]
+    },
+    {
+      "id": "005-httpbin-form",
+      "layer": "L2",
+      "pass": true,
+      "metrics": {
+        "correctness": 1,
+        "efficiency": 0.4666666666666667,
+        "robustness": 1,
+        "utilization": 1,
+        "encountered_expected_error": false,
+        "used_observe": true,
+        "used_events": false,
+        "unique_tool_count": 6
+      },
+      "agent": {
+        "steps": 8,
+        "inputTokens": 34905,
+        "outputTokens": 335,
+        "toolCalls": [
+          "vortex_page_navigate",
+          "vortex_observe",
+          "vortex_dom_fill",
+          "vortex_dom_fill",
+          "vortex_dom_click",
+          "vortex_page_wait_for_network_idle",
+          "vortex_content_get_text"
+        ],
+        "errorCodes": [],
+        "terminationReason": "done",
+        "elapsedMs": 71229
+      },
+      "judge_checks": [
+        {
+          "ok": true,
+          "name": "agent_success"
+        },
+        {
+          "ok": true,
+          "name": "url_contains(\"/post\")"
+        },
+        {
+          "ok": true,
+          "name": "llm_judge",
+          "detail": "The agent navigated to the URL, filled the specified fields, submitted the form, and confirmed the correct values appeared in the server response."
+        }
+      ]
+    }
+  ],
+  "aggregate": {
+    "layers": {
+      "L2": {
+        "layer": "L2",
+        "count": 5,
+        "pass": 3,
+        "correctness": 0.6,
+        "efficiency": 0.5433333333333333,
+        "robustness": 1,
+        "utilization": 0.575,
+        "score": 64.9
+      }
+    },
+    "roi": {
+      "observe": 24,
+      "errorHint": null,
+      "eventBus": null
+    },
+    "vb_index": 64.9,
+    "usage": {
+      "tokens_total": 295068,
+      "tokens_input": 290329,
+      "tokens_output": 4739,
+      "steps_p50": 4,
+      "steps_p95": 8,
+      "elapsed_ms_total": 1213374,
+      "tool_usage": {
+        "vortex_page_navigate": 5,
+        "vortex_content_get_text": 6,
+        "vortex_content_get_html": 1,
+        "vortex_observe": 2,
+        "vortex_capture_screenshot": 1,
+        "vortex_dom_fill": 2,
+        "vortex_dom_click": 1,
+        "vortex_page_wait_for_network_idle": 1
+      },
+      "unused_tools": [
+        "vortex_capture_element",
+        "vortex_capture_gif_frame",
+        "vortex_capture_gif_start",
+        "vortex_capture_gif_stop",
+        "vortex_console_clear",
+        "vortex_console_get_errors",
+        "vortex_console_get_logs",
+        "vortex_content_get_accessibility_tree",
+        "vortex_content_get_computed_style",
+        "vortex_content_get_element_text",
+        "vortex_dom_get_attribute",
+        "vortex_dom_get_scroll_info",
+        "vortex_dom_hover",
+        "vortex_dom_query",
+        "vortex_dom_query_all",
+        "vortex_dom_scroll",
+        "vortex_dom_select",
+        "vortex_dom_type",
+        "vortex_dom_unwatch_mutations",
+        "vortex_dom_wait_for_mutation",
+        "vortex_dom_watch_mutations",
+        "vortex_events_subscribe",
+        "vortex_events_unsubscribe",
+        "vortex_file_download",
+        "vortex_file_get_downloads",
+        "vortex_file_upload",
+        "vortex_frames_find",
+        "vortex_frames_list",
+        "vortex_js_call_function",
+        "vortex_js_evaluate",
+        "vortex_js_evaluate_async",
+        "vortex_keyboard_press",
+        "vortex_keyboard_shortcut",
+        "vortex_mouse_click",
+        "vortex_mouse_double_click",
+        "vortex_mouse_move",
+        "vortex_network_clear",
+        "vortex_network_filter",
+        "vortex_network_get_errors",
+        "vortex_network_get_logs",
+        "vortex_network_get_response_body",
+        "vortex_page_back",
+        "vortex_page_forward",
+        "vortex_page_info",
+        "vortex_page_reload",
+        "vortex_page_wait",
+        "vortex_ping",
+        "vortex_storage_delete_cookie",
+        "vortex_storage_export_session",
+        "vortex_storage_get_cookies",
+        "vortex_storage_get_local_storage",
+        "vortex_storage_get_session_storage",
+        "vortex_storage_import_session",
+        "vortex_storage_set_cookie",
+        "vortex_storage_set_local_storage",
+        "vortex_storage_set_session_storage",
+        "vortex_tab_activate",
+        "vortex_tab_close",
+        "vortex_tab_create",
+        "vortex_tab_get_info",
+        "vortex_tab_list"
+      ]
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "layer": "L2",
+  "budgetSteps": 12,
+  "budgetTokens": 150000,
+  "assertions": [
+    { "type": "agent_success" },
+    { "type": "url_contains", "value": "anthropic-sdk-typescript" }
+  ],
+  "llmRubric": "The agent's final text must identify TypeScript as the primary programming language of the anthropic-sdk-typescript repo. Accept 'TypeScript' or 'Typescript'."
+}

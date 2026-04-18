@@ -1,0 +1,1 @@
+Use the browser's active tab. Navigate to `https://httpbin.org/html`. The page renders an excerpt from Moby Dick. In your final text, quote the first 8 words of the main text body (ignoring the heading). Stop when done.

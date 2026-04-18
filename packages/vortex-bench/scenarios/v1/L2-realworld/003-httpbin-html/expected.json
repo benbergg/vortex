@@ -1,0 +1,10 @@
+{
+  "layer": "L2",
+  "budgetSteps": 8,
+  "budgetTokens": 80000,
+  "assertions": [
+    { "type": "agent_success" },
+    { "type": "url_contains", "value": "httpbin.org/html" }
+  ],
+  "llmRubric": "The agent's final text must quote the opening words of Herman Melville's Moby Dick excerpt rendered on httpbin.org/html. The first 8 words should be: 'Availing himself of the mild, clear blue'. Minor punctuation differences are acceptable."
+}
