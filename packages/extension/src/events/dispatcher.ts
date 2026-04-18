@@ -78,8 +78,11 @@ export class EventDispatcher {
     }
   }
 
-  /** 强制立即 flush 所有 buffer（测试 / 进程退出前用） */
-  flushAll(): void {
+  /**
+   * 强制立即 flush 所有 buffer（进程退出前 / 测试 / vortex_events_drain 工具用）。
+   * 返回本次 flush 实际发送的事件条数（合并后）。
+   */
+  flushAll(): { notice: number; info: number } {
     if (this.noticeTimer !== null) {
       clearTimeout(this.noticeTimer);
       this.noticeTimer = null;
@@ -88,18 +91,20 @@ export class EventDispatcher {
       clearTimeout(this.infoTimer);
       this.infoTimer = null;
     }
-    this.flushNotice();
-    this.flushInfo();
+    const notice = this.flushNotice();
+    const info = this.flushInfo();
+    return { notice, info };
   }
 
-  private flushNotice(): void {
+  private flushNotice(): number {
     const batch = this.noticeBuffer;
     this.noticeBuffer = [];
     this.noticeTimer = null;
     for (const entry of batch) this.sendEntry(entry);
+    return batch.length;
   }
 
-  private flushInfo(): void {
+  private flushInfo(): number {
     const batch = this.infoBuffer;
     this.infoBuffer = [];
     this.infoTimer = null;
@@ -135,6 +140,7 @@ export class EventDispatcher {
       }
     }
 
+    let sent = 0;
     for (const group of merged.values()) {
       if (group.count === 1) {
         this.sendEntry(group.firstEntry);
@@ -150,7 +156,9 @@ export class EventDispatcher {
           },
         });
       }
+      sent++;
     }
+    return sent;
   }
 
   private sendEntry(entry: BatchEntry): void {

@@ -18,6 +18,7 @@ import { registerMouseHandlers } from "./handlers/mouse.js";
 import { registerFileHandlers } from "./handlers/file.js";
 import { registerObserveHandlers } from "./handlers/observe.js";
 import { registerMutationHandlers } from "./handlers/mutations.js";
+import { registerEventHandlers } from "./handlers/events.js";
 import { EventDispatcher, registerEventSources } from "./events/dispatcher.js";
 
 const router = new ActionRouter();
@@ -51,6 +52,7 @@ const nm = new NativeMessagingClient(
 // 事件分发器：需要 nm，后续 handler 都可借它上报事件
 const eventDispatcher = new EventDispatcher(nm);
 registerEventSources(eventDispatcher);
+registerEventHandlers(router, eventDispatcher);
 
 // content script → background 的事件中继（F6/F7）
 chrome.runtime.onMessage.addListener((rawMsg, sender) => {

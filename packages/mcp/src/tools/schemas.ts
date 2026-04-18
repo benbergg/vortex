@@ -306,6 +306,17 @@ function eventsTools(): ToolDef[] {
         required: ["subscriptionId"],
       },
     },
+    {
+      name: "vortex_events_drain",
+      action: "__mcp_events_drain__",
+      description:
+        "Force-flush the event dispatcher (all buffered notice/info events, bypassing the 200ms/1000ms aggregation windows) and return matching events inline. Use this AFTER triggering actions that should produce events (e.g. DOM-mutating clicks) when you need the events before the normal aggregation window completes — essential for sub-second ReAct loops where the agent would otherwise finish before info-level events flush. Normally events piggyback onto subsequent tool responses; drain bypasses that with inline return. Returns { events: [...], flushed: { notice, info } }. Requires an active subscription. Failures: none typically.",
+      schema: {
+        type: "object",
+        properties: {},
+        required: [],
+      },
+    },
   ];
 }
 

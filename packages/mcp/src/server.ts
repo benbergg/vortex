@@ -90,6 +90,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }]);
   }
 
+  // 特殊 tool: events drain（强制 flush dispatcher + 拉 eventStore buffer）
+  if (toolDef.action === "__mcp_events_drain__") {
+    let flushed: { notice: number; info: number } = { notice: 0, info: 0 };
+    try {
+      const resp = await sendRequest("events.drain", {}, PORT, undefined, 5000);
+      const result = (resp.result ?? {}) as { flushed?: { notice: number; info: number } };
+      if (result.flushed) flushed = result.flushed;
+    } catch (err) {
+      // flush 失败仍尝试 drain 本地 buffer（可能已有之前 ingest 的事件）
+      const msg = err instanceof Error ? err.message : String(err);
+      const events = eventStore.drain();
+      return {
+        content: [{
+          type: "text" as const,
+          text: JSON.stringify({ events, flushed, note: `flush failed: ${msg}` }, null, 2),
+        }],
+      };
+    }
+    // 顺序保证：ws FIFO → extension 的 dispatcher.flushAll 发出的 events
+    // 在 action response 之前到达 mcp 端，此时已经 ingest 到 eventStore
+    const events = eventStore.drain();
+    return {
+      content: [{
+        type: "text" as const,
+        text: JSON.stringify({ events, flushed }, null, 2),
+      }],
+    };
+  }
+
   // 特殊 tool: vortex_ping（MCP 自身诊断）
   if (toolDef.action === "__mcp_ping__") {
     try {
