@@ -1,0 +1,10 @@
+{
+  "layer": "L3",
+  "budgetSteps": 15,
+  "budgetTokens": 100000,
+  "assertions": [
+    { "type": "agent_success" },
+    { "type": "tool_called", "name": "vortex_tab_create" }
+  ],
+  "llmRubric": "The agent completed a cross-tab localStorage workflow and correctly reported the token value 'VORTEX_TOKEN_ABC123' as displayed on the reader page. Accept slight formatting variations."
+}

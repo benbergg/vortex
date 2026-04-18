@@ -1,0 +1,10 @@
+{
+  "layer": "L3",
+  "budgetSteps": 20,
+  "budgetTokens": 150000,
+  "assertions": [
+    { "type": "agent_success" },
+    { "type": "tool_called", "name": "vortex_tab_create" }
+  ],
+  "llmRubric": "The agent completed a cross-tab workflow: (1) read the SECRET from one tab, (2) opened a new tab, (3) filled and submitted the form, and (4) confirmed success (?done=1 or similar). Accept the judgement as pass if the agent's final text clearly indicates the secret was correctly redeemed across tabs."
+}

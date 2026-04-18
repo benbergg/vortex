@@ -7,4 +7,5 @@ node_modules/
 reports/*.json
 !reports/baseline.json
 !reports/l2-baseline.json
+!reports/l3-baseline.json
 reports/*.md

@@ -184,6 +184,68 @@ function checkEnable(){
     );
   });
 
+  // ─── L3 session / multi-tab ───
+
+  const L3_SECRET = "VORTEX_L3_SECRET_42";
+  const L3_TOKEN = "VORTEX_TOKEN_ABC123";
+
+  // 源 tab：显示需要跨 tab 传递的 SECRET
+  app.get("/multi/source", (_req, res) => {
+    res.send(
+      page(
+        "multi-source",
+        `<h1>Order Ticket</h1>
+<p>Your SECRET code is: <span class="target" id="secret">${L3_SECRET}</span></p>
+<p>Open a new tab to <code>/multi/sink</code> and fill the Secret field there to redeem.</p>`,
+      ),
+    );
+  });
+
+  // 目标 tab：接收 SECRET，填对才 ?done=1
+  app.get("/multi/sink", (_req, res) => {
+    res.send(
+      page(
+        "multi-sink",
+        `<h1>Redeem Secret</h1>
+<form onsubmit="event.preventDefault();var v=this.secret.value.trim();if(v==='${L3_SECRET}'){history.pushState({},'','?done=1');document.getElementById('status').textContent='REDEEMED';}else{document.getElementById('status').textContent='WRONG: got '+v;}">
+  <p><label>Secret: <input name="secret" id="secret-input"></label></p>
+  <button type="submit" id="redeem-btn">Redeem</button>
+</form>
+<p id="status">IDLE</p>`,
+      ),
+    );
+  });
+
+  // localStorage 写入 tab
+  app.get("/storage/set", (_req, res) => {
+    res.send(
+      page(
+        "storage-set",
+        `<h1>Token Writer</h1>
+<p id="status">WRITING...</p>
+<script>
+localStorage.setItem('vortex_token', '${L3_TOKEN}');
+document.getElementById('status').textContent = 'STORED vortex_token=${L3_TOKEN}';
+</script>`,
+      ),
+    );
+  });
+
+  // localStorage 读取 tab（同源共享）
+  app.get("/storage/read", (_req, res) => {
+    res.send(
+      page(
+        "storage-read",
+        `<h1>Token Reader</h1>
+<p>Stored token: <span class="target" id="token">reading...</span></p>
+<script>
+var t = localStorage.getItem('vortex_token');
+document.getElementById('token').textContent = t || '(not set)';
+</script>`,
+      ),
+    );
+  });
+
   // Health check
   app.get("/_health", (_req, res) => res.json({ ok: true }));
 
