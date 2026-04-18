@@ -4,6 +4,70 @@
 
 ---
 
+## [0.2.0] — 2026-04-18
+
+> 在 beta.1 基础上：新增 **vortex-bench v1** 评测集（18 场景，4 层分层）、`vortex_events_drain` 工具（主动拉聚合事件绕过 1s 节流窗口）。首版 baseline = 87.0/100（GLM-4.7），drain 工具令 C event-bus ROI 从 0% 升到 100%。
+
+### 新增（Added）
+
+- **MCP 工具**（1 个）
+  - `vortex_events_drain`：强制 flush dispatcher（notice+info buffer 全清），返回 `{ events, flushed: { notice, info } }`。专为 sub-second ReAct loop 设计，解决"agent 在 1s 聚合窗口内结束导致事件被吞"的使用性问题。
+  - 底层 action：`events.drain`（新 `EventsActions` 命名空间）
+- **vortex-bench v1**（新包 `packages/vortex-bench/`，private）
+  - 18 场景 4 层分层：L0 smoke (5) / L1 antipattern (5) / L2 realworld (5) / L3 session (3)
+  - 四维指标：Correctness / Efficiency / Robustness / Utilization
+  - VB_Index = 0.25·L0 + 0.25·L1 + 0.30·L2 + 0.20·L3
+  - ROI 三件独立分：A observe / B error-hint / C event-bus
+  - Provider 路由：zhipu / anthropic / minimax 自动或显式切换（一套 `@anthropic-ai/sdk` 吃三家）
+  - CLI：`bench run / score / diff`
+  - 程序化 judge（声明式断言）+ LLM judge 兜底（`expected.llmRubric`）
+  - 本地 CI 脚本 `scripts/bench-ci.sh` + GH Actions workflow 占位
+  - Baselines 入 git：L0+L1 / L2 / L3 / 完整 v1 / GLM-4.7 / GLM-4.6V
+- **dispatcher.flushAll() 返回计数**：`{ notice: N, info: M }`，便于观察/测试
+
+### 变更（Changed）
+
+- **dispatcher**：`flushAll()` API 从 `void` 改为返回 `{ notice, info }`（破坏性？—— 但仅内部使用，不影响外部调用方）
+- **CHANGELOG**：补 bench v1 / drain 工具 / 模型对比数据
+
+### 测试
+
+- extension 单测 42 → **48**（+6 events-handler.test.ts）
+- 真实 bench 跑通 L0+L1+L2+L3 = 18 场景，GLM-4.7 pass 17/18
+- 单个 GLM-4.6V baseline 也入 git（pass 13/18，用于模型能力对比）
+
+### Bench 首版 baseline 数字
+
+| Provider | VB_Index | Pass | L0 | L1 | L2 | L3 | A ROI | C ROI |
+|----------|---------:|-----:|---:|---:|---:|---:|------:|------:|
+| GLM-4.7 (智谱) | **87.0** | 17/18 | 89.0 | 93.0 | 77.2 | 91.7 | 68.2% | 100% |
+| GLM-4.6V (智谱) | 75.1 | 13/18 | 89.8 | 64.4 | 61.0 | 91.3 | 47.5% | 100% |
+
+- GLM-4.7 在"长 ReAct 循环"任务上明显优于 4.6V（L1/L2 差 16-28 分）
+- drain 工具对两模型同样有效（C ROI = 100%）
+
+### 向后兼容
+
+- `vortex_events_drain` 是新增工具，不破坏已有订阅/取消流程
+- `flushAll()` 签名变化仅影响内部（测试/进程退出兜底），无外部 client 依赖
+
+### 已知限制
+
+- bench CI 需本地 Chrome + 扩展 active + vortex-server（GH Actions 占位为 workflow_dispatch，待后续 headless runner）
+- GLM-4.6V 在多步 ReAct 任务上容易陷 max_steps，建议 bench 默认选 GLM-4.7
+
+### 发布 commits
+
+- `4f6c395` vortex_events_drain + L3-003 pass
+- `9fa7de8` 完整 v1 baseline (82.4→87.0)
+- `4aec05b` L2-003 rubric 松化
+- `9673c5d` GLM-4.6V 模型对比 baseline
+- `44ea25e` B7 L2/L3 共 8 场景（beta 后补齐）
+- `0d36167` bench B1~B6 核心切片
+- `733a4ec` beta.1 → （本版本）
+
+---
+
 ## [0.2.0-beta.1] — 2026-04-18
 
 > 在 alpha.1 基础上清掉所有登记的 follow-up（F1~F11 + DOM_MUTATED），修复 E2E 发现的两个关键通道 bug，引入 content script 架构做页面级事件拦截。真实浏览器 E2E 9/10 场景通过。

@@ -1,6 +1,6 @@
 {
   "name": "@bytenew/vortex-bench",
-  "version": "0.2.0-beta.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "bin": {
@@ -12,7 +12,7 @@
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "bench": "node dist/index.js",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
