@@ -5,32 +5,162 @@ import {
 } from "@bytenew/vortex-shared";
 import type { NativeMessagingClient } from "../lib/native-messaging.js";
 
+interface EmitOpts {
+  tabId?: number;
+  frameId?: number;
+  level?: VtxEventLevel;
+}
+
+interface BatchEntry {
+  type: string;
+  data: unknown;
+  tabId?: number;
+  frameId?: number;
+  level: VtxEventLevel;
+  time: number;
+}
+
 /**
- * 事件分发器：统一封装 extension 侧事件上报。
- *
- * 当前实现：直接透传到 NM 通道（level 写入事件体）。
- * 未来如需节流 / 聚合 / 去重，集中到本文件即可。
+ * 事件分发器 · 三级节流（F10）：
+ * - urgent：立即 send，零延迟
+ * - notice：200ms 批量 flush，不合并（保留每条事件结构）
+ * - info：1000ms 批量 flush + 同 (type, tabId, frameId) 合并
+ *   （data 包装成 { mergedCount, firstAt, lastAt, samples }，
+ *   最多保留 3 条 sample 原始 data）
  */
 export class EventDispatcher {
-  constructor(private nm: NativeMessagingClient) {}
+  private noticeBuffer: BatchEntry[] = [];
+  private infoBuffer: BatchEntry[] = [];
+  private noticeTimer: ReturnType<typeof setTimeout> | null = null;
+  private infoTimer: ReturnType<typeof setTimeout> | null = null;
 
-  emit(
-    type: string,
-    data: unknown,
-    opts: {
-      tabId?: number;
-      frameId?: number;
-      level?: VtxEventLevel;
-    } = {},
-  ): void {
+  // 可覆盖窗口（便于测试）
+  readonly NOTICE_FLUSH_MS: number;
+  readonly INFO_FLUSH_MS: number;
+  readonly INFO_SAMPLE_LIMIT = 3;
+
+  constructor(
+    private nm: NativeMessagingClient,
+    opts: { noticeFlushMs?: number; infoFlushMs?: number } = {},
+  ) {
+    this.NOTICE_FLUSH_MS = opts.noticeFlushMs ?? 200;
+    this.INFO_FLUSH_MS = opts.infoFlushMs ?? 1000;
+  }
+
+  emit(type: string, data: unknown, opts: EmitOpts = {}): void {
     const level = opts.level ?? eventLevelOf(type);
-    this.nm.send({
-      type: "event",
-      event: type,
+    const entry: BatchEntry = {
+      type,
       data,
       tabId: opts.tabId,
       frameId: opts.frameId,
       level,
+      time: Date.now(),
+    };
+
+    if (level === "urgent") {
+      this.sendEntry(entry);
+      return;
+    }
+
+    if (level === "notice") {
+      this.noticeBuffer.push(entry);
+      if (this.noticeTimer === null) {
+        this.noticeTimer = setTimeout(() => this.flushNotice(), this.NOTICE_FLUSH_MS);
+      }
+      return;
+    }
+
+    // info
+    this.infoBuffer.push(entry);
+    if (this.infoTimer === null) {
+      this.infoTimer = setTimeout(() => this.flushInfo(), this.INFO_FLUSH_MS);
+    }
+  }
+
+  /** 强制立即 flush 所有 buffer（测试 / 进程退出前用） */
+  flushAll(): void {
+    if (this.noticeTimer !== null) {
+      clearTimeout(this.noticeTimer);
+      this.noticeTimer = null;
+    }
+    if (this.infoTimer !== null) {
+      clearTimeout(this.infoTimer);
+      this.infoTimer = null;
+    }
+    this.flushNotice();
+    this.flushInfo();
+  }
+
+  private flushNotice(): void {
+    const batch = this.noticeBuffer;
+    this.noticeBuffer = [];
+    this.noticeTimer = null;
+    for (const entry of batch) this.sendEntry(entry);
+  }
+
+  private flushInfo(): void {
+    const batch = this.infoBuffer;
+    this.infoBuffer = [];
+    this.infoTimer = null;
+
+    // 按 type + tabId + frameId 合并
+    const merged = new Map<
+      string,
+      {
+        firstEntry: BatchEntry;
+        count: number;
+        firstAt: number;
+        lastAt: number;
+        samples: unknown[];
+      }
+    >();
+    for (const e of batch) {
+      const key = `${e.type}::${e.tabId ?? "-"}::${e.frameId ?? "-"}`;
+      const existing = merged.get(key);
+      if (existing) {
+        existing.count++;
+        existing.lastAt = e.time;
+        if (existing.samples.length < this.INFO_SAMPLE_LIMIT) {
+          existing.samples.push(e.data);
+        }
+      } else {
+        merged.set(key, {
+          firstEntry: e,
+          count: 1,
+          firstAt: e.time,
+          lastAt: e.time,
+          samples: [e.data],
+        });
+      }
+    }
+
+    for (const group of merged.values()) {
+      if (group.count === 1) {
+        this.sendEntry(group.firstEntry);
+      } else {
+        this.sendEntry({
+          ...group.firstEntry,
+          data: {
+            mergedCount: group.count,
+            firstAt: group.firstAt,
+            lastAt: group.lastAt,
+            samples: group.samples,
+            note: `${group.count} events of "${group.firstEntry.type}" merged over ${this.INFO_FLUSH_MS}ms window`,
+          },
+        });
+      }
+    }
+  }
+
+  private sendEntry(entry: BatchEntry): void {
+    this.nm.send({
+      type: "event",
+      event: entry.type,
+      data: entry.data,
+      tabId: entry.tabId,
+      frameId: entry.frameId,
+      level: entry.level,
     });
   }
 }
