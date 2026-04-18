@@ -102,6 +102,14 @@ async function runOneScenario(opts: {
       `${flag}  steps=${agent.steps} tokens=${agent.inputTokens + agent.outputTokens} ` +
         `tools=${agent.toolCalls.length} errors=[${agent.errorCodes.join(",")}] ${elapsedMs}ms\n`,
     );
+    // L1 ROI 可视化：是否撞到预期错误码（即 B error-hint 恢复路径是否被触发）
+    if (scenario.expected.expectedErrorCode) {
+      const hit = agent.errorCodes.includes(scenario.expected.expectedErrorCode);
+      const mark = hit ? "↻ recovered" : "→ direct";
+      process.stdout.write(
+        `   [ROI-B] expected=${scenario.expected.expectedErrorCode} ${mark}${pass ? "" : " (but task failed)"}\n`,
+      );
+    }
     for (const c of judge.checks) {
       const mark = c.ok ? "✓" : "✗";
       process.stdout.write(
