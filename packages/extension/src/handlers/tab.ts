@@ -1,4 +1,4 @@
-import { TabActions } from "@bytenew/vortex-shared";
+import { TabActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 
 export function registerTabHandlers(router: ActionRouter): void {
@@ -21,14 +21,14 @@ export function registerTabHandlers(router: ActionRouter): void {
 
     [TabActions.CLOSE]: async (args, tabId) => {
       const targetId = (args.tabId as number) ?? tabId;
-      if (!targetId) throw new Error("No tabId specified");
+      if (!targetId) throw vtxError(VtxErrorCode.INVALID_PARAMS, "tabId is required");
       await chrome.tabs.remove(targetId);
       return { success: true };
     },
 
     [TabActions.ACTIVATE]: async (args) => {
       const targetId = args.tabId as number;
-      if (!targetId) throw new Error("No tabId specified");
+      if (!targetId) throw vtxError(VtxErrorCode.INVALID_PARAMS, "tabId is required");
       const tab = await chrome.tabs.update(targetId, { active: true });
       if (tab.windowId) {
         await chrome.windows.update(tab.windowId, { focused: true });
@@ -38,7 +38,7 @@ export function registerTabHandlers(router: ActionRouter): void {
 
     [TabActions.GET_INFO]: async (args, tabId) => {
       const targetId = (args.tabId as number) ?? tabId;
-      if (!targetId) throw new Error("No tabId specified");
+      if (!targetId) throw vtxError(VtxErrorCode.INVALID_PARAMS, "tabId is required");
       const tab = await chrome.tabs.get(targetId);
       return {
         id: tab.id, url: tab.url, title: tab.title, active: tab.active,

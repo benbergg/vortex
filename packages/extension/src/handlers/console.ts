@@ -1,6 +1,6 @@
 // packages/extension/src/handlers/console.ts
 
-import { ConsoleActions } from "@bytenew/vortex-shared";
+import { ConsoleActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import type { NativeMessagingClient } from "../lib/native-messaging.js";
@@ -24,7 +24,7 @@ const subscribedTabs = new Set<number>();
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) throw new Error("No active tab found");
+  if (!tab?.id) throw vtxError(VtxErrorCode.TAB_NOT_FOUND, "No active tab found");
   return tab.id;
 }
 
