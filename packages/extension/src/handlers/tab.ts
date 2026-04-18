@@ -26,8 +26,8 @@ export function registerTabHandlers(router: ActionRouter): void {
       return { success: true };
     },
 
-    [TabActions.ACTIVATE]: async (args) => {
-      const targetId = args.tabId as number;
+    [TabActions.ACTIVATE]: async (args, tabId) => {
+      const targetId = (args.tabId as number) ?? tabId;
       if (!targetId) throw vtxError(VtxErrorCode.INVALID_PARAMS, "tabId is required");
       const tab = await chrome.tabs.update(targetId, { active: true });
       if (tab.windowId) {
