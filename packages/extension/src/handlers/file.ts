@@ -63,7 +63,12 @@ export function registerFileHandlers(
       });
 
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, { selector });
+      if (res?.error) {
+        let code: VtxErrorCode = VtxErrorCode.JS_EXECUTION_ERROR;
+        if (res.error.startsWith("Element not found:")) code = VtxErrorCode.ELEMENT_NOT_FOUND;
+        else if (res.error === "Element is not a file input") code = VtxErrorCode.INVALID_PARAMS;
+        throw vtxError(code, res.error, { selector });
+      }
       return res?.result;
     },
 

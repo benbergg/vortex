@@ -63,7 +63,12 @@ export function registerJsHandlers(router: ActionRouter): void {
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError(VtxErrorCode.JS_EXECUTION_ERROR, res.error);
+      if (res?.error) {
+        const code = res.error.endsWith("is not a function")
+          ? VtxErrorCode.INVALID_PARAMS
+          : VtxErrorCode.JS_EXECUTION_ERROR;
+        throw vtxError(code, res.error);
+      }
       return res?.result;
     },
   });
