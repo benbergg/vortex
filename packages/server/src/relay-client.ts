@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import type { VtxRequest, VtxResponse } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError, type VtxRequest, type VtxResponse } from "@bytenew/vortex-shared";
 
 export type RelayState =
   | "disconnected"
@@ -145,10 +145,11 @@ export class RelayClient {
           const errResp: VtxResponse = {
             action: msg.action,
             id: msg.id,
-            error: {
-              code: "RELAY_HANDLER_ERROR",
-              message: err?.message ?? String(err),
-            },
+            error: vtxError(
+              VtxErrorCode.INTERNAL_ERROR,
+              err?.message ?? String(err),
+              { extras: { source: "relay" } },
+            ).toJSON(),
           };
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify(errResp));

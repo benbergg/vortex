@@ -1,3 +1,5 @@
+import type { VtxErrorPayload } from "./errors.js";
+
 // ========== 客户端 <-> 中间件 ==========
 
 export interface VtxRequest {
@@ -11,10 +13,7 @@ export interface VtxResponse {
   action: string;
   id: string;
   result?: unknown;
-  error?: {
-    code: string;
-    message: string;
-  };
+  error?: VtxErrorPayload;
 }
 
 export interface VtxEvent {
@@ -38,10 +37,7 @@ export interface NmResponse {
   type: "tool_response";
   requestId: string;
   result?: unknown;
-  error?: {
-    code: string;
-    message: string;
-  };
+  error?: VtxErrorPayload;
 }
 
 export interface NmEvent {
