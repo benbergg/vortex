@@ -23,7 +23,7 @@ const LEVEL_RANK: Record<VtxEventLevel, number> = {
  * 订阅状态存在 MCP 进程内，进程重启后失效（client 需重新订阅）。
  * eventBuffer 容量 50、TTL 60s，上限兜底防内存泄漏。
  */
-class EventStore {
+export class EventStore {
   private subs = new Map<string, Subscription>();
   private buffer: VtxEvent[] = [];
   private readonly BUFFER_LIMIT = 50;
