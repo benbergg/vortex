@@ -1,0 +1,11 @@
+{
+  "layer": "L0",
+  "budgetSteps": 10,
+  "budgetTokens": 70000,
+  "assertions": [
+    { "type": "agent_success" },
+    { "type": "url_contains", "value": "/smoke/navigate/page2" },
+    { "type": "text_in_page", "value": "REACHED" },
+    { "type": "no_error_codes" }
+  ]
+}

@@ -1,13 +1,16 @@
 #!/usr/bin/env node
-// vortex-bench CLI 入口（B2：run 已接入，score/diff 待 B5）
+// vortex-bench CLI 入口。
 
-import { resolve } from "node:path";
+import { readdir, stat } from "node:fs/promises";
+import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
 import { createMcpConnection, closeMcpConnection } from "./runner/mcp-client.js";
-import { runAgent } from "./runner/agent.js";
-import { loadScenario } from "./runner/scenario.js";
-import { resolveProvider } from "./runner/provider.js";
+import { runAgent, type AgentResult } from "./runner/agent.js";
+import { loadScenario, type Scenario } from "./runner/scenario.js";
+import { resolveProvider, type ProviderConfig } from "./runner/provider.js";
+import { startFixtureServer, type FixtureServer } from "./runner/fixtures.js";
+import { runJudge, type JudgeReport } from "./runner/judge.js";
 
 loadEnv();
 
@@ -15,6 +18,7 @@ const USAGE = `vortex-bench <command> [options]
 
 Commands:
   run <scenarioDir>              Run a single scenario directory
+  run --layer <dir>              Run all subdirectories of <dir> (layer batch)
   score <report.json>            Compute VB_Index (B5, not yet implemented)
   diff <baseline> <latest>       Compare two reports (B5, not yet implemented)
   --help                         Show this message
@@ -40,14 +44,113 @@ function printUsage(): void {
 
 function resolveMcpBin(): string {
   if (process.env.VORTEX_MCP_BIN) return resolve(process.env.VORTEX_MCP_BIN);
-  // 默认 workspace 相对路径：packages/vortex-bench/dist → packages/mcp/dist/src/server.js
   const here = fileURLToPath(import.meta.url);
   return resolve(here, "../../..", "mcp", "dist", "src", "server.js");
 }
 
+interface ScenarioOutcome {
+  scenario: Scenario;
+  agent: AgentResult;
+  judge: JudgeReport;
+  elapsedMs: number;
+  pass: boolean;
+}
+
+async function runOneScenario(opts: {
+  scenarioDir: string;
+  provider: ProviderConfig;
+  fixture: FixtureServer;
+  mcpBin: string;
+  maxSteps: number;
+  maxTokens: number;
+}): Promise<ScenarioOutcome> {
+  const scenario = await loadScenario(opts.scenarioDir, {
+    placeholders: { FIXTURE_URL: opts.fixture.url },
+  });
+
+  process.stdout.write(`\n━━━ ${scenario.id} ━━━\n`);
+  process.stdout.write(`task: ${scenario.task.split("\n")[0].slice(0, 100)}...\n`);
+
+  const mcp = await createMcpConnection({
+    command: process.execPath,
+    args: [opts.mcpBin],
+    env: { ...(process.env as Record<string, string>) },
+  });
+
+  try {
+    const started = Date.now();
+    const agent = await runAgent({
+      task: scenario.task,
+      mcp,
+      model: opts.provider.model,
+      ...(opts.provider.authToken ? { authToken: opts.provider.authToken } : {}),
+      ...(opts.provider.apiKey ? { apiKey: opts.provider.apiKey } : {}),
+      baseURL: opts.provider.baseURL,
+      maxSteps: opts.maxSteps,
+      maxTokens: opts.maxTokens,
+    });
+    const elapsedMs = Date.now() - started;
+
+    const judge = await runJudge(scenario.expected.assertions, {
+      agentResult: agent,
+      mcp,
+    });
+
+    const pass = judge.pass;
+    const flag = pass ? "✓ PASS" : "✗ FAIL";
+    process.stdout.write(
+      `${flag}  steps=${agent.steps} tokens=${agent.inputTokens + agent.outputTokens} ` +
+        `tools=${agent.toolCalls.length} errors=[${agent.errorCodes.join(",")}] ${elapsedMs}ms\n`,
+    );
+    for (const c of judge.checks) {
+      const mark = c.ok ? "✓" : "✗";
+      process.stdout.write(
+        `   ${mark} ${c.name}${c.detail ? `  — ${c.detail}` : ""}\n`,
+      );
+    }
+    if (agent.finalText) {
+      process.stdout.write(`   text: ${agent.finalText.slice(0, 160)}\n`);
+    }
+
+    return { scenario, agent, judge, elapsedMs, pass };
+  } finally {
+    await closeMcpConnection(mcp);
+  }
+}
+
+async function collectScenarios(dir: string): Promise<string[]> {
+  const absRoot = resolve(dir);
+  const s = await stat(absRoot);
+  if (!s.isDirectory()) throw new Error(`Not a directory: ${absRoot}`);
+
+  // task.md 存在 → 自身即 scenario；否则递归一层找子目录
+  const selfTask = join(absRoot, "task.md");
+  try {
+    await stat(selfTask);
+    return [absRoot];
+  } catch {
+    // 批量模式
+  }
+
+  const entries = await readdir(absRoot, { withFileTypes: true });
+  const out: string[] = [];
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    const child = join(absRoot, e.name);
+    try {
+      await stat(join(child, "task.md"));
+      out.push(child);
+    } catch {
+      // skip
+    }
+  }
+  out.sort();
+  return out;
+}
+
 async function cmdRun(args: string[]): Promise<number> {
-  const scenarioDir = args[0];
-  if (!scenarioDir) {
+  const target = args[0];
+  if (!target) {
     process.stderr.write("[vortex-bench] run requires <scenarioDir>\n");
     return 1;
   }
@@ -58,58 +161,54 @@ async function cmdRun(args: string[]): Promise<number> {
     ? parseInt(process.env.BENCH_MAX_TOKENS, 10)
     : Number.POSITIVE_INFINITY;
 
-  const scenario = await loadScenario(scenarioDir);
-  process.stdout.write(`[vortex-bench] scenario=${scenario.id}\n`);
+  const scenarios = await collectScenarios(target);
+  if (scenarios.length === 0) {
+    process.stderr.write(`[vortex-bench] no scenarios found under ${target}\n`);
+    return 1;
+  }
+
   process.stdout.write(
-    `[vortex-bench] provider=${provider.provider} model=${provider.model} base=${provider.baseURL}\n`,
+    `[vortex-bench] provider=${provider.provider} model=${provider.model}\n`,
+  );
+  process.stdout.write(`[vortex-bench] scenarios: ${scenarios.length}\n`);
+
+  const fixture = await startFixtureServer();
+  process.stdout.write(`[vortex-bench] fixture server: ${fixture.url}\n`);
+  const mcpBin = resolveMcpBin();
+
+  const outcomes: ScenarioOutcome[] = [];
+  try {
+    for (const s of scenarios) {
+      try {
+        const out = await runOneScenario({
+          scenarioDir: s,
+          provider,
+          fixture,
+          mcpBin,
+          maxSteps,
+          maxTokens,
+        });
+        outcomes.push(out);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`[vortex-bench] scenario ${s} failed: ${msg}\n`);
+      }
+    }
+  } finally {
+    await fixture.close();
+  }
+
+  const passCount = outcomes.filter((o) => o.pass).length;
+  const totalSteps = outcomes.reduce((s, o) => s + o.agent.steps, 0);
+  const totalIn = outcomes.reduce((s, o) => s + o.agent.inputTokens, 0);
+  const totalOut = outcomes.reduce((s, o) => s + o.agent.outputTokens, 0);
+
+  process.stdout.write(
+    `\n━━━ summary ━━━\npass: ${passCount}/${outcomes.length}  ` +
+      `steps: ${totalSteps}  tokens: in=${totalIn} out=${totalOut}\n`,
   );
 
-  const mcpBin = resolveMcpBin();
-  process.stdout.write(`[vortex-bench] spawning vortex-mcp: ${mcpBin}\n`);
-
-  const mcp = await createMcpConnection({
-    command: process.execPath,
-    args: [mcpBin],
-    env: { ...(process.env as Record<string, string>) },
-  });
-  process.stdout.write(`[vortex-bench] mcp tools loaded: ${mcp.tools.length}\n`);
-
-  try {
-    const started = Date.now();
-    const result = await runAgent({
-      task: scenario.task,
-      mcp,
-      model: provider.model,
-      ...(provider.authToken ? { authToken: provider.authToken } : {}),
-      ...(provider.apiKey ? { apiKey: provider.apiKey } : {}),
-      baseURL: provider.baseURL,
-      maxSteps,
-      maxTokens,
-    });
-    const elapsedMs = Date.now() - started;
-
-    process.stdout.write("\n━━━ result ━━━\n");
-    process.stdout.write(`success:           ${result.success}\n`);
-    process.stdout.write(`terminationReason: ${result.terminationReason}`);
-    if (result.terminationDetail) process.stdout.write(` (${result.terminationDetail})`);
-    process.stdout.write("\n");
-    process.stdout.write(`steps:             ${result.steps}\n`);
-    process.stdout.write(`tokens:            in=${result.inputTokens} out=${result.outputTokens}\n`);
-    process.stdout.write(`toolCalls:         ${result.toolCalls.length}\n`);
-    for (const tc of result.toolCalls) {
-      const flag = tc.isError ? "✗" : "✓";
-      process.stdout.write(`  ${flag} ${tc.name}  (errorCodes=${JSON.stringify(tc.errorCodes)})\n`);
-    }
-    if (result.errorCodes.length > 0) {
-      process.stdout.write(`errorCodes seen:   ${result.errorCodes.join(", ")}\n`);
-    }
-    process.stdout.write(`elapsed:           ${elapsedMs}ms\n`);
-    process.stdout.write(`finalText:         ${result.finalText || "(none)"}\n`);
-
-    return result.success ? 0 : 2;
-  } finally {
-    await closeMcpConnection(mcp);
-  }
+  return passCount === outcomes.length ? 0 : 2;
 }
 
 async function main(): Promise<number> {

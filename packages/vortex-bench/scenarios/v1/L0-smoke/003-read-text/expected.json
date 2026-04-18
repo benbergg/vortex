@@ -1,0 +1,11 @@
+{
+  "layer": "L0",
+  "budgetSteps": 6,
+  "budgetTokens": 40000,
+  "assertions": [
+    { "type": "agent_success" },
+    { "type": "url_contains", "value": "/smoke/read-text" },
+    { "type": "text_in_page", "value": "VORTEX_SMOKE_42" },
+    { "type": "no_error_codes" }
+  ]
+}
