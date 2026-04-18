@@ -34,6 +34,8 @@ export const DomActions = {
   GET_ATTRIBUTE: "dom.getAttribute",
   GET_SCROLL_INFO: "dom.getScrollInfo",
   WAIT_FOR_MUTATION: "dom.waitForMutation",
+  WATCH_MUTATIONS: "dom.watchMutations",
+  UNWATCH_MUTATIONS: "dom.unwatchMutations",
 } as const;
 
 export const ContentActions = {

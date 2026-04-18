@@ -17,6 +17,7 @@ import { registerKeyboardHandlers } from "./handlers/keyboard.js";
 import { registerMouseHandlers } from "./handlers/mouse.js";
 import { registerFileHandlers } from "./handlers/file.js";
 import { registerObserveHandlers } from "./handlers/observe.js";
+import { registerMutationHandlers } from "./handlers/mutations.js";
 import { EventDispatcher, registerEventSources } from "./events/dispatcher.js";
 
 const router = new ActionRouter();
@@ -32,6 +33,7 @@ registerContentHandlers(router);
 registerStorageHandlers(router);
 registerCaptureHandlers(router, debuggerMgr);
 registerObserveHandlers(router);
+registerMutationHandlers(router);
 
 // NM 客户端
 const nm = new NativeMessagingClient(
@@ -61,6 +63,8 @@ chrome.runtime.onMessage.addListener((rawMsg, sender) => {
     eventDispatcher.emit(VtxEventType.DIALOG_OPENED, msg.data, { tabId, frameId });
   } else if (msg.event === VtxEventType.FORM_SUBMITTED) {
     eventDispatcher.emit(VtxEventType.FORM_SUBMITTED, msg.data, { tabId, frameId });
+  } else if (msg.event === VtxEventType.DOM_MUTATED) {
+    eventDispatcher.emit(VtxEventType.DOM_MUTATED, msg.data, { tabId, frameId });
   }
 });
 

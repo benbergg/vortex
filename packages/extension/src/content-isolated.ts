@@ -51,4 +51,52 @@
     },
     true,
   );
+
+  // 3. MutationObserver（按需激活，dispatcher info 级会合并）
+  let mutationObserver: MutationObserver | null = null;
+
+  function startMutationWatch(): void {
+    if (mutationObserver) return;
+    mutationObserver = new MutationObserver((mutations) => {
+      // 仅发轻量摘要，避免 page 体大 mutation 被 serialize 全传
+      const addedCount = mutations.reduce(
+        (s, m) => s + (m.addedNodes?.length ?? 0),
+        0,
+      );
+      const removedCount = mutations.reduce(
+        (s, m) => s + (m.removedNodes?.length ?? 0),
+        0,
+      );
+      const attributeCount = mutations.filter(
+        (m) => m.type === "attributes",
+      ).length;
+      send("dom.mutated", {
+        batchSize: mutations.length,
+        added: addedCount,
+        removed: removedCount,
+        attrChanged: attributeCount,
+        url: location.href,
+      });
+    });
+    mutationObserver.observe(document.documentElement || document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: false, // text-only 改动噪音太大，默认关
+    });
+  }
+
+  function stopMutationWatch(): void {
+    if (!mutationObserver) return;
+    mutationObserver.disconnect();
+    mutationObserver = null;
+  }
+
+  // 接 background 的激活 / 去激活指令
+  chrome.runtime.onMessage.addListener((rawMsg) => {
+    const msg = rawMsg as { source?: string; action?: string } | null;
+    if (!msg || msg.source !== "vortex-bg") return;
+    if (msg.action === "start-mutation-watch") startMutationWatch();
+    else if (msg.action === "stop-mutation-watch") stopMutationWatch();
+  });
 })();

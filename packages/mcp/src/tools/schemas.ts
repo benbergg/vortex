@@ -65,6 +65,27 @@ function domTools(): ToolDef[] {
     { name: "vortex_dom_get_attribute", action: "dom.getAttribute", description: "Get the value of a specific HTML attribute of an element. Target by selector or by vortex_observe index. Failures: ELEMENT_NOT_FOUND, STALE_SNAPSHOT, INVALID_INDEX.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector (alternative: index + snapshotId)" }, attribute: { type: "string", description: "Attribute name (e.g. href, src, class)" }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: ["attribute"] } },
     { name: "vortex_dom_get_scroll_info", action: "dom.getScrollInfo", description: "Get scroll position, viewport size, and total scrollable dimensions. Target element by selector or vortex_observe index (omit both for page).", schema: { type: "object", properties: { selector: { type: "string", description: "Element selector (alternative: index + snapshotId; omit both for page)" }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: [] } },
     { name: "vortex_dom_wait_for_mutation", action: "dom.waitForMutation", description: "Wait for DOM changes on an element. Useful for detecting lazy-loaded or dynamically inserted content. Target by selector or by vortex_observe index. Failures: ELEMENT_NOT_FOUND, STALE_SNAPSHOT, INVALID_INDEX.", schema: { type: "object", properties: { selector: { type: "string", description: "CSS selector to observe (alternative: index + snapshotId)" }, timeout: { type: "number", description: "Timeout in ms", default: 10000 }, ...targetSpec, ...optionalTabId, ...optionalFrameId }, required: [] } },
+    {
+      name: "vortex_dom_watch_mutations",
+      action: "dom.watchMutations",
+      description:
+        "Start reporting DOM mutations on a tab as 'dom.mutated' events (info level, dispatcher-merged every 1s). Use with vortex_events_subscribe({types:['dom.mutated'], minLevel:'info'}) to receive them. Heavy on mutation-busy pages — unwatch when done. Failures: JS_EXECUTION_ERROR (content script not injected — reload the page).",
+      schema: {
+        type: "object",
+        properties: { ...optionalTabId },
+        required: [],
+      },
+    },
+    {
+      name: "vortex_dom_unwatch_mutations",
+      action: "dom.unwatchMutations",
+      description: "Stop DOM mutation reporting on a tab.",
+      schema: {
+        type: "object",
+        properties: { ...optionalTabId },
+        required: [],
+      },
+    },
   ];
 }
 
