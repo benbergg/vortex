@@ -326,7 +326,7 @@ function observeTools(): ToolDef[] {
       name: "vortex_observe",
       action: "observe.snapshot",
       description:
-        "⭐ On any non-trivial page, call this first. Using vortex_content_get_text / _html / vortex_dom_query on large pages (>128KB) risks truncation; this tool returns a small structured index of interactive elements indexed by position. Get an LLM-friendly snapshot of the page in ONE call: indexed interactive elements (button/link/input/select/etc.) with role, accessible name, bbox, occlusion status (visible/occludedBy), and key attributes. Prefer this over multiple dom.query calls when exploring what the page can do. Returns a snapshotId; pair with `index` in dom.* tools to operate on elements without guessing CSS selectors. Snapshot TTL: 60s. Failures: TAB_NOT_FOUND, JS_EXECUTION_ERROR.",
+        "⭐ On any non-trivial page, call this first. Using vortex_content_get_text / _html / vortex_dom_query on large pages (>128KB) risks truncation; this tool returns a small structured index of interactive elements indexed by position. Get an LLM-friendly snapshot of the page in ONE call: indexed interactive elements (button/link/input/select/etc.) with role, accessible name, bbox, occlusion status (visible/occludedBy), and key attributes. Prefer this over multiple dom.query calls when exploring what the page can do. Returns a snapshotId; pair with `index` in dom.* tools to operate on elements without guessing CSS selectors. @since 0.4.0: response has `version: 2`; set `frames` to scan iframes (elements from all frames share a global `index` and each element carries `frameId` for routing). Snapshot TTL: 60s. Failures: TAB_NOT_FOUND, JS_EXECUTION_ERROR.",
       schema: {
         type: "object",
         properties: {
@@ -339,7 +339,7 @@ function observeTools(): ToolDef[] {
           },
           maxElements: {
             type: "number",
-            description: "Max elements to return (default 200).",
+            description: "Max elements to return per frame (default 200). When scanning multiple frames, each frame has its own cap.",
             default: 200,
           },
           includeAX: {
@@ -353,6 +353,15 @@ function observeTools(): ToolDef[] {
             description:
               "Compute accessible name from aria-label/labels/innerText (default true).",
             default: true,
+          },
+          frames: {
+            description:
+              "Which frames to scan. 'main' (default, backward compatible): only top frame. 'all-same-origin': descend into same-origin iframes. 'all': descend into all frames (cross-origin may return empty without error). Or pass an array of frameIds. Ignored when the legacy `frameId` param is set (then only that single frame is scanned). @since 0.4.0",
+            oneOf: [
+              { type: "string", enum: ["main", "all-same-origin", "all"] },
+              { type: "array", items: { type: "number" } },
+            ],
+            default: "main",
           },
           ...optionalTabId,
           ...optionalFrameId,

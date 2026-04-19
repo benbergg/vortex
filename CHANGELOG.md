@@ -4,6 +4,26 @@
 
 ---
 
+## [Unreleased] (towards 0.4.0)
+
+### Added
+
+- **`vortex_observe` 多 frame 扫描**：新增 `frames` 参数，`"main"`（默认，向后兼容）/ `"all-same-origin"` / `"all"` / `number[]`。跨 frame 扫描时 `index` 按扫描顺序累加为全局唯一，`element.frameId` 指向元素所在 frame。
+- 响应体升级为 `version: 2`：顶层新增 `frames[]`（每帧含 `frameId / parentFrameId / url / offset / elementCount / truncated / scanned`），`elements[]` 每个元素带 `frameId` 字段。
+- `resolveTarget` 路由升级：按 snapshot `element.frameId` 路由至正确 frame 操作；兼容旧 `entry.frameId` 单 frame 写法。
+- 跨源 iframe 扫描失败标记为 `scanned: false`、`elementCount: 0`，不 throw 不污染结果。
+
+### Changed
+
+- `SnapshotElement` 新增可选 `frameId` 字段；多 frame 时 `SnapshotEntry.frameId` 不填，单 frame 兼容旧 hint。
+- 向后兼容：`frameId` 单值参数保持原语义（只扫该 frame）；不传 `frames` / 不传 `frameId` 时仅扫主 frame，返回结构除 `version` / `frames[]` / `element.frameId` 字段外与 v0.3 行为一致。
+
+### Tests
+
+- 新增 `tests/observe-multi-frame.test.ts`（8 用例）：默认 main / all-same-origin 跨 frame / 跨源排除 / entry.frameId 单帧兼容 / per-element frameId 路由 / legacy frameId 优先 / 扫描失败降级 / 无 frame IFRAME_NOT_READY。
+
+---
+
 ## [0.3.0] - 2026-04-19
 
 > **发布性质**：结构型版本。主要价值是 **bench 方法论升级 + L1b 新层 + content 护栏**，bench canonical 分数因 N=3 揭示 flakiness 从 75.1 回退到 71.08（非 v0.3 代码引起；详见 Metrics 段）。B error-hint ROI 仍 null——L1b fixture 强化需在 v0.3.1 跟进。

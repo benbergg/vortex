@@ -54,7 +54,8 @@ export function resolveTarget(args: Record<string, unknown>): ResolvedTarget {
     return {
       selector: hit.selector,
       boundTabId: entry.tabId,
-      boundFrameId: entry.frameId,
+      // 跨 frame snapshot 时 element.frameId 才是权威；回退到 entry.frameId（兼容旧单 frame snapshot）
+      boundFrameId: hit.frameId ?? entry.frameId,
     };
   }
 
