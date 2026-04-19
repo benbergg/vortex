@@ -68,7 +68,7 @@ const DEFAULT_SYSTEM = `You are an autonomous browser-automation agent operating
 Rules:
 - Use the provided tools to accomplish the user task.
 - Each tool response may include structured error fields { code, hint, recoverable, context } — read hint before retrying.
-- Prefer calling vortex_observe to get an element index, then use index-based dom.* tools over brittle selectors.
+- On unknown or complex pages, call vortex_observe BEFORE any vortex_content_get_text / _html / vortex_dom_query to avoid filling context with 100KB+ of DOM. Then use index-based dom.* tools over brittle selectors.
 - Stop and return a short summary when the task is done (no more tool_use blocks).`;
 
 export async function runAgent(opts: AgentOptions): Promise<AgentResult> {
