@@ -1,0 +1,11 @@
+{
+  "layer": "L1b",
+  "expectedErrorCode": "ELEMENT_DISABLED",
+  "budgetSteps": 15,
+  "budgetTokens": 120000,
+  "disabledTools": ["vortex_observe"],
+  "assertions": [
+    { "type": "agent_success" },
+    { "type": "url_contains", "value": "?done=1" }
+  ]
+}

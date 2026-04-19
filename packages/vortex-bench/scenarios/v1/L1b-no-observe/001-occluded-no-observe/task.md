@@ -1,0 +1,1 @@
+Use the browser's active tab. Navigate to `{{FIXTURE_URL}}/anti/occluded`, then click the Submit button to complete the task (the URL must end up containing `?done=1`). If a tool returns an error with a `hint` field, read the hint carefully and adjust your plan. Stop when done.
