@@ -9,7 +9,50 @@ import {
   type SnapshotElement,
 } from "../lib/snapshot-store.js";
 
-type FramesParam = "main" | "all-same-origin" | "all" | number[];
+type FramesParam =
+  | "main"
+  | "all-same-origin"
+  /** @since 0.4.0 (O-6)：按扩展 manifest host_permissions 过滤，不用严格 origin 同源 */
+  | "all-permitted"
+  | "all"
+  | number[];
+
+/**
+ * 轻量 MV3 match pattern 匹配器：支持 `<all_urls>` / `scheme://host-pattern/path-pattern`。
+ * scheme 里 `*` 代表 http|https，host 里 `*.example.com` 代表任意子域 / example.com 本身。
+ * 不支持 port / 完整正则——对扩展 manifest 通常足够。
+ */
+function matchesHostPermission(pattern: string, url: URL): boolean {
+  if (pattern === "<all_urls>") {
+    return /^(https?|ws|wss|ftp|file):$/.test(url.protocol);
+  }
+  const m = pattern.match(/^([^:]+):\/\/([^/]+)\/(.*)$/);
+  if (!m) return false;
+  const [, scheme, host] = m;
+  const urlScheme = url.protocol.replace(/:$/, "");
+  if (scheme !== "*" && scheme !== urlScheme) {
+    if (!(scheme === "*" && /^(https?)$/.test(urlScheme))) return false;
+  }
+  if (host === "*") return true;
+  if (host.startsWith("*.")) {
+    const base = host.slice(2);
+    return url.hostname === base || url.hostname.endsWith("." + base);
+  }
+  return host === url.hostname;
+}
+
+function isFrameInPermissions(url: string): boolean {
+  try {
+    const u = new URL(url);
+    // 非 HTTP(S) frame（chrome:// / about:blank / data:）视为不可 scan
+    if (!/^https?:|^ws:|^wss:$/.test(u.protocol)) return false;
+    const manifest = chrome.runtime.getManifest();
+    const patterns = manifest.host_permissions ?? [];
+    return patterns.some((p) => matchesHostPermission(p, u));
+  } catch {
+    return false;
+  }
+}
 
 interface FrameTarget {
   frameId: number;
@@ -79,6 +122,11 @@ async function resolveTargetFrames(
   }
   if (framesParam === "all") {
     return asTargets(all);
+  }
+  if (framesParam === "all-permitted") {
+    // 按扩展 manifest host_permissions 过滤。host_permissions=<all_urls> 时
+    // 行为等同 "all"；当 manifest 收紧 host_permissions 时，只 scan 有权限的。
+    return asTargets(all.filter((f) => isFrameInPermissions(f.url)));
   }
   if (framesParam === "all-same-origin") {
     const main = all.find((f) => f.frameId === 0);

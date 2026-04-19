@@ -8,6 +8,8 @@
 
 ### Added
 
+- **`vortex_observe` 新增 `frames: "all-permitted"`**（O-6）：按扩展 `manifest.host_permissions` 过滤 iframe，而不是严格 origin 同源。真实踩坑案例——`testc.bytenew.com` 页面里的主功能位于 `voc-testc.bytenew.com` 跨源 iframe，扩展对 `*.bytenew.com` 有权限但 `all-same-origin` 会漏掉它，导致"看不见菜单 → 回退到 js_evaluate 手摸"的坑。`all-permitted` 解决这个——manifest 是 `<all_urls>` 时等同 `all`，当 manifest 收紧时才真正过滤。内置轻量 MV3 match pattern 匹配器（支持 `<all_urls>` + `scheme://host-pattern/path`，含 `*.domain.com` 子域通配），不依赖 `chrome.permissions` API 以避免扩大扩展权限。
+- 非 HTTP(S)/ws(s) 的 frame（`about:blank` / `chrome://newtab/` 等）在 `all-permitted` 模式下自动跳过。
 - **`vortex_dom_commit` 支持 `kind: "checkbox-group"`**（O-10，消灭 3 个 session 踩过的同一个坑）：Element Plus `<el-checkbox-group>` 的幂等 toggle。传 `{values: ["好评"]}`，driver diff 当前 `.is-checked` 与目标 labels 的对称差，**逐个** `input.click()` + `await setTimeout 40ms` 让 Vue reactivity 在每次 toggle 间跑完 render cycle——修掉 `forEach(btn=>btn.click())` 被 Element Plus 合并成"只切最后一次"的坑。失败抛 `COMMIT_FAILED{stage:"verify"}`，extras 带 `checkedNow / wanted / toggled`。未知 label 抛 `INVALID_PARAMS` 并列出 `available`。
 - **`vortex_observe` 元素带 `state` 字段**（O-8）：从 element 自身 + 最近 2 层 ancestor 扫 `.is-checked` / `.is-selected` / `.is-active` / `aria-checked=true` / `aria-selected=true` / `aria-pressed=true` / `disabled` / `aria-disabled`。代理不再需要额外 js_evaluate 补查框架状态（Element Plus 把 checked 放 label.is-checked 而不在 input 上，之前每次 session 都要踩一遍）。只有任一状态位为 true 时才附加 `state` 字段，保持常规元素的输出干净。
 - **扩展自重载**（O-3b，对称 O-3）：vortex-server 启动时 `fs.watch(packages/extension/dist/)`，`.js` / `.html` / `manifest.json` 变化 → 2s debounce → 通过 native messaging 推送 `{type:"control", action:"reload-extension"}` → 扩展 background 收到后调 `chrome.runtime.reload()`（Chrome 对 load-unpacked 扩展会重读磁盘 dist）。上次 session 踩到的"O-1 报 `diagnosticsSupported:false` 但没法自动刷扩展"的坑被这个修掉：现在 `pnpm -C packages/extension build` 后 2s 内扩展自动换新，无需人肉 `chrome://extensions` 点重载。
@@ -47,6 +49,7 @@
 
 ### Tests
 
+- 新增 `packages/extension/tests/observe-all-permitted.test.ts`（4 用例）：<all_urls> 下跨源 frame 被扫 / 限制 host_permissions 时过滤生效 / 非 HTTP 协议跳过 / 三种 frames 值（all-same-origin / all-permitted / all）行为对比。
 - 新增 `packages/extension/tests/checkbox-group-commit.test.ts`（8 用例）：driver 注册表 + dom.ts 源码合约（for…of + await tick / is-checked 作为幂等判定 / verify 失败抛 COMMIT_FAILED / 未知 label 抛 INVALID_PARAMS）。
 - 新增 `packages/extension/tests/observe-ui-state.test.ts`（7 用例）：getUiState 读 class + aria 的 6 个 state 位 / 仅在非空时附加 state 字段 / 类型层有 state?: 定义。
 - 新增 `packages/extension/tests/extension-self-reload.test.ts`（13 用例）：源码级合约测试固化 O-3b 的跨三文件不变式（protocol.ts 的 NmControl 定义 / server watcher 的 opt-out + debounce + 文件过滤 + 写消息路径 + 从 startServer 调用 / extension background 的 control 分支 + chrome.runtime.reload 包 setTimeout）。
