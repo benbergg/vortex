@@ -27,6 +27,8 @@ interface ScannedElement {
   inViewport: boolean;
   occludedBy?: string;
   attrs: Record<string, string>;
+  /** Framework UI state derived from class / aria. @since 0.4.0 (O-8) */
+  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean };
   _sel: string;
 }
 
@@ -227,6 +229,52 @@ async function scanOneFrame(
           );
         }
 
+        // O-8: framework UI state from class / aria.
+        // 代理拿到 observe 结果时最需要的两个问题：
+        //   1. checkbox/radio 当前是不是 checked（Element Plus 把状态放在 label.is-checked，不在 input）
+        //   2. tab 当前是不是 active（div.is-active / [aria-selected=true]）
+        // 下面的 getUiState 沿 el 自身 + 上溯 2 层 ancestor 扫这几个 class / aria。
+        function getUiState(el: HTMLElement): {
+          checked?: boolean;
+          selected?: boolean;
+          active?: boolean;
+          disabled?: boolean;
+        } | undefined {
+          const s: {
+            checked?: boolean;
+            selected?: boolean;
+            active?: boolean;
+            disabled?: boolean;
+          } = {};
+          let cur: Element | null = el;
+          for (let i = 0; i < 3 && cur; i++, cur = cur.parentElement) {
+            const cls =
+              typeof cur.className === "string" ? cur.className : "";
+            if (s.checked === undefined) {
+              if (cls.includes("is-checked") || cur.getAttribute("aria-checked") === "true") {
+                s.checked = true;
+              }
+            }
+            if (s.selected === undefined) {
+              if (cls.includes("is-selected") || cur.getAttribute("aria-selected") === "true") {
+                s.selected = true;
+              }
+            }
+            if (s.active === undefined) {
+              if (cls.includes("is-active") || cur.getAttribute("aria-pressed") === "true") {
+                s.active = true;
+              }
+            }
+          }
+          if (
+            (el as HTMLInputElement).disabled === true ||
+            el.hasAttribute("aria-disabled")
+          ) {
+            s.disabled = true;
+          }
+          return Object.keys(s).length > 0 ? s : undefined;
+        }
+
         const nodeList = document.querySelectorAll(INTERACTIVE_SELECTORS);
         const elements: Array<{
           index: number;
@@ -238,6 +286,7 @@ async function scanOneFrame(
           inViewport: boolean;
           occludedBy?: string;
           attrs: Record<string, string>;
+          state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean };
           _sel: string;
         }> = [];
 
@@ -287,6 +336,7 @@ async function scanOneFrame(
           const name = withText ? getAccessibleName(htmlEl) : "";
 
           // 这里的 index 是 frame 内局部 id，observer handler 侧重编全局 index
+          const state = getUiState(htmlEl);
           elements.push({
             index: elements.length,
             tag: htmlEl.tagName.toLowerCase(),
@@ -302,6 +352,7 @@ async function scanOneFrame(
             inViewport,
             occludedBy,
             attrs,
+            ...(state ? { state } : {}),
             _sel: buildSelector(htmlEl),
           });
         }
@@ -436,6 +487,7 @@ export function registerObserveHandlers(router: ActionRouter): void {
             inViewport: e.inViewport,
             occludedBy: e.occludedBy,
             attrs: e.attrs,
+            ...(e.state ? { state: e.state } : {}),
             frameId: s.frameId,
             // LLM-friendly 下一步命令提示。coordSpace="frame" 默认按 frameId 自动换算。
             suggestedUsage: {
