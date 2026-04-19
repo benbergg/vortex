@@ -12,18 +12,27 @@
 - `iframe-offset` 支持嵌套 iframe 偏移累加（原实现只算直接父 frame，跨两层以上 iframe 会错位）。跨源父 frame 执行失败时整体回退到 `{0,0}` 并允许调用方显式改走 `coordSpace: "viewport"`。
 - **`vortex_network_get_logs` / `_get_errors` / `_filter` / `_get_response_body` 首次调用自动订阅**：无需先调 `vortex_network_subscribe` 即可拿到 XHR/Fetch 日志。首次触达 tab 时自动 `enableDomain(Network)` + 加入 `subscribedTabs`，后续调用幂等。显式 `SUBSCRIBE` 仍可覆盖 urlPattern / types / maxApiLogs 配置，职责从"启用"退化为"调参"。
 - network schema 描述补"Auto-subscribes on first call" 提示。
+- **`vortex_page_wait_for_xhr_idle`** 新工具：只盯 CDP 请求 type 为 `XHR`/`Fetch` 的请求 idle，忽略 WebSocket / Image / Stylesheet / Font，专解 SPA 上"后台 telemetry 长连导致 network_idle 永不到"的痛点。默认 idleTime 200ms、timeout 10s。
+- **`vortex_page_wait_for_network_idle` 增强**：新增三个可选参数：
+  - `urlPattern: string` —— 只计数 URL 含该子串的请求
+  - `requestTypes: string[]` —— CDP 请求 type 白名单（如 `["XHR","Fetch"]`）
+  - `minRequests: number` —— 至少看到 N 个匹配请求发起过才允许 resolve，防止"页面静止时瞬间假 idle"
+- 返回体新增 `matchedRequests: number` 字段，便于调用方确认过滤器是否命中。
 
 ### Changed
 
 - `vortex_mouse_*` 工具的 `description` 统一补充 frame-aware 行为说明。
 - 静态资源默认不收（`includeResources` 需要配合显式 `SUBSCRIBE` 打开资源侧订阅），避免自动订阅引入大量噪声。
 - `network_get_response_body` 的 hint 改写：自动订阅生效后提示代理"触发请求再取"，不再指示用户手动 subscribe。
+- `waitForNetworkIdle` 内部抽象为 `awaitIdle(tabId, opts)` 通用助手，`waitForXhrIdle` 复用。
+- `awaitIdle` 按 `requestId` 集合追踪 pending，只对过滤命中的请求计数并在 `loadingFinished/loadingFailed` 时核验 id——修掉旧实现"过滤掉的请求也递减 pending 导致假 idle"的 bug。
 
 ### Tests
 
 - 新增 `tests/iframe-offset.test.ts`（7 用例）覆盖主 frame / 单层 / 嵌套 / 跨源失败 / 未知 frameId 五种路径。
 - 新增 `tests/mouse-handlers.test.ts`（8 用例）覆盖 CLICK / DOUBLE_CLICK / MOVE 三类工具的 viewport / frame-local / 显式 coordSpace 覆盖 / INVALID_PARAMS / 偏移回退场景。
 - 新增 `tests/network-auto-subscribe.test.ts`（6 用例）覆盖首次自动订阅 / 幂等 / GET_ERRORS + FILTER 同样走自动订阅 / 显式 SUBSCRIBE 覆盖 / 多 tab 独立订阅。因 `network.ts` 含模块级 state，测试使用 `vi.resetModules` + 动态 import 隔离。
+- 新增 `tests/page-wait-idle.test.ts`（7 用例）：无请求瞬间 idle / 忽略 WebSocket+Image / XHR 挂起不 idle / urlPattern 过滤 / minRequests gate / TIMEOUT / ghost loadingFinished 不误触发。使用 `vi.useFakeTimers + advanceTimersByTimeAsync`。
 
 ---
 
