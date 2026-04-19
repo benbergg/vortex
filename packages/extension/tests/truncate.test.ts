@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { truncateByCodePoints } from "../src/lib/truncate.js";
+import { truncateByCodePoints, truncateWithTextTrailer, truncateWithHtmlTrailer } from "../src/lib/truncate.js";
 
 describe("truncateByCodePoints", () => {
   it("returns original string when length is within limit", () => {
@@ -38,5 +38,46 @@ describe("truncateByCodePoints", () => {
 
   it("returns empty string when limit is 0", () => {
     expect(truncateByCodePoints("hello", 0)).toBe("");
+  });
+});
+
+describe("truncateWithTextTrailer", () => {
+  it("returns original when under limit", () => {
+    const out = truncateWithTextTrailer("small text", 100);
+    expect(out).toBe("small text");
+  });
+
+  it("appends plain-text trailer when truncated", () => {
+    const input = "x".repeat(200);
+    const out = truncateWithTextTrailer(input, 100);
+    expect(out.startsWith("x".repeat(100))).toBe(true);
+    expect(out).toContain("\n\n[VORTEX_TRUNCATED");
+    expect(out).toContain("original=200");
+    expect(out).toContain("limit=100");
+    expect(out).toContain("vortex_observe");
+  });
+
+  it("keeps truncated content length at exactly limit code points", () => {
+    const input = "a".repeat(200);
+    const out = truncateWithTextTrailer(input, 100);
+    const prefix = out.split("\n\n[VORTEX_TRUNCATED")[0];
+    expect([...prefix].length).toBe(100);
+  });
+});
+
+describe("truncateWithHtmlTrailer", () => {
+  it("returns original when under limit", () => {
+    const out = truncateWithHtmlTrailer("<p>small</p>", 100);
+    expect(out).toBe("<p>small</p>");
+  });
+
+  it("appends HTML-comment trailer when truncated", () => {
+    const input = "<p>" + "x".repeat(200) + "</p>";
+    const out = truncateWithHtmlTrailer(input, 50);
+    expect(out).toContain("<!-- [VORTEX_TRUNCATED");
+    expect(out).toContain("original=");
+    expect(out).toContain("limit=50");
+    expect(out).toContain("vortex_observe");
+    expect(out.endsWith("-->")).toBe(true);
   });
 });
