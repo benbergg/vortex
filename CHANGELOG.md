@@ -4,6 +4,24 @@
 
 ---
 
+## [Unreleased] (towards 0.4.0)
+
+### Added
+
+- **`vortex_network_get_logs` / `_get_errors` / `_filter` / `_get_response_body` 首次调用自动订阅**：无需先调 `vortex_network_subscribe` 即可拿到 XHR/Fetch 日志。首次触达 tab 时自动 `enableDomain(Network)` + 加入 `subscribedTabs`，后续调用幂等。显式 `SUBSCRIBE` 仍可覆盖 urlPattern / types / maxApiLogs 配置，职责从"启用"退化为"调参"。
+- schema 描述补"Auto-subscribes on first call" 提示。
+
+### Changed
+
+- 静态资源默认不收（`includeResources` 需要配合显式 `SUBSCRIBE` 打开资源侧订阅），避免自动订阅引入大量噪声。
+- `get_response_body` 的 hint 改写：自动订阅生效后提示代理"触发请求再取"，不再指示用户手动 subscribe。
+
+### Tests
+
+- 新增 `tests/network-auto-subscribe.test.ts`（6 用例）覆盖首次自动订阅 / 幂等 / GET_ERRORS + FILTER 同样走自动订阅 / 显式 SUBSCRIBE 覆盖 / 多 tab 独立订阅。因 `network.ts` 含模块级 state，测试使用 `vi.resetModules` + 动态 import 隔离。
+
+---
+
 ## [0.3.0] - 2026-04-19
 
 > **发布性质**：结构型版本。主要价值是 **bench 方法论升级 + L1b 新层 + content 护栏**，bench canonical 分数因 N=3 揭示 flakiness 从 75.1 回退到 71.08（非 v0.3 代码引起；详见 Metrics 段）。B error-hint ROI 仍 null——L1b fixture 强化需在 v0.3.1 跟进。
