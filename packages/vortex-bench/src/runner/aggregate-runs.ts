@@ -1,8 +1,7 @@
-import type { ScenarioDataPoint, ScenarioMetrics } from "./metrics.js";
+import type { ScenarioDataPoint } from "./metrics.js";
+import { scoreOf } from "./metrics.js";
 
-export function scoreOf(m: ScenarioMetrics): number {
-  return 60 * m.correctness + 15 * m.efficiency + 15 * m.robustness + 10 * m.utilization;
-}
+export { scoreOf };
 
 function tokensOf(p: ScenarioDataPoint): number {
   return p.agent.inputTokens + p.agent.outputTokens;

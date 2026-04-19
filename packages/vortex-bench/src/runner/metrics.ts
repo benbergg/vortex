@@ -104,6 +104,24 @@ export function computeScenarioMetrics(args: {
 
 // ─── 层级聚合 ───
 
+/**
+ * 层级 score 公式：60C + 15E + 15R + 10U。
+ * 用于 per-scenario 排序（aggregate-runs.pickRepresentativeIndex）+ 层级聚合（aggregateLayer）。
+ */
+export function scoreOf(
+  m: Pick<
+    ScenarioMetrics,
+    "correctness" | "efficiency" | "robustness" | "utilization"
+  >,
+): number {
+  return (
+    60 * m.correctness +
+    15 * m.efficiency +
+    15 * m.robustness +
+    10 * m.utilization
+  );
+}
+
 export interface LayerAggregate {
   layer: string;
   count: number;
@@ -139,8 +157,7 @@ export function aggregateLayer(
   const efficiency = avg((p) => p.metrics.efficiency);
   const robustness = avg((p) => p.metrics.robustness);
   const utilization = avg((p) => p.metrics.utilization);
-  const score =
-    60 * correctness + 15 * efficiency + 15 * robustness + 10 * utilization;
+  const score = scoreOf({ correctness, efficiency, robustness, utilization });
 
   return {
     layer: label,
