@@ -122,6 +122,12 @@ export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
     hint: "Unknown action. Check spelling or verify the action is supported in this vortex version.",
     recoverable: false,
   },
+
+  // -- 组件 / 框架 --
+  UNSUPPORTED_TARGET: {
+    hint: "Target is a framework-controlled component (e.g. Element Plus datetime-range picker). Use vortex_dom_commit with a matching kind instead of vortex_dom_fill/type.",
+    recoverable: false,
+  },
 };
 
 /**

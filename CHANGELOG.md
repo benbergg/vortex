@@ -20,6 +20,10 @@
 - 返回体新增 `matchedRequests: number` 字段，便于调用方确认过滤器是否命中。
 - **`vortex_dom_wait_settled`** 新工具：页内注入 `MutationObserver` 监视子树，在 `quietMs`（默认 300ms）内无任何 mutation 即返回。与已有 `vortex_dom_wait_for_mutation`（等待 CHANGE）互补。不传 selector 时观察 `document.body` 整棵树。返回体含 `{ settled: true, waitedMs, mutationsSeen }`。典型用法：点击筛选按钮触发 re-render 后立刻调用确保列表重排完成再读计数，避免把"渲染中间态"当作稳定状态。
 - `DomActions.WAIT_SETTLED` 枚举位。
+- **`vortex_dom_fill` framework-aware 拒绝**：命中受控组件（Element Plus datetime/date range picker & cascader、Ant Design RangePicker）时抛 `UNSUPPORTED_TARGET`，并在 hint 中指引代理改走 `vortex_dom_commit`。杜绝"DOM input.value 改了但组件状态没同步"的隐蔽 false-positive。
+- `fallbackToNative: true` 参数（`dom_fill`）：兜底过渡开关。旧代理若强依赖松弛写值，可一版 window 期内显式开启；目标是 v0.5 前全面收紧。
+- `VtxErrorCode.UNSUPPORTED_TARGET` 错误码 + `DEFAULT_ERROR_META` 对应 hint。
+- 新增模块 `packages/extension/src/patterns/`：集中声明 fill 拒绝模式的 `{id, closestSelector, reason, suggestedTool}` 注册表，为后续 commit driver 扩展预留入口。
 
 ### Changed
 
@@ -28,6 +32,7 @@
 - `network_get_response_body` 的 hint 改写：自动订阅生效后提示代理"触发请求再取"，不再指示用户手动 subscribe。
 - `waitForNetworkIdle` 内部抽象为 `awaitIdle(tabId, opts)` 通用助手，`waitForXhrIdle` 复用。
 - `awaitIdle` 按 `requestId` 集合追踪 pending，只对过滤命中的请求计数并在 `loadingFinished/loadingFailed` 时核验 id——修掉旧实现"过滤掉的请求也递减 pending 导致假 idle"的 bug。
+- `vortex_dom_fill` description 的 `Failures:` 段补充 `UNSUPPORTED_TARGET`。
 
 ### Tests
 
@@ -36,6 +41,8 @@
 - 新增 `tests/network-auto-subscribe.test.ts`（6 用例）覆盖首次自动订阅 / 幂等 / GET_ERRORS + FILTER 同样走自动订阅 / 显式 SUBSCRIBE 覆盖 / 多 tab 独立订阅。因 `network.ts` 含模块级 state，测试使用 `vi.resetModules` + 动态 import 隔离。
 - 新增 `tests/page-wait-idle.test.ts`（7 用例）：无请求瞬间 idle / 忽略 WebSocket+Image / XHR 挂起不 idle / urlPattern 过滤 / minRequests gate / TIMEOUT / ghost loadingFinished 不误触发。使用 `vi.useFakeTimers + advanceTimersByTimeAsync`。
 - 新增 `tests/dom-wait-settled.test.ts`（7 用例）：默认返回 / selector 透传 / 'DOM did not settle' → TIMEOUT / 'Element not found:' → ELEMENT_NOT_FOUND / 'document.body not found' → ELEMENT_NOT_FOUND / 任意报错 → JS_EXECUTION_ERROR / 默认 quietMs=300 + timeout=8000。
+- 新增 `tests/fill-reject-patterns.test.ts`（7 用例）覆盖 pattern 注册表完整性 + 拒绝决策算法（含 `fallbackToNative` bypass）。
+- `packages/shared/tests/errors.test.ts` 用例总数 24 → 25，单独断言 `UNSUPPORTED_TARGET`。
 
 ---
 
