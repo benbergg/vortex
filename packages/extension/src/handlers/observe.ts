@@ -382,7 +382,16 @@ export function registerObserveHandlers(router: ActionRouter): void {
       }
 
       // 分配跨 frame 全局 index（按 frameTargets 顺序）
-      const elementsOut: Array<Omit<ScannedElement, "_sel"> & { frameId: number }> = [];
+      // 每个元素附加 suggestedUsage：给 LLM 直接可用的下一步命令，避免再自行推断应传 frameId。
+      const elementsOut: Array<
+        Omit<ScannedElement, "_sel"> & {
+          frameId: number;
+          suggestedUsage: {
+            click: string;
+            domClick: string;
+          };
+        }
+      > = [];
       const elementMap: SnapshotElement[] = [];
       let cursor = 0;
       let totalCandidates = 0;
@@ -415,6 +424,8 @@ export function registerObserveHandlers(router: ActionRouter): void {
         anyTruncated = anyTruncated || s.page.truncated;
         for (const e of s.page.elements) {
           const globalIdx = cursor++;
+          const centerX = e.bbox.x + Math.round(e.bbox.w / 2);
+          const centerY = e.bbox.y + Math.round(e.bbox.h / 2);
           elementsOut.push({
             index: globalIdx,
             tag: e.tag,
@@ -426,6 +437,13 @@ export function registerObserveHandlers(router: ActionRouter): void {
             occludedBy: e.occludedBy,
             attrs: e.attrs,
             frameId: s.frameId,
+            // LLM-friendly 下一步命令提示。coordSpace="frame" 默认按 frameId 自动换算。
+            suggestedUsage: {
+              // 首选：按 snapshot index 路由（最稳，不怕选择器变化）
+              domClick: `vortex_dom_click({ index: ${globalIdx}, snapshotId: "<this-snapshot-id>" })`,
+              // 需要真实鼠标事件时：frame-local 坐标 + frameId，server 自动换算
+              click: `vortex_mouse_click({ x: ${centerX}, y: ${centerY}, frameId: ${s.frameId} })`,
+            },
           });
           elementMap.push({
             index: globalIdx,

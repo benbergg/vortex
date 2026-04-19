@@ -17,7 +17,7 @@ export interface VtxErrorMeta {
 export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
   // -- 元素定位 --
   ELEMENT_NOT_FOUND: {
-    hint: "Element not found. Verify the selector, or call vortex_observe to list visible interactive elements.",
+    hint: "Element not found. Verify the selector, or call vortex_observe to list interactive elements. If the element may live inside an iframe, call vortex_observe({frames:'all-same-origin'}) to descend into iframes — then use the returned element.frameId with dom.* / mouse_click for auto-offset routing.",
     recoverable: true,
   },
   ELEMENT_OCCLUDED: {
@@ -55,7 +55,7 @@ export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
     recoverable: true,
   },
   IFRAME_NOT_READY: {
-    hint: "Target iframe is not ready or not yet loaded. Call vortex_frames_list after a short wait.",
+    hint: "Target iframe is not ready or not yet loaded. Call vortex_frames_list after a short wait, or retry vortex_observe with frames:'all-same-origin' — the returned elements will carry frameId so follow-up mouse_click / dom.* can route correctly.",
     recoverable: true,
   },
 

@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
+import { createRequire } from "node:module";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -8,6 +10,21 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { sendRequest } from "./client.js";
 import { getToolDefs, getToolDef } from "./tools/registry.js";
+
+const require_ = createRequire(import.meta.url);
+const MCP_VERSION: string = (require_("../../package.json") as { version: string }).version;
+
+/**
+ * 计算当前 MCP 注册的所有工具指纹。
+ * 变更任一工具 name / action / description 都会影响 hash。
+ * 代理拿到 ping 响应里的 schemaHash 可对比自己缓存的版本，
+ * 判断 MCP server 是否被重启过（典型场景：merge 了新 PR 但 Claude Code 还没重启）。
+ */
+function computeSchemaHash(): string {
+  const defs = getToolDefs();
+  const payload = defs.map((d) => `${d.name}:${d.action}:${d.description.length}`).sort().join("|");
+  return createHash("sha256").update(payload).digest("hex").slice(0, 12);
+}
 import {
   saveBase64Image,
   getImageSize,
@@ -119,11 +136,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
-  // 特殊 tool: vortex_ping（MCP 自身诊断）
+  // 特殊 tool: vortex_ping（MCP 自身诊断 + 版本指纹，@since 0.4.0）
   if (toolDef.action === "__mcp_ping__") {
     try {
-      const resp = await sendRequest("tab.list", {}, PORT, undefined, 5000);
-      const tabs = Array.isArray(resp.result) ? resp.result : [];
+      const [tabsResp, versionResp] = await Promise.allSettled([
+        sendRequest("tab.list", {}, PORT, undefined, 5000),
+        sendRequest("diagnostics.version", {}, PORT, undefined, 5000),
+      ]);
+      const tabs =
+        tabsResp.status === "fulfilled" && Array.isArray(tabsResp.value.result)
+          ? tabsResp.value.result
+          : [];
+      const versionInfo =
+        versionResp.status === "fulfilled"
+          ? (versionResp.value.result as {
+              extensionVersion?: string;
+              actionCount?: number;
+              actions?: string[];
+            } | undefined) ?? {}
+          : {};
+      const toolCount = getToolDefs().length;
+      const schemaHash = computeSchemaHash();
+
+      // 版本漂移检测：MCP 与扩展的语义主版本不一致时给出明显提示。
+      const extVersion = versionInfo.extensionVersion;
+      const versionDrift =
+        extVersion && extVersion !== "unknown" && extVersion !== MCP_VERSION
+          ? `MCP (${MCP_VERSION}) ≠ extension (${extVersion}). Rebuild + reload may be needed.`
+          : undefined;
+      // 扩展太旧时，它汇报的 actions 不会包含 diagnostics.version，此时 versionInfo 为空。
+      const diagnosticsSupported = typeof extVersion === "string";
+
       return {
         content: [{
           type: "text" as const,
@@ -132,6 +175,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             vortexServer: `localhost:${PORT}`,
             tabCount: tabs.length,
             timeoutMs: DEFAULT_TIMEOUT,
+            mcpVersion: MCP_VERSION,
+            extensionVersion: extVersion ?? "unknown",
+            schemaHash,
+            toolCount,
+            extensionActionCount: versionInfo.actionCount ?? null,
+            diagnosticsSupported,
+            ...(versionDrift ? { warning: versionDrift } : {}),
           }, null, 2),
         }],
       };

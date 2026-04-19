@@ -130,7 +130,7 @@ function mouseTools(): ToolDef[] {
     {
       name: "vortex_mouse_click",
       action: "mouse.click",
-      description: "Click at specific x,y coordinates using CDP real mouse events (mousedown + mouseup sequence). Use this when dom.click doesn't trigger expected behavior (React synthetic events, anti-bot detection). For element-based clicking, prefer vortex_dom_click with useRealMouse=true. When frameId is provided, x/y are treated as frame-local coordinates and automatically offset to viewport (@since 0.4.0).",
+      description: "⭐ If clicking inside an iframe, PASS `frameId` — x/y will be treated as frame-local and auto-offset to viewport (no manual `+iframe.x` needed). Typical flow: vortex_observe({frames:'all-same-origin'}) → read `element.frameId` + `bbox` → vortex_mouse_click({x, y, frameId}). Click at specific x,y using CDP real mouse events (mousedown + mouseup). Use this when dom.click doesn't trigger expected behavior (React synthetic events, anti-bot detection). For element-based clicking, prefer vortex_dom_click with useRealMouse=true. @since 0.4.0 frameId.",
       schema: {
         type: "object",
         properties: {
@@ -147,7 +147,7 @@ function mouseTools(): ToolDef[] {
     {
       name: "vortex_mouse_double_click",
       action: "mouse.doubleClick",
-      description: "Double-click at specific coordinates using CDP real mouse events. When frameId is provided, x/y are treated as frame-local coordinates and automatically offset to viewport (@since 0.4.0).",
+      description: "Double-click at specific coordinates using CDP real mouse events. ⭐ When clicking inside an iframe, pass `frameId` and use frame-local x/y — server auto-offsets to viewport. @since 0.4.0 frameId.",
       schema: {
         type: "object",
         properties: {
@@ -163,7 +163,7 @@ function mouseTools(): ToolDef[] {
     {
       name: "vortex_mouse_move",
       action: "mouse.move",
-      description: "Move the mouse to specific coordinates. Useful for triggering hover effects that require real mouse events. When frameId is provided, x/y are treated as frame-local coordinates and automatically offset to viewport (@since 0.4.0).",
+      description: "Move the mouse to specific coordinates (hover trigger). ⭐ When hovering an iframe element, pass `frameId` and use frame-local x/y — server auto-offsets to viewport. @since 0.4.0 frameId.",
       schema: {
         type: "object",
         properties: {
@@ -343,7 +343,7 @@ function observeTools(): ToolDef[] {
       name: "vortex_observe",
       action: "observe.snapshot",
       description:
-        "⭐ On any non-trivial page, call this first. Using vortex_content_get_text / _html / vortex_dom_query on large pages (>128KB) risks truncation; this tool returns a small structured index of interactive elements indexed by position. Get an LLM-friendly snapshot of the page in ONE call: indexed interactive elements (button/link/input/select/etc.) with role, accessible name, bbox, occlusion status (visible/occludedBy), and key attributes. Prefer this over multiple dom.query calls when exploring what the page can do. Returns a snapshotId; pair with `index` in dom.* tools to operate on elements without guessing CSS selectors. @since 0.4.0: response has `version: 2`; set `frames` to scan iframes (elements from all frames share a global `index` and each element carries `frameId` for routing). Snapshot TTL: 60s. Failures: TAB_NOT_FOUND, JS_EXECUTION_ERROR.",
+        "⭐ On any non-trivial page, call this first. Each returned element carries `suggestedUsage` — ready-to-paste commands (dom_click by index, or mouse_click with frameId) so you don't need to derive them. For iframe-heavy sites (SPA, embedded widgets), set `frames: 'all-same-origin'` — elements from all frames share a global `index` and each element carries `frameId` so dom_click / mouse_click auto-route to the right frame (no manual offset math). Using vortex_content_get_text / _html / vortex_dom_query on large pages (>128KB) risks truncation; this tool returns a small structured index of interactive elements indexed by position. Snapshot TTL: 60s. Response has `version: 2` (@since 0.4.0). Failures: TAB_NOT_FOUND, JS_EXECUTION_ERROR, IFRAME_NOT_READY.",
       schema: {
         type: "object",
         properties: {
@@ -394,7 +394,7 @@ function diagnosticsTools(): ToolDef[] {
     {
       name: "vortex_ping",
       action: "__mcp_ping__",
-      description: "Check if vortex-server is reachable and report connection status. Use this FIRST if other vortex tools fail — returns 'ok' with tab count, or a clear error with instructions if the server is not running.",
+      description: "⭐ Call this FIRST every session (or if tools misbehave). Returns reachability + version fingerprint: `mcpVersion` (MCP server), `extensionVersion` (Chrome extension), `schemaHash` (12-char tool-set hash), `toolCount`, `tabCount`. If `warning` field appears → MCP and extension versions drifted; rebuild + reload Claude Code and extension. If `diagnosticsSupported: false` → extension is pre-0.4.0. @since 0.4.0 version fingerprint.",
       schema: { type: "object", properties: {}, required: [] },
     },
   ];

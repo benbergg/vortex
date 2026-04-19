@@ -19,6 +19,7 @@ import { registerFileHandlers } from "./handlers/file.js";
 import { registerObserveHandlers } from "./handlers/observe.js";
 import { registerMutationHandlers } from "./handlers/mutations.js";
 import { registerEventHandlers } from "./handlers/events.js";
+import { registerDiagnosticsHandlers } from "./handlers/diagnostics.js";
 import { EventDispatcher, registerEventSources } from "./events/dispatcher.js";
 
 const router = new ActionRouter();
@@ -35,6 +36,7 @@ registerStorageHandlers(router);
 registerCaptureHandlers(router, debuggerMgr);
 registerObserveHandlers(router);
 registerMutationHandlers(router);
+registerDiagnosticsHandlers(router);
 
 // NM 客户端
 const nm = new NativeMessagingClient(
