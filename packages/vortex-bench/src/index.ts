@@ -24,6 +24,7 @@ import {
 } from "./runner/metrics.js";
 import { renderMarkdown, writeJsonReport, type Report } from "./runner/reporter.js";
 import { diffReports, renderDiffMarkdown } from "./runner/diff.js";
+import { pickRepresentativeIndex, computeVariance } from "./runner/aggregate-runs.js";
 
 loadEnv();
 
@@ -164,6 +165,28 @@ async function runOneScenario(opts: {
   }
 }
 
+async function runOneScenarioN(
+  opts: Parameters<typeof runOneScenario>[0],
+  n: number,
+): Promise<{
+  outcomes: Awaited<ReturnType<typeof runOneScenario>>[];
+  errors: Array<{ index: number; reason: string }>;
+}> {
+  const outcomes: Awaited<ReturnType<typeof runOneScenario>>[] = [];
+  const errors: Array<{ index: number; reason: string }> = [];
+  for (let i = 0; i < n; i++) {
+    try {
+      const out = await runOneScenario(opts);
+      outcomes.push(out);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      errors.push({ index: i, reason });
+      process.stderr.write(`[vortex-bench] ${opts.scenarioDir} run ${i} failed: ${reason}\n`);
+    }
+  }
+  return { outcomes, errors };
+}
+
 async function collectScenarios(dir: string): Promise<string[]> {
   const absRoot = resolve(dir);
   const s = await stat(absRoot);
@@ -259,24 +282,55 @@ async function cmdRun(args: string[]): Promise<number> {
   const mcpBin = resolveMcpBin();
 
   const outcomes: ScenarioOutcome[] = [];
+  const incompleteIds: string[] = [];
   let allTools: string[] = [];
 
+  const n = parsed.repeats;
+
   try {
+    // 每 scenario 跑 N 次
+    const perScenario: Array<{
+      outcomes: Awaited<ReturnType<typeof runOneScenario>>[];
+      errors: Array<{ index: number; reason: string }>;
+      dir: string;
+    }> = [];
+
     for (const s of scenarios) {
-      try {
-        const out = await runOneScenario({
-          scenarioDir: s,
-          provider,
-          fixture,
-          mcpBin,
-          maxSteps,
-          maxTokens,
-        });
-        outcomes.push(out);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        process.stderr.write(`[vortex-bench] scenario ${s} failed: ${msg}\n`);
+      const { outcomes: sOutcomes, errors } = await runOneScenarioN(
+        { scenarioDir: s, provider, fixture, mcpBin, maxSteps, maxTokens },
+        n,
+      );
+      perScenario.push({ outcomes: sOutcomes, errors, dir: s });
+    }
+
+    // 挑 representative / 处理 incomplete
+    for (const ps of perScenario) {
+      if (ps.outcomes.length === 0) {
+        incompleteIds.push(ps.dir.split(/[\\/]/).pop() ?? ps.dir);
+        continue;
       }
+      if (ps.outcomes.length < Math.ceil(n / 2)) {
+        incompleteIds.push(ps.outcomes[0].scenario.id);
+        continue;
+      }
+      const dataPoints = ps.outcomes.map((o) => o.data);
+      const repIdx = pickRepresentativeIndex(dataPoints);
+      const rep = ps.outcomes[repIdx];
+
+      // 把 v2 字段挂到 rep 对象上（用类型断言为 any），report 构造段读取
+      (rep as unknown as Record<string, unknown>)._v2 = {
+        runs: n,
+        runs_completed: ps.outcomes.length,
+        incomplete: false,
+        error_runs: ps.errors,
+        pass_rate: `${ps.outcomes.filter((o) => o.pass).length}/${ps.outcomes.length}`,
+        pass_stable: new Set(ps.outcomes.map((o) => o.pass)).size === 1,
+        representative_index: repIdx,
+        variance: computeVariance(dataPoints),
+        allRuns: parsed.verboseRuns ? dataPoints : undefined,
+      };
+
+      outcomes.push(rep);
     }
 
     // 拉一次 tool 列表用于 unused_tools 统计
@@ -306,7 +360,7 @@ async function cmdRun(args: string[]): Promise<number> {
   const usage = computeUsageStats(points, allTools);
 
   const report: Report = {
-    schema_version: 1,
+    schema_version: n > 1 ? 2 : 1,
     dataset_version: "v1",
     generated_at: new Date().toISOString(),
     git_commit: gitCommitSafe(),
@@ -315,11 +369,21 @@ async function cmdRun(args: string[]): Promise<number> {
       model: provider.model,
       baseURL: provider.baseURL,
     },
-    scenarios: outcomes.map((o) => ({
-      ...o.data,
-      judge_checks: o.judge.checks,
-    })),
-    aggregate: { layers, roi, vb_index: vb, usage },
+    scenarios: outcomes.map((o) => {
+      const v2 = (o as unknown as Record<string, unknown>)._v2 as Record<string, unknown> | undefined;
+      return {
+        ...o.data,
+        judge_checks: o.judge.checks,
+        ...(v2 ?? {}),
+      };
+    }),
+    aggregate: {
+      layers,
+      roi,
+      vb_index: vb,
+      usage,
+      ...(incompleteIds.length > 0 ? { incomplete_scenarios: incompleteIds } : {}),
+    },
   };
 
   const jsonPath = await writeJsonReport(report, reportsDir(), process.env.REPORT_NAME);
