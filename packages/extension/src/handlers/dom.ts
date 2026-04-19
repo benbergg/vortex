@@ -4,6 +4,7 @@ import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 import { getIframeOffset } from "../lib/iframe-offset.js";
 import { resolveTarget, resolveTargetOptional } from "../lib/resolve-target.js";
+import { FILL_REJECT_PATTERNS } from "../patterns/index.js";
 
 export function registerDomHandlers(
   router: ActionRouter,
@@ -385,12 +386,23 @@ export function registerDomHandlers(
       const __t = resolveTarget(args);
       const selector = __t.selector;
       const value = args.value as string;
+      const fallbackToNative = args.fallbackToNative === true;
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
-        func: (sel: string, val: string) => {
+        func: (
+          sel: string,
+          val: string,
+          rejectPatterns: {
+            id: string;
+            closestSelector: string;
+            reason: string;
+            suggestedTool: string;
+          }[],
+          allowFallback: boolean,
+        ) => {
           try {
             // === 探测（与 CLICK 同步）===
             const els = document.querySelectorAll(sel);
@@ -426,6 +438,24 @@ export function registerDomHandlers(
                 error: `Element ${sel} is outside the viewport`,
               };
             }
+            // === framework-aware 拒绝（@since 0.4.0）===
+            if (!allowFallback) {
+              for (const p of rejectPatterns) {
+                let hit = false;
+                try { hit = !!el.closest(p.closestSelector); } catch { /* 无效选择器跳过 */ }
+                if (hit) {
+                  return {
+                    errorCode: "UNSUPPORTED_TARGET",
+                    error: `dom_fill rejected on framework-controlled target (${p.id}): ${p.reason}`,
+                    extras: {
+                      pattern: p.id,
+                      suggestedTool: p.suggestedTool,
+                      selector: sel,
+                    },
+                  };
+                }
+              }
+            }
             // === fill 操作 ===
             const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
               window.HTMLInputElement.prototype,
@@ -443,7 +473,7 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, value],
+        args: [selector, value, FILL_REJECT_PATTERNS, fallbackToNative],
         world: "MAIN",
       });
       const res = results[0]?.result as {

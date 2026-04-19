@@ -57,8 +57,8 @@ describe("VtxError", () => {
 });
 
 describe("VtxErrorCode enum", () => {
-  it("includes all 24 error codes", () => {
-    expect(Object.keys(VtxErrorCode)).toHaveLength(24);
+  it("includes all 25 error codes", () => {
+    expect(Object.keys(VtxErrorCode)).toHaveLength(25);
   });
 
   it("each constant equals its own string value (self-describing)", () => {
@@ -72,6 +72,10 @@ describe("VtxErrorCode enum", () => {
     expect(VtxErrorCode.STALE_SNAPSHOT).toBe("STALE_SNAPSHOT");
     expect(VtxErrorCode.INVALID_INDEX).toBe("INVALID_INDEX");
     expect(VtxErrorCode.INTERNAL_ERROR).toBe("INTERNAL_ERROR");
+  });
+
+  it("exposes UNSUPPORTED_TARGET (@since 0.4.0)", () => {
+    expect(VtxErrorCode.UNSUPPORTED_TARGET).toBe("UNSUPPORTED_TARGET");
   });
 });
 

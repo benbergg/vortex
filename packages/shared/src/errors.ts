@@ -34,6 +34,11 @@ export const VtxErrorCode = {
   EXTENSION_NOT_CONNECTED: "EXTENSION_NOT_CONNECTED",
   INVALID_PARAMS: "INVALID_PARAMS",
   UNKNOWN_ACTION: "UNKNOWN_ACTION",
+
+  // -- 组件 / 框架（1 类，@since 0.4.0）--
+  /** 目标元素属于框架托管的受控组件（如 Element Plus datetime-range picker），
+   *  不能用普通 DOM 原语（fill/type）安全提交值；需换用 vortex_dom_commit。 */
+  UNSUPPORTED_TARGET: "UNSUPPORTED_TARGET",
 } as const;
 
 export type VtxErrorCode = (typeof VtxErrorCode)[keyof typeof VtxErrorCode];

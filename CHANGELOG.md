@@ -4,6 +4,26 @@
 
 ---
 
+## [Unreleased] (towards 0.4.0)
+
+### Added
+
+- **`vortex_dom_fill` framework-aware 拒绝**：命中受控组件（Element Plus datetime/date range picker & cascader、Ant Design RangePicker）时抛 `UNSUPPORTED_TARGET`，并在 hint 中指引代理改走 `vortex_dom_commit`（即将在后续 PR 落地）。杜绝"DOM input.value 改了但组件状态没同步"的隐蔽 false-positive。
+- `fallbackToNative: true` 参数：兜底过渡开关。旧代理若强依赖松弛写值，可一版 window 期内显式开启；目标是 v0.5 前全面收紧。
+- `VtxErrorCode.UNSUPPORTED_TARGET` 错误码 + `DEFAULT_ERROR_META` 对应 hint。
+- 新增模块 `packages/extension/src/patterns/`：集中声明 fill 拒绝模式的 `{id, closestSelector, reason, suggestedTool}` 注册表，为 v0.4 后续 driver 扩展预留入口。
+
+### Changed
+
+- `vortex_dom_fill` description 的 `Failures:` 段补充 `UNSUPPORTED_TARGET`。
+
+### Tests
+
+- 新增 `tests/fill-reject-patterns.test.ts`（7 用例）覆盖 pattern 注册表完整性 + 拒绝决策算法（含 `fallbackToNative` bypass）。
+- `packages/shared/tests/errors.test.ts` 用例总数 24 → 25，单独断言 `UNSUPPORTED_TARGET`。
+
+---
+
 ## [0.3.0] - 2026-04-19
 
 > **发布性质**：结构型版本。主要价值是 **bench 方法论升级 + L1b 新层 + content 护栏**，bench canonical 分数因 N=3 揭示 flakiness 从 75.1 回退到 71.08（非 v0.3 代码引起；详见 Metrics 段）。B error-hint ROI 仍 null——L1b fixture 强化需在 v0.3.1 跟进。
