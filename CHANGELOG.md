@@ -10,15 +10,20 @@
 
 - **`vortex_mouse_click` / `_double_click` / `_move` 支持 `frameId` + `coordSpace`**：传入 iframe 相对坐标 + frameId，自动换算为视口坐标后送 CDP，嵌套 iframe 累加祖先链偏移。`coordSpace` 默认按 frameId 自动选择（`frame` / `viewport`），可显式覆盖。返回体新增 `coordSpace`、`frameId`、`offsetApplied` 三个字段便于排障。
 - `iframe-offset` 支持嵌套 iframe 偏移累加（原实现只算直接父 frame，跨两层以上 iframe 会错位）。跨源父 frame 执行失败时整体回退到 `{0,0}` 并允许调用方显式改走 `coordSpace: "viewport"`。
+- **`vortex_network_get_logs` / `_get_errors` / `_filter` / `_get_response_body` 首次调用自动订阅**：无需先调 `vortex_network_subscribe` 即可拿到 XHR/Fetch 日志。首次触达 tab 时自动 `enableDomain(Network)` + 加入 `subscribedTabs`，后续调用幂等。显式 `SUBSCRIBE` 仍可覆盖 urlPattern / types / maxApiLogs 配置，职责从"启用"退化为"调参"。
+- network schema 描述补"Auto-subscribes on first call" 提示。
 
 ### Changed
 
 - `vortex_mouse_*` 工具的 `description` 统一补充 frame-aware 行为说明。
+- 静态资源默认不收（`includeResources` 需要配合显式 `SUBSCRIBE` 打开资源侧订阅），避免自动订阅引入大量噪声。
+- `network_get_response_body` 的 hint 改写：自动订阅生效后提示代理"触发请求再取"，不再指示用户手动 subscribe。
 
 ### Tests
 
 - 新增 `tests/iframe-offset.test.ts`（7 用例）覆盖主 frame / 单层 / 嵌套 / 跨源失败 / 未知 frameId 五种路径。
 - 新增 `tests/mouse-handlers.test.ts`（8 用例）覆盖 CLICK / DOUBLE_CLICK / MOVE 三类工具的 viewport / frame-local / 显式 coordSpace 覆盖 / INVALID_PARAMS / 偏移回退场景。
+- 新增 `tests/network-auto-subscribe.test.ts`（6 用例）覆盖首次自动订阅 / 幂等 / GET_ERRORS + FILTER 同样走自动订阅 / 显式 SUBSCRIBE 覆盖 / 多 tab 独立订阅。因 `network.ts` 含模块级 state，测试使用 `vi.resetModules` + 动态 import 隔离。
 
 ---
 

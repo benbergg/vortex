@@ -50,6 +50,25 @@ async function getActiveTabId(tabId?: number): Promise<number> {
   return tab.id;
 }
 
+/**
+ * 自动订阅：首次调用 get_logs / get_errors / filter / get_response_body 时
+ * 若 tab 尚未订阅，则启用 CDP Network 域并开始收集日志（API 请求，不含静态资源）。
+ *
+ * 设计：
+ * - 不覆盖已有 tabConfigs（若用户显式 SUBSCRIBE 过，保留其 urlPattern/types 等）
+ * - 默认不收集 resource 类型日志（静态资源噪声大，需要时仍可手动 SUBSCRIBE 并传配置）
+ * - @since 0.4.0
+ */
+async function ensureSubscribed(
+  debuggerMgr: DebuggerManager,
+  tabId: number,
+): Promise<void> {
+  if (subscribedTabs.has(tabId)) return;
+  if (!tabConfigs.has(tabId)) tabConfigs.set(tabId, {});
+  await debuggerMgr.enableDomain(tabId, "Network");
+  subscribedTabs.add(tabId);
+}
+
 function addLog(tabId: number, entry: NetworkEntry): void {
   const isApi = API_TYPES.has(entry.type ?? "");
   const store = isApi ? apiLogs : resourceLogs;
@@ -256,6 +275,7 @@ export function registerNetworkHandlers(
       const tid = await getActiveTabId(
         (args.tabId as number | undefined) ?? tabId,
       );
+      await ensureSubscribed(debuggerMgr, tid);
       const includeResources = args.includeResources as boolean | undefined;
       const apis = apiLogs.get(tid) ?? [];
       if (!includeResources) return apis;
@@ -267,6 +287,7 @@ export function registerNetworkHandlers(
       const tid = await getActiveTabId(
         (args.tabId as number | undefined) ?? tabId,
       );
+      await ensureSubscribed(debuggerMgr, tid);
       const includeResources = args.includeResources as boolean | undefined;
       const apis = apiLogs.get(tid) ?? [];
       const source = includeResources
@@ -279,6 +300,7 @@ export function registerNetworkHandlers(
       const tid = await getActiveTabId(
         (args.tabId as number | undefined) ?? tabId,
       );
+      await ensureSubscribed(debuggerMgr, tid);
       const includeResources = args.includeResources as boolean | undefined;
       const urlPattern = args.url as string | undefined;
       const methodFilter = args.method as string | undefined;
@@ -319,6 +341,7 @@ export function registerNetworkHandlers(
         return { requestId, body: cached.body, encoding: cached.encoding };
       }
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
+      await ensureSubscribed(debuggerMgr, tid);
       if (debuggerMgr.isAttached(tid)) {
         try {
           const result = await debuggerMgr.sendCommand(tid, "Network.getResponseBody", { requestId }) as any;
@@ -328,7 +351,7 @@ export function registerNetworkHandlers(
             VtxErrorCode.INTERNAL_ERROR,
             `Response body not available for ${requestId}`,
             { extras: { requestId } },
-            { hint: "Response body may have been 204/redirect or evicted from cache. Re-subscribe and retry." },
+            { hint: "Response body may have been 204/redirect or evicted from cache. Trigger the request again (subscription is now active) and retry." },
           );
         }
       }
@@ -336,7 +359,7 @@ export function registerNetworkHandlers(
         VtxErrorCode.INTERNAL_ERROR,
         `Response body not found for ${requestId}`,
         { extras: { requestId } },
-        { hint: "Subscribe to network events before capturing requests (vortex_network_subscribe)." },
+        { hint: "Network subscription was just auto-activated; trigger the request and retry. If the requestId came from an earlier session, it has been evicted." },
       );
     },
   });
