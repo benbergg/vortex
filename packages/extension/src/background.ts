@@ -44,6 +44,20 @@ const nm = new NativeMessagingClient(
     if (msg.type === "tool_request") {
       const response = await router.dispatch(msg as NmRequest);
       nm.send(response);
+    } else if (msg.type === "control") {
+      // @since 0.4.0 (O-3b)：server 端 watcher 检测到扩展 dist 变化后推送
+      // reload-extension 控制消息。chrome.runtime.reload() 会让 Chrome 重读
+      // load-unpacked 的磁盘 dist，service worker 上下文会被重建，native
+      // messaging port 会断开——background 重启后会重新连上新的 server 进程。
+      const ctl = msg as { type: "control"; action: string; reason?: string };
+      if (ctl.action === "reload-extension") {
+        console.warn(
+          `[vortex] reloading extension due to dist change (${ctl.reason ?? "<no reason>"})`,
+        );
+        // 用 setTimeout 让这条 console 先 flush，同时给上层 onMessage
+        // 链路一个 tick 的余地（非必需但更稳）。
+        setTimeout(() => chrome.runtime.reload(), 50);
+      }
     }
   },
   () => {
