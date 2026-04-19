@@ -11,4 +11,5 @@ reports/*.json
 !reports/full-v1-baseline.json
 !reports/full-v1-with-drain-baseline.json
 !reports/full-v1-glm46v-baseline.json
+!reports/full-v1-repeats3-v0.3.0-glm46v.json
 reports/*.md
