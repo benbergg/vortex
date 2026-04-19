@@ -107,6 +107,26 @@ export function diffReports(
     });
   }
 
+  // v2 variance regression 检查：latest scenario 有 variance 字段时，对比 baseline tokens
+  for (const latestScenario of latest.scenarios) {
+    const baselineScenario = baseline.scenarios.find((b) => b.id === latestScenario.id);
+    if (!baselineScenario) continue;
+    const latestV = (latestScenario as any).variance as
+      | { tokens: { min: number; p50: number; max: number } }
+      | undefined;
+    const baselineTokens =
+      baselineScenario.agent.inputTokens + baselineScenario.agent.outputTokens;
+    if (latestV?.tokens?.max !== undefined && baselineTokens > 0) {
+      const threshold = baselineTokens * 1.5;
+      if (latestV.tokens.max > threshold) {
+        regressions.push({
+          severity: "warning",
+          message: `[variance] ${latestScenario.id} tokens.max ${latestV.tokens.max} exceeds baseline ${baselineTokens} × 1.5 (${threshold})`,
+        });
+      }
+    }
+  }
+
   return {
     vb_index_delta: vbDelta,
     layer_deltas: layerDeltas,
