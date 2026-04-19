@@ -34,6 +34,8 @@ export const DomActions = {
   GET_ATTRIBUTE: "dom.getAttribute",
   GET_SCROLL_INFO: "dom.getScrollInfo",
   WAIT_FOR_MUTATION: "dom.waitForMutation",
+  /** 对 framework 受控组件（picker/cascader/select 等）提交值：打开→导航→点→确认的完整流程。@since 0.4.0 */
+  COMMIT: "dom.commit",
   WATCH_MUTATIONS: "dom.watchMutations",
   UNWATCH_MUTATIONS: "dom.unwatchMutations",
 } as const;

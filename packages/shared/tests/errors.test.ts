@@ -57,8 +57,8 @@ describe("VtxError", () => {
 });
 
 describe("VtxErrorCode enum", () => {
-  it("includes all 25 error codes", () => {
-    expect(Object.keys(VtxErrorCode)).toHaveLength(25);
+  it("includes all 26 error codes", () => {
+    expect(Object.keys(VtxErrorCode)).toHaveLength(26);
   });
 
   it("each constant equals its own string value (self-describing)", () => {
@@ -76,6 +76,10 @@ describe("VtxErrorCode enum", () => {
 
   it("exposes UNSUPPORTED_TARGET (@since 0.4.0)", () => {
     expect(VtxErrorCode.UNSUPPORTED_TARGET).toBe("UNSUPPORTED_TARGET");
+  });
+
+  it("exposes COMMIT_FAILED (@since 0.4.0)", () => {
+    expect(VtxErrorCode.COMMIT_FAILED).toBe("COMMIT_FAILED");
   });
 });
 

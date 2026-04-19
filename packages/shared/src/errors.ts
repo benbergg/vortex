@@ -35,10 +35,13 @@ export const VtxErrorCode = {
   INVALID_PARAMS: "INVALID_PARAMS",
   UNKNOWN_ACTION: "UNKNOWN_ACTION",
 
-  // -- 组件 / 框架（1 类，@since 0.4.0）--
+  // -- 组件 / 框架（2 类，@since 0.4.0）--
   /** 目标元素属于框架托管的受控组件（如 Element Plus datetime-range picker），
    *  不能用普通 DOM 原语（fill/type）安全提交值；需换用 vortex_dom_commit。 */
   UNSUPPORTED_TARGET: "UNSUPPORTED_TARGET",
+  /** vortex_dom_commit 的 driver 在流程中途失败（picker 打不开、日期格找不到、校验不一致等）。
+   *  context.extras 会带 stage 字段标识失败阶段。*/
+  COMMIT_FAILED: "COMMIT_FAILED",
 } as const;
 
 export type VtxErrorCode = (typeof VtxErrorCode)[keyof typeof VtxErrorCode];

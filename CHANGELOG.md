@@ -8,10 +8,13 @@
 
 ### Added
 
-- **`vortex_dom_fill` framework-aware 拒绝**：命中受控组件（Element Plus datetime/date range picker & cascader、Ant Design RangePicker）时抛 `UNSUPPORTED_TARGET`，并在 hint 中指引代理改走 `vortex_dom_commit`（即将在后续 PR 落地）。杜绝"DOM input.value 改了但组件状态没同步"的隐蔽 false-positive。
+- **`vortex_dom_commit`** 新工具：对 framework 受控组件（picker/cascader/select）执行完整 "open → navigate → click → confirm → verify" 流程。首发覆盖 **Element Plus `<el-date-picker type='daterange'|'datetimerange'>`**，单次调用就能把 `{start: "2026-01-01", end: "2026-03-31"}` 提交到组件，告别 agent 侧手打二十次 `mouse_click` 导航 picker 的反模式。
+- `VtxErrorCode.COMMIT_FAILED` 错误码：driver 中途失败时抛出，`context.extras.stage` 指示失败阶段（`open-picker` / `click-start` / `click-end` / `verify` 等），便于代理自愈或切换策略。
+- 新增 `patterns/commit-drivers.ts` 注册表声明 driver 元数据（`id/kind/closestSelector/summary`），为 Ant Design / 其它框架 driver 预留。实际交互逻辑在 `dom.ts` COMMIT handler 的 page-side func 里按 `driverId` 分派。
+- **`vortex_dom_fill` framework-aware 拒绝**：命中受控组件（Element Plus datetime/date range picker & cascader、Ant Design RangePicker）时抛 `UNSUPPORTED_TARGET`，并在 hint 中指引代理改走 `vortex_dom_commit`。杜绝"DOM input.value 改了但组件状态没同步"的隐蔽 false-positive。
 - `fallbackToNative: true` 参数：兜底过渡开关。旧代理若强依赖松弛写值，可一版 window 期内显式开启；目标是 v0.5 前全面收紧。
 - `VtxErrorCode.UNSUPPORTED_TARGET` 错误码 + `DEFAULT_ERROR_META` 对应 hint。
-- 新增模块 `packages/extension/src/patterns/`：集中声明 fill 拒绝模式的 `{id, closestSelector, reason, suggestedTool}` 注册表，为 v0.4 后续 driver 扩展预留入口。
+- 新增模块 `packages/extension/src/patterns/`：集中声明 fill 拒绝模式 + commit driver 注册表。
 
 ### Changed
 
@@ -19,8 +22,9 @@
 
 ### Tests
 
+- 新增 `tests/dom-commit.test.ts`（11 用例）：driver 注册表完整性 + handler 参数校验（missing kind/value/unknown kind）+ 四类错误映射（COMMIT_FAILED 带 stage / UNSUPPORTED_TARGET / ELEMENT_NOT_FOUND / 成功返回 startValue+endValue）。
 - 新增 `tests/fill-reject-patterns.test.ts`（7 用例）覆盖 pattern 注册表完整性 + 拒绝决策算法（含 `fallbackToNative` bypass）。
-- `packages/shared/tests/errors.test.ts` 用例总数 24 → 25，单独断言 `UNSUPPORTED_TARGET`。
+- `packages/shared/tests/errors.test.ts` 用例总数 24 → 26，单独断言 `UNSUPPORTED_TARGET` 和 `COMMIT_FAILED`。
 
 ---
 

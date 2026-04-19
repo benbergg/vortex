@@ -128,6 +128,10 @@ export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
     hint: "Target is a framework-controlled component (e.g. Element Plus datetime-range picker). Use vortex_dom_commit with a matching kind instead of vortex_dom_fill/type.",
     recoverable: false,
   },
+  COMMIT_FAILED: {
+    hint: "vortex_dom_commit driver failed mid-flow. Inspect context.extras.stage (open-picker / navigate-month / click-day / confirm / verify) to see which step broke. Page state may have changed between calls, or the framework version is not matched by any driver.",
+    recoverable: true,
+  },
 };
 
 /**
