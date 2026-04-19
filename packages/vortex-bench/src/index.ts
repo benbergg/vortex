@@ -380,11 +380,17 @@ async function main(): Promise<number> {
   }
 }
 
-main().then(
-  (code) => process.exit(code),
-  (err) => {
-    process.stderr.write(`[vortex-bench] fatal: ${err instanceof Error ? err.message : String(err)}\n`);
-    if (err instanceof Error && err.stack) process.stderr.write(err.stack + "\n");
-    process.exit(1);
-  },
-);
+// ESM entry-point guard：仅当作为 CLI 直接启动时才运行（import 时不运行，测试友好）
+const isDirectRun = process.argv[1]
+  ? fileURLToPath(import.meta.url) === process.argv[1]
+  : false;
+if (isDirectRun) {
+  main().then(
+    (code) => process.exit(code),
+    (err) => {
+      process.stderr.write(`[vortex-bench] fatal: ${err instanceof Error ? err.message : String(err)}\n`);
+      if (err instanceof Error && err.stack) process.stderr.write(err.stack + "\n");
+      process.exit(1);
+    },
+  );
+}
