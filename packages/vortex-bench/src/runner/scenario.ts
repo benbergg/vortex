@@ -4,7 +4,7 @@ import { readFile, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import type { Assertion } from "./judge.js";
 
-export type Layer = "L0" | "L1" | "L2" | "L3";
+export type Layer = "L0" | "L1" | "L1b" | "L2" | "L3";
 
 export interface ExpectedSpec {
   layer?: Layer;
@@ -14,6 +14,8 @@ export interface ExpectedSpec {
   budgetTokens?: number;
   /** 本次场景预期必须撞到的错误码（L1 用） */
   expectedErrorCode?: string;
+  /** 场景禁用的工具列表（L1b 用） */
+  disabledTools?: string[];
   /** 断言序列 */
   assertions: Assertion[];
   /** LLM judge 兜底：提供 rubric 则跑一次 LLM judge，结果合并到 checks 最终 pass 为 AND */
