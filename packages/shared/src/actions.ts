@@ -120,6 +120,11 @@ export const EventsActions = {
   DRAIN: "events.drain",
 } as const;
 
+export const DiagnosticsActions = {
+  /** 返回扩展版本 + 支持的 action 列表指纹，供 MCP ping 做版本协商。@since 0.4.0 */
+  VERSION: "diagnostics.version",
+} as const;
+
 export type ActionString =
   | (typeof TabActions)[keyof typeof TabActions]
   | (typeof PageActions)[keyof typeof PageActions]
@@ -135,4 +140,5 @@ export type ActionString =
   | (typeof FramesActions)[keyof typeof FramesActions]
   | (typeof FileActions)[keyof typeof FileActions]
   | (typeof ObserveActions)[keyof typeof ObserveActions]
-  | (typeof EventsActions)[keyof typeof EventsActions];
+  | (typeof EventsActions)[keyof typeof EventsActions]
+  | (typeof DiagnosticsActions)[keyof typeof DiagnosticsActions];

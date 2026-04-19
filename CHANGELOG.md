@@ -8,6 +8,12 @@
 
 ### Added
 
+- **`vortex_ping` 返回版本指纹**（O-1）：响应体新增 `mcpVersion` / `extensionVersion` / `schemaHash`（12-char）/ `toolCount` / `extensionActionCount` / `diagnosticsSupported` 字段。MCP 与扩展语义主版本不一致时自动带 `warning`。代理在每个新 session 第一次 ping 即可看出"MCP 没重启"或"扩展过旧"的版本漂移问题，不再白跑一圈才发现工具对不上。
+- `DiagnosticsActions.VERSION`（`diagnostics.version`）扩展侧 action：返回 `{ extensionVersion, actionCount, actions[] }`。版本由 `vite.config.ts` 的 `define.__EXTENSION_VERSION__` 从 `package.json` 注入。
+- **observe 元素附加 `suggestedUsage`**（O-2）：每个 element 带 `{ domClick: "vortex_dom_click({ index, snapshotId })", click: "vortex_mouse_click({ x, y, frameId })" }` 预拼好的下一步命令。代理不必再自行推断应传 frameId——直接抄即可。
+- `mouse_click` / `_double_click` / `_move` description 前置 ⭐ 标记主动推荐 frameId 用法；`vortex_observe` description 点明 `suggestedUsage` 与 `frames: 'all-same-origin'` iframe 流程；`vortex_ping` description 改写为"FIRST 调用"的版本指纹检查工具。
+- `ELEMENT_NOT_FOUND` 和 `IFRAME_NOT_READY` hint 补"先 observe(frames:'all-same-origin') 拿 frameId 再 route"的引导链路，修复 v0.4 新工具"有但代理不用"的惯性。
+
 - **`vortex_mouse_click` / `_double_click` / `_move` 支持 `frameId` + `coordSpace`**：传入 iframe 相对坐标 + frameId，自动换算为视口坐标后送 CDP，嵌套 iframe 累加祖先链偏移。`coordSpace` 默认按 frameId 自动选择（`frame` / `viewport`），可显式覆盖。返回体新增 `coordSpace`、`frameId`、`offsetApplied` 三个字段便于排障。
 - `iframe-offset` 支持嵌套 iframe 偏移累加（原实现只算直接父 frame，跨两层以上 iframe 会错位）。跨源父 frame 执行失败时整体回退到 `{0,0}` 并允许调用方显式改走 `coordSpace: "viewport"`。
 - **`vortex_network_get_logs` / `_get_errors` / `_filter` / `_get_response_body` 首次调用自动订阅**：无需先调 `vortex_network_subscribe` 即可拿到 XHR/Fetch 日志。首次触达 tab 时自动 `enableDomain(Network)` + 加入 `subscribedTabs`，后续调用幂等。显式 `SUBSCRIBE` 仍可覆盖 urlPattern / types / maxApiLogs 配置，职责从"启用"退化为"调参"。
@@ -31,6 +37,11 @@
 - observe 响应体升级为 `version: 2`：顶层新增 `frames[]`（每帧含 `frameId / parentFrameId / url / offset / elementCount / truncated / scanned`），`elements[]` 每个元素带 `frameId` 字段。
 - `resolveTarget` 路由升级：按 snapshot `element.frameId` 路由至正确 frame 操作；兼容旧 `entry.frameId` 单 frame 写法。
 - 跨源 iframe 扫描失败标记为 `scanned: false`、`elementCount: 0`，不 throw 不污染结果。
+
+### Tests
+
+- 新增 `packages/extension/tests/diagnostics-handler.test.ts`（3 用例）：版本字符串存在 / actionCount>0 + 已排序 + 包含 `diagnostics.version`+`tab.list` / tab.* 数量断言。
+- 新增 `packages/mcp/tests/ping-fingerprint.test.ts`（6 用例）：schemaHash 12 字符 hex / description 长度变化即触发 hash 漂移 / v0.4 新工具均在 toolset / ping description 提及 mcpVersion 等四字段 / mouse_click description 首 12 字符含 ⭐ 且 frameId 在 CDP 之前 / observe description 含 suggestedUsage+all-same-origin。
 
 ### Changed
 
