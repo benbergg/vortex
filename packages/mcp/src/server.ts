@@ -2,6 +2,9 @@
 
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
+import { watch } from "node:fs";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -54,6 +57,60 @@ const DEFAULT_TIMEOUT = parseInt(process.env.VORTEX_TIMEOUT_MS ?? "30000");
 const LARGE_IMAGE_BYTES = 500_000;   // 超过 500KB 的图片默认切 file 模式
 const RESPONSE_SIZE_LIMIT = 100_000; // 非图片响应 100KB 截断
 
+/**
+ * 自重启机制（@since 0.4.0）：
+ *
+ * MCP server 作为 Claude Code 的 stdio 子进程长驻，每次 `pnpm -r build` 刷新 dist
+ * 后，若 server 不重启，Claude 就永远看不到新工具 schema（典型踩坑）。
+ *
+ * 方案：watch 自身所在 dist 目录，`.js` 变更即标记 pendingRestart，等 inflight
+ * 请求归零后 `process.exit(0)`。Claude Code 的 MCP stdio client 在子进程退出后
+ * 下次 tool_call 触发自动 respawn，读到最新 schema。
+ *
+ * 关键安全点：
+ *  - 必须等 inflight=0 才 exit，否则正在处理的请求会丢响应。
+ *  - 不 watch src/（只 watch dist/），避免 dev 模式频繁误触发。
+ *  - VORTEX_MCP_NO_AUTO_RESTART=1 提供 opt-out（CI 环境可关闭）。
+ */
+let inflight = 0;
+let pendingRestart = false;
+const AUTO_RESTART = process.env.VORTEX_MCP_NO_AUTO_RESTART !== "1";
+
+function maybeExitAfterDrain(): void {
+  if (pendingRestart && inflight === 0) {
+    process.stderr.write(
+      "[vortex-mcp] dist changed and inflight drained; exiting for Claude Code to respawn with fresh schema.\n",
+    );
+    // setImmediate 给 stderr 一次 flush 机会
+    setImmediate(() => process.exit(0));
+  }
+}
+
+function installAutoRestart(): void {
+  if (!AUTO_RESTART) return;
+  // __dirname 等价：本文件所在目录（dist/src/ 在运行期，src/ 在测试期——后者 fs.watch 也能跑）
+  const here = dirname(fileURLToPath(import.meta.url));
+  try {
+    const watcher = watch(here, { recursive: true }, (eventType, filename) => {
+      if (eventType !== "change" && eventType !== "rename") return;
+      if (!filename || !filename.endsWith(".js")) return;
+      if (pendingRestart) return; // already armed
+      pendingRestart = true;
+      process.stderr.write(
+        `[vortex-mcp] dist file changed (${filename}); will exit after current requests drain.\n`,
+      );
+      maybeExitAfterDrain();
+    });
+    watcher.on("error", (err: unknown) => {
+      const msg = err instanceof Error ? err.message : String(err);
+      process.stderr.write(`[vortex-mcp] fs.watch failed: ${msg}; auto-restart disabled.\n`);
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`[vortex-mcp] fs.watch init failed: ${msg}; auto-restart disabled.\n`);
+  }
+}
+
 const server = new Server(
   { name: "vortex", version: "0.1.0" },
   { capabilities: { tools: {} } },
@@ -71,6 +128,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  inflight++;
+  try {
+    return await handleCallTool(request);
+  } finally {
+    inflight--;
+    maybeExitAfterDrain();
+  }
+});
+
+async function handleCallTool(
+  request: { params: { name: string; arguments?: unknown } },
+): Promise<{ content: ContentItem[]; isError?: boolean }> {
   const { name, arguments: args } = request.params;
   const toolDef = getToolDef(name);
 
@@ -293,9 +362,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       content: [{ type: "text" as const, text: friendly }],
     };
   }
-});
+}
 
 async function main(): Promise<void> {
+  installAutoRestart();
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }

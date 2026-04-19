@@ -8,6 +8,8 @@
 
 ### Added
 
+- **MCP server 自重启**（O-3）：server 启动后 `fs.watch` 自身运行目录（生产环境是 `dist/src/`），`.js` 文件变更即标记 `pendingRestart`；等当前正在处理的 `tool_call` 全部结束（`inflight === 0`）再 `process.exit(0)`。Claude Code 的 MCP stdio client 在子进程退出后会在下一次 tool_call 时自动 respawn，拿到最新 schema。解决"`pnpm -r build` 后 Claude 仍看不到新工具，必须手动重启 Claude Code"的踩坑（O-1 里添加的 `warning` 字段本质是让代理**看见**问题，O-3 让问题**自动消失**）。Opt-out：`VORTEX_MCP_NO_AUTO_RESTART=1`。
+- `CallToolRequestSchema` handler 包裹 `inflight++/--` + `maybeExitAfterDrain`，保证 in-flight 请求不会被 exit 打断。
 - **`vortex_ping` 返回版本指纹**（O-1）：响应体新增 `mcpVersion` / `extensionVersion` / `schemaHash`（12-char）/ `toolCount` / `extensionActionCount` / `diagnosticsSupported` 字段。MCP 与扩展语义主版本不一致时自动带 `warning`。代理在每个新 session 第一次 ping 即可看出"MCP 没重启"或"扩展过旧"的版本漂移问题，不再白跑一圈才发现工具对不上。
 - `DiagnosticsActions.VERSION`（`diagnostics.version`）扩展侧 action：返回 `{ extensionVersion, actionCount, actions[] }`。版本由 `vite.config.ts` 的 `define.__EXTENSION_VERSION__` 从 `package.json` 注入。
 - **observe 元素附加 `suggestedUsage`**（O-2）：每个 element 带 `{ domClick: "vortex_dom_click({ index, snapshotId })", click: "vortex_mouse_click({ x, y, frameId })" }` 预拼好的下一步命令。代理不必再自行推断应传 frameId——直接抄即可。
@@ -40,6 +42,7 @@
 
 ### Tests
 
+- 新增 `packages/mcp/tests/self-restart.test.ts`（7 用例）：源码级合约测试固化 O-3 的四条不变式（env opt-out / watch 自身目录 / exit 门控 inflight=0 / handler 包裹 inflight / 只响应 .js / watcher.on('error') graceful / installAutoRestart 在 connect 前调用）。
 - 新增 `packages/extension/tests/diagnostics-handler.test.ts`（3 用例）：版本字符串存在 / actionCount>0 + 已排序 + 包含 `diagnostics.version`+`tab.list` / tab.* 数量断言。
 - 新增 `packages/mcp/tests/ping-fingerprint.test.ts`（6 用例）：schemaHash 12 字符 hex / description 长度变化即触发 hash 漂移 / v0.4 新工具均在 toolset / ping description 提及 mcpVersion 等四字段 / mouse_click description 首 12 字符含 ⭐ 且 frameId 在 CDP 之前 / observe description 含 suggestedUsage+all-same-origin。
 
