@@ -8,6 +8,9 @@
 
 ### Added
 
+- **扩展自重载**（O-3b，对称 O-3）：vortex-server 启动时 `fs.watch(packages/extension/dist/)`，`.js` / `.html` / `manifest.json` 变化 → 2s debounce → 通过 native messaging 推送 `{type:"control", action:"reload-extension"}` → 扩展 background 收到后调 `chrome.runtime.reload()`（Chrome 对 load-unpacked 扩展会重读磁盘 dist）。上次 session 踩到的"O-1 报 `diagnosticsSupported:false` 但没法自动刷扩展"的坑被这个修掉：现在 `pnpm -C packages/extension build` 后 2s 内扩展自动换新，无需人肉 `chrome://extensions` 点重载。
+- shared 协议扩展：`NmControl` 类型（`type:"control"`, `action:"reload-extension"`, `reason?:string`）加入 `NmMessageFromServer` 联合。
+- `VORTEX_NO_EXT_AUTO_RELOAD=1` opt-out；扩展 dist 不存在时 watcher 优雅跳过不崩 server。
 - **MCP server 自重启**（O-3）：server 启动后 `fs.watch` 自身运行目录（生产环境是 `dist/src/`），`.js` 文件变更即标记 `pendingRestart`；等当前正在处理的 `tool_call` 全部结束（`inflight === 0`）再 `process.exit(0)`。Claude Code 的 MCP stdio client 在子进程退出后会在下一次 tool_call 时自动 respawn，拿到最新 schema。解决"`pnpm -r build` 后 Claude 仍看不到新工具，必须手动重启 Claude Code"的踩坑（O-1 里添加的 `warning` 字段本质是让代理**看见**问题，O-3 让问题**自动消失**）。Opt-out：`VORTEX_MCP_NO_AUTO_RESTART=1`。
 - `CallToolRequestSchema` handler 包裹 `inflight++/--` + `maybeExitAfterDrain`，保证 in-flight 请求不会被 exit 打断。
 - **`vortex_ping` 返回版本指纹**（O-1）：响应体新增 `mcpVersion` / `extensionVersion` / `schemaHash`（12-char）/ `toolCount` / `extensionActionCount` / `diagnosticsSupported` 字段。MCP 与扩展语义主版本不一致时自动带 `warning`。代理在每个新 session 第一次 ping 即可看出"MCP 没重启"或"扩展过旧"的版本漂移问题，不再白跑一圈才发现工具对不上。
@@ -42,6 +45,7 @@
 
 ### Tests
 
+- 新增 `packages/extension/tests/extension-self-reload.test.ts`（13 用例）：源码级合约测试固化 O-3b 的跨三文件不变式（protocol.ts 的 NmControl 定义 / server watcher 的 opt-out + debounce + 文件过滤 + 写消息路径 + 从 startServer 调用 / extension background 的 control 分支 + chrome.runtime.reload 包 setTimeout）。
 - 新增 `packages/mcp/tests/self-restart.test.ts`（7 用例）：源码级合约测试固化 O-3 的四条不变式（env opt-out / watch 自身目录 / exit 门控 inflight=0 / handler 包裹 inflight / 只响应 .js / watcher.on('error') graceful / installAutoRestart 在 connect 前调用）。
 - 新增 `packages/extension/tests/diagnostics-handler.test.ts`（3 用例）：版本字符串存在 / actionCount>0 + 已排序 + 包含 `diagnostics.version`+`tab.list` / tab.* 数量断言。
 - 新增 `packages/mcp/tests/ping-fingerprint.test.ts`（6 用例）：schemaHash 12 字符 hex / description 长度变化即触发 hash 漂移 / v0.4 新工具均在 toolset / ping description 提及 mcpVersion 等四字段 / mouse_click description 首 12 字符含 ⭐ 且 frameId 在 CDP 之前 / observe description 含 suggestedUsage+all-same-origin。
