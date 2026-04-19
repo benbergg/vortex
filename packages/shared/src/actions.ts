@@ -38,6 +38,8 @@ export const DomActions = {
   WAIT_FOR_MUTATION: "dom.waitForMutation",
   /** 等待 DOM 子树在 quietMs ms 内无任何 mutation 后返回。与 WAIT_FOR_MUTATION 语义互补。@since 0.4.0 */
   WAIT_SETTLED: "dom.waitSettled",
+  /** 对 framework 受控组件（picker/cascader/select 等）提交值：打开→导航→点→确认的完整流程。@since 0.4.0 */
+  COMMIT: "dom.commit",
   WATCH_MUTATIONS: "dom.watchMutations",
   UNWATCH_MUTATIONS: "dom.unwatchMutations",
 } as const;
