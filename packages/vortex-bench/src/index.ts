@@ -16,6 +16,7 @@ import { runLlmJudge } from "./runner/judge-llm.js";
 import {
   computeScenarioMetrics,
   aggregateLayer,
+  aggregateL1b,
   computeRoi,
   vbIndex,
   computeUsageStats,
@@ -380,6 +381,7 @@ async function cmdRun(args: string[]): Promise<number> {
   ) as Parameters<typeof vbIndex>[0];
   const vb = vbIndex(layerScores);
   const usage = computeUsageStats(points, allTools);
+  const l1b = aggregateL1b(points);
 
   const report: Report = {
     schema_version: n > 1 ? 2 : 1,
@@ -404,6 +406,7 @@ async function cmdRun(args: string[]): Promise<number> {
       roi,
       vb_index: vb,
       usage,
+      ...(l1b ? { l1b } : {}),
       ...(incompleteIds.length > 0 ? { incomplete_scenarios: incompleteIds } : {}),
     },
   };

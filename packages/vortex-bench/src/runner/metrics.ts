@@ -171,6 +171,15 @@ export function aggregateLayer(
   };
 }
 
+/**
+ * L1b 独立聚合。复用 aggregateLayer 计算方式，但产物单独挂在 aggregate.l1b，不进入 vb_index 归一化。
+ */
+export function aggregateL1b(points: ScenarioDataPoint[]): LayerAggregate | undefined {
+  const l1bPoints = points.filter((p) => p.layer === "L1b");
+  if (l1bPoints.length === 0) return undefined;
+  return aggregateLayer(l1bPoints, "L1b");
+}
+
 // ─── ROI 三件 ───
 
 export interface RoiScores {
