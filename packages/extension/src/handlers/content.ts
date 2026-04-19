@@ -1,6 +1,7 @@
 import { ContentActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
+import { truncateWithTextTrailer } from "../lib/truncate.js";
 
 export function registerContentHandlers(router: ActionRouter): void {
   router.registerAll({
@@ -27,7 +28,13 @@ export function registerContentHandlers(router: ActionRouter): void {
       });
       const res = results[0]?.result as { result?: unknown; error?: string };
       if (res?.error) throw vtxError(res.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
-      return res?.result;
+      const raw = res?.result;
+      if (typeof raw !== "string") return raw;
+      const maxBytes = typeof args.maxBytes === "number" ? args.maxBytes : 131072;
+      if (!Number.isInteger(maxBytes) || maxBytes < 4096 || maxBytes > 5242880) {
+        throw vtxError(VtxErrorCode.INVALID_PARAMS, `maxBytes must be an integer in [4096, 5242880]; got ${maxBytes}`);
+      }
+      return truncateWithTextTrailer(raw, maxBytes);
     },
 
     [ContentActions.GET_HTML]: async (args, tabId) => {
