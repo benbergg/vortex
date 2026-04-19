@@ -195,12 +195,47 @@ async function collectScenarios(dir: string): Promise<string[]> {
   return out;
 }
 
+export interface RunArgs {
+  scenarioDir: string;
+  repeats: number;
+  verboseRuns: boolean;
+}
+
+export function parseRunArgs(argv: string[]): RunArgs {
+  const envRepeats = process.env.BENCH_REPEATS;
+  let repeats = envRepeats ? parseInt(envRepeats, 10) : 1;
+  let verboseRuns = false;
+  let scenarioDir: string | undefined;
+
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === "--verbose-runs") {
+      verboseRuns = true;
+    } else if (a === "--repeats" || a.startsWith("--repeats=")) {
+      const val = a.includes("=") ? a.split("=")[1] : argv[++i];
+      const n = parseInt(val ?? "", 10);
+      if (!Number.isInteger(n) || n < 1) {
+        throw new Error(`--repeats must be a positive integer, got: ${val}`);
+      }
+      repeats = n;
+    } else if (!a.startsWith("-") && scenarioDir === undefined) {
+      scenarioDir = a;
+    }
+  }
+
+  if (!scenarioDir) throw new Error("run requires <scenarioDir>");
+  return { scenarioDir, repeats, verboseRuns };
+}
+
 async function cmdRun(args: string[]): Promise<number> {
-  const target = args[0];
-  if (!target) {
-    process.stderr.write("[vortex-bench] run requires <scenarioDir>\n");
+  let parsed: RunArgs;
+  try {
+    parsed = parseRunArgs(args);
+  } catch (err) {
+    process.stderr.write(`[vortex-bench] ${err instanceof Error ? err.message : String(err)}\n`);
     return 1;
   }
+  const target = parsed.scenarioDir;
 
   const provider = resolveProvider();
   const maxSteps = parseInt(process.env.BENCH_MAX_STEPS ?? "30", 10);
