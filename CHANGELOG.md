@@ -27,6 +27,10 @@
 - **`vortex_dom_commit`** 新工具：对 framework 受控组件（picker/cascader/select）执行完整 "open → navigate → click → confirm → verify" 流程。首发覆盖 **Element Plus `<el-date-picker type='daterange'|'datetimerange'>`**，单次调用就能把 `{start: "2026-01-01", end: "2026-03-31"}` 提交到组件，告别 agent 侧手打二十次 `mouse_click` 导航 picker 的反模式。
 - `VtxErrorCode.COMMIT_FAILED` 错误码：driver 中途失败时抛出，`context.extras.stage` 指示失败阶段（`open-picker` / `click-start` / `click-end` / `verify` 等），便于代理自愈或切换策略。
 - 新增 `patterns/commit-drivers.ts` 注册表声明 driver 元数据（`id/kind/closestSelector/summary`），为 Ant Design / 其它框架 driver 预留。实际交互逻辑在 `dom.ts` COMMIT handler 的 page-side func 里按 `driverId` 分派。
+- **`vortex_observe` 多 frame 扫描**：新增 `frames` 参数，`"main"`（默认，向后兼容）/ `"all-same-origin"` / `"all"` / `number[]`。跨 frame 扫描时 `index` 按扫描顺序累加为全局唯一，`element.frameId` 指向元素所在 frame。
+- observe 响应体升级为 `version: 2`：顶层新增 `frames[]`（每帧含 `frameId / parentFrameId / url / offset / elementCount / truncated / scanned`），`elements[]` 每个元素带 `frameId` 字段。
+- `resolveTarget` 路由升级：按 snapshot `element.frameId` 路由至正确 frame 操作；兼容旧 `entry.frameId` 单 frame 写法。
+- 跨源 iframe 扫描失败标记为 `scanned: false`、`elementCount: 0`，不 throw 不污染结果。
 
 ### Changed
 
@@ -36,6 +40,8 @@
 - `waitForNetworkIdle` 内部抽象为 `awaitIdle(tabId, opts)` 通用助手，`waitForXhrIdle` 复用。
 - `awaitIdle` 按 `requestId` 集合追踪 pending，只对过滤命中的请求计数并在 `loadingFinished/loadingFailed` 时核验 id——修掉旧实现"过滤掉的请求也递减 pending 导致假 idle"的 bug。
 - `vortex_dom_fill` description 的 `Failures:` 段补充 `UNSUPPORTED_TARGET`。
+- `SnapshotElement` 新增可选 `frameId` 字段；多 frame 时 `SnapshotEntry.frameId` 不填，单 frame 兼容旧 hint。
+- 向后兼容：`frameId` 单值参数保持原 observe 语义（只扫该 frame）；不传 `frames` / 不传 `frameId` 时仅扫主 frame，返回结构除 `version` / `frames[]` / `element.frameId` 字段外与 v0.3 行为一致。
 
 ### Tests
 
@@ -46,6 +52,7 @@
 - 新增 `tests/dom-wait-settled.test.ts`（7 用例）：默认返回 / selector 透传 / 'DOM did not settle' → TIMEOUT / 'Element not found:' → ELEMENT_NOT_FOUND / 'document.body not found' → ELEMENT_NOT_FOUND / 任意报错 → JS_EXECUTION_ERROR / 默认 quietMs=300 + timeout=8000。
 - 新增 `tests/fill-reject-patterns.test.ts`（7 用例）覆盖 pattern 注册表完整性 + 拒绝决策算法（含 `fallbackToNative` bypass）。
 - 新增 `tests/dom-commit.test.ts`（11 用例）：driver 注册表完整性 + handler 参数校验（missing kind/value/unknown kind）+ 四类错误映射（COMMIT_FAILED 带 stage / UNSUPPORTED_TARGET / ELEMENT_NOT_FOUND / 成功返回 startValue+endValue）。
+- 新增 `tests/observe-multi-frame.test.ts`（8 用例）：默认 main / all-same-origin 跨 frame / 跨源排除 / entry.frameId 单帧兼容 / per-element frameId 路由 / legacy frameId 优先 / 扫描失败降级 / 无 frame IFRAME_NOT_READY。
 - `packages/shared/tests/errors.test.ts` 用例总数 24 → 26，单独断言 `UNSUPPORTED_TARGET` 和 `COMMIT_FAILED`。
 
 ---

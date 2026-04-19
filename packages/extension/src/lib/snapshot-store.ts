@@ -6,15 +6,23 @@
  * - 60s TTL，每次 newSnapshotId 前做一次被动 GC
  * - MV3 service worker 休眠会清空内存——这是 MV3 的固有限制，
  *   实际影响小（LLM 一般在 60s 内使用 snapshot）
+ *
+ * 多 frame（@since 0.4.0）：
+ * - SnapshotElement.frameId 为元素所在 frame（跨 frame 全局唯一 index）
+ * - SnapshotEntry.frameId 保留作为"主 frame hint"，向后兼容
+ * - resolveTarget 优先读 element.frameId，否则回退到 entry.frameId
  */
 
 export interface SnapshotElement {
   index: number;
   selector: string;
+  /** 元素所在 frame id；跨 frame snapshot 用于路由。@since 0.4.0 */
+  frameId?: number;
 }
 
 export interface SnapshotEntry {
   tabId: number;
+  /** 向后兼容字段：单 frame snapshot 的 frameId hint；多 frame 时忽略，按 element.frameId 路由 */
   frameId?: number;
   capturedAt: number;
   elements: SnapshotElement[];
