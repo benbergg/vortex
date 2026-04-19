@@ -24,6 +24,8 @@ export interface AgentOptions {
   maxTokens?: number;
   maxOutputPerStep?: number;
   systemPrompt?: string;
+  /** 覆盖 mcp.tools 的工具列表（用于 per-scenario disabledTools）。不传则用 mcp.tools。 */
+  tools?: MCPTool[];
 }
 
 export interface ToolCallSummary {
@@ -85,7 +87,7 @@ export async function runAgent(opts: AgentOptions): Promise<AgentResult> {
     ...(opts.baseURL ? { baseURL: opts.baseURL } : {}),
   });
 
-  const tools = opts.mcp.tools.map(mcpToAnthropicTool);
+  const tools = (opts.tools ?? opts.mcp.tools).map(mcpToAnthropicTool);
   const trace = new Trace();
   const messages: Anthropic.MessageParam[] = [
     { role: "user", content: opts.task },
