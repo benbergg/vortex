@@ -18,6 +18,8 @@
   - `requestTypes: string[]` —— CDP 请求 type 白名单（如 `["XHR","Fetch"]`）
   - `minRequests: number` —— 至少看到 N 个匹配请求发起过才允许 resolve，防止"页面静止时瞬间假 idle"
 - 返回体新增 `matchedRequests: number` 字段，便于调用方确认过滤器是否命中。
+- **`vortex_dom_wait_settled`** 新工具：页内注入 `MutationObserver` 监视子树，在 `quietMs`（默认 300ms）内无任何 mutation 即返回。与已有 `vortex_dom_wait_for_mutation`（等待 CHANGE）互补。不传 selector 时观察 `document.body` 整棵树。返回体含 `{ settled: true, waitedMs, mutationsSeen }`。典型用法：点击筛选按钮触发 re-render 后立刻调用确保列表重排完成再读计数，避免把"渲染中间态"当作稳定状态。
+- `DomActions.WAIT_SETTLED` 枚举位。
 
 ### Changed
 
@@ -33,6 +35,7 @@
 - 新增 `tests/mouse-handlers.test.ts`（8 用例）覆盖 CLICK / DOUBLE_CLICK / MOVE 三类工具的 viewport / frame-local / 显式 coordSpace 覆盖 / INVALID_PARAMS / 偏移回退场景。
 - 新增 `tests/network-auto-subscribe.test.ts`（6 用例）覆盖首次自动订阅 / 幂等 / GET_ERRORS + FILTER 同样走自动订阅 / 显式 SUBSCRIBE 覆盖 / 多 tab 独立订阅。因 `network.ts` 含模块级 state，测试使用 `vi.resetModules` + 动态 import 隔离。
 - 新增 `tests/page-wait-idle.test.ts`（7 用例）：无请求瞬间 idle / 忽略 WebSocket+Image / XHR 挂起不 idle / urlPattern 过滤 / minRequests gate / TIMEOUT / ghost loadingFinished 不误触发。使用 `vi.useFakeTimers + advanceTimersByTimeAsync`。
+- 新增 `tests/dom-wait-settled.test.ts`（7 用例）：默认返回 / selector 透传 / 'DOM did not settle' → TIMEOUT / 'Element not found:' → ELEMENT_NOT_FOUND / 'document.body not found' → ELEMENT_NOT_FOUND / 任意报错 → JS_EXECUTION_ERROR / 默认 quietMs=300 + timeout=8000。
 
 ---
 

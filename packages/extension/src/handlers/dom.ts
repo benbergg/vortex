@@ -794,5 +794,90 @@ export function registerDomHandlers(
       if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
       return res?.result;
     },
+
+    [DomActions.WAIT_SETTLED]: async (args, tabId) => {
+      // selector 可选；无 selector 时监视 document.body 整棵
+      const __t = resolveTargetOptional(args);
+      const selector = __t?.selector;
+      const quietMs = (args.quietMs as number | undefined) ?? 300;
+      const timeout = (args.timeout as number | undefined) ?? 8000;
+      const tid = await getActiveTabId(
+        __t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId,
+      );
+      const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
+      const results = await chrome.scripting.executeScript({
+        target: buildExecuteTarget(tid, frameId),
+        func: (sel: string | null, quiet: number, to: number) => {
+          return new Promise<{ result?: unknown; error?: string }>((resolve) => {
+            try {
+              const root = sel ? document.querySelector(sel) : document.body;
+              if (!root) {
+                resolve({ error: sel ? `Element not found: ${sel}` : "document.body not found" });
+                return;
+              }
+              const start = Date.now();
+              let settled = false;
+              let quietTimer: ReturnType<typeof setTimeout> | null = null;
+              let mutationsSeen = 0;
+
+              const timeoutTimer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                obs.disconnect();
+                if (quietTimer) clearTimeout(quietTimer);
+                resolve({
+                  error: `DOM did not settle within ${to}ms (${mutationsSeen} mutations observed)`,
+                  // 标识 TIMEOUT，便于 handler 分类
+                  // 约定：以 "DOM did not settle" 开头 → TIMEOUT
+                });
+              }, to);
+
+              const startQuiet = () => {
+                if (quietTimer) clearTimeout(quietTimer);
+                quietTimer = setTimeout(() => {
+                  if (settled) return;
+                  settled = true;
+                  obs.disconnect();
+                  clearTimeout(timeoutTimer);
+                  resolve({
+                    result: {
+                      settled: true,
+                      waitedMs: Date.now() - start,
+                      mutationsSeen,
+                    },
+                  });
+                }, quiet);
+              };
+
+              const obs = new MutationObserver(() => {
+                mutationsSeen++;
+                startQuiet();
+              });
+              obs.observe(root, { childList: true, subtree: true, attributes: true });
+              // 立即开 quiet 窗口（"已经静止"情况下直接到期 resolve）
+              startQuiet();
+            } catch (err) {
+              resolve({ error: err instanceof Error ? err.message : String(err) });
+            }
+          });
+        },
+        args: [selector ?? null, quietMs, timeout],
+        world: "MAIN",
+      });
+      const res = results[0]?.result as { result?: unknown; error?: string };
+      if (res?.error) {
+        const isTimeout = res.error.startsWith("DOM did not settle");
+        const isNotFound =
+          res.error.startsWith("Element not found:") ||
+          res.error.startsWith("document.body not found");
+        const code = isTimeout
+          ? VtxErrorCode.TIMEOUT
+          : isNotFound
+            ? VtxErrorCode.ELEMENT_NOT_FOUND
+            : VtxErrorCode.JS_EXECUTION_ERROR;
+        throw vtxError(code, res.error, selector ? { selector } : undefined);
+      }
+      return res?.result;
+    },
   });
 }
