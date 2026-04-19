@@ -12,7 +12,9 @@ export type CommitKind =
   | "daterange"
   | "datetimerange"
   | "cascader"
-  | "select";
+  | "select"
+  /** @since 0.4.0 (O-10) */
+  | "checkbox-group";
 
 export interface CommitDriverSpec {
   id: string;
@@ -37,6 +39,13 @@ export const COMMIT_DRIVERS: CommitDriverSpec[] = [
     closestSelector: ".el-date-editor.el-range-editor",
     summary:
       "Element Plus <el-date-picker type='daterange'>: same as datetimerange but no time inputs / no 确定 button.",
+  },
+  {
+    id: "element-plus-checkbox-group",
+    kind: "checkbox-group",
+    closestSelector: ".el-checkbox-group",
+    summary:
+      "Element Plus <el-checkbox-group>: idempotent toggle. Pass {values: string[]} — driver diffs current checked labels with target, clicks each sequentially with a microtask gap so Vue reactivity catches every toggle (avoids the 'forEach click batched → only one toggled' trap).",
   },
 ];
 

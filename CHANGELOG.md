@@ -8,6 +8,8 @@
 
 ### Added
 
+- **`vortex_dom_commit` 支持 `kind: "checkbox-group"`**（O-10，消灭 3 个 session 踩过的同一个坑）：Element Plus `<el-checkbox-group>` 的幂等 toggle。传 `{values: ["好评"]}`，driver diff 当前 `.is-checked` 与目标 labels 的对称差，**逐个** `input.click()` + `await setTimeout 40ms` 让 Vue reactivity 在每次 toggle 间跑完 render cycle——修掉 `forEach(btn=>btn.click())` 被 Element Plus 合并成"只切最后一次"的坑。失败抛 `COMMIT_FAILED{stage:"verify"}`，extras 带 `checkedNow / wanted / toggled`。未知 label 抛 `INVALID_PARAMS` 并列出 `available`。
+- **`vortex_observe` 元素带 `state` 字段**（O-8）：从 element 自身 + 最近 2 层 ancestor 扫 `.is-checked` / `.is-selected` / `.is-active` / `aria-checked=true` / `aria-selected=true` / `aria-pressed=true` / `disabled` / `aria-disabled`。代理不再需要额外 js_evaluate 补查框架状态（Element Plus 把 checked 放 label.is-checked 而不在 input 上，之前每次 session 都要踩一遍）。只有任一状态位为 true 时才附加 `state` 字段，保持常规元素的输出干净。
 - **扩展自重载**（O-3b，对称 O-3）：vortex-server 启动时 `fs.watch(packages/extension/dist/)`，`.js` / `.html` / `manifest.json` 变化 → 2s debounce → 通过 native messaging 推送 `{type:"control", action:"reload-extension"}` → 扩展 background 收到后调 `chrome.runtime.reload()`（Chrome 对 load-unpacked 扩展会重读磁盘 dist）。上次 session 踩到的"O-1 报 `diagnosticsSupported:false` 但没法自动刷扩展"的坑被这个修掉：现在 `pnpm -C packages/extension build` 后 2s 内扩展自动换新，无需人肉 `chrome://extensions` 点重载。
 - shared 协议扩展：`NmControl` 类型（`type:"control"`, `action:"reload-extension"`, `reason?:string`）加入 `NmMessageFromServer` 联合。
 - `VORTEX_NO_EXT_AUTO_RELOAD=1` opt-out；扩展 dist 不存在时 watcher 优雅跳过不崩 server。
@@ -45,6 +47,8 @@
 
 ### Tests
 
+- 新增 `packages/extension/tests/checkbox-group-commit.test.ts`（8 用例）：driver 注册表 + dom.ts 源码合约（for…of + await tick / is-checked 作为幂等判定 / verify 失败抛 COMMIT_FAILED / 未知 label 抛 INVALID_PARAMS）。
+- 新增 `packages/extension/tests/observe-ui-state.test.ts`（7 用例）：getUiState 读 class + aria 的 6 个 state 位 / 仅在非空时附加 state 字段 / 类型层有 state?: 定义。
 - 新增 `packages/extension/tests/extension-self-reload.test.ts`（13 用例）：源码级合约测试固化 O-3b 的跨三文件不变式（protocol.ts 的 NmControl 定义 / server watcher 的 opt-out + debounce + 文件过滤 + 写消息路径 + 从 startServer 调用 / extension background 的 control 分支 + chrome.runtime.reload 包 setTimeout）。
 - 新增 `packages/mcp/tests/self-restart.test.ts`（7 用例）：源码级合约测试固化 O-3 的四条不变式（env opt-out / watch 自身目录 / exit 门控 inflight=0 / handler 包裹 inflight / 只响应 .js / watcher.on('error') graceful / installAutoRestart 在 connect 前调用）。
 - 新增 `packages/extension/tests/diagnostics-handler.test.ts`（3 用例）：版本字符串存在 / actionCount>0 + 已排序 + 包含 `diagnostics.version`+`tab.list` / tab.* 数量断言。

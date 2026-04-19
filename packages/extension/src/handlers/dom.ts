@@ -1165,6 +1165,88 @@ export function registerDomHandlers(
               })();
             }
 
+            // -------- Element Plus checkbox-group driver (O-10, @since 0.4.0) --------
+            if (driverId === "element-plus-checkbox-group") {
+              const v = val as { values?: string[] };
+              if (!v || !Array.isArray(v.values)) {
+                return {
+                  error: `value must be { values: string[] }, got ${JSON.stringify(v)}`,
+                  errorCode: "INVALID_PARAMS",
+                };
+              }
+              const target = new Set(v.values.map((s) => String(s).trim()));
+
+              return (async () => {
+                const btns = Array.from(root.querySelectorAll(".el-checkbox-button")) as HTMLElement[];
+                if (btns.length === 0) {
+                  return {
+                    error: "No .el-checkbox-button children found under .el-checkbox-group",
+                    errorCode: "COMMIT_FAILED",
+                    stage: "resolve-buttons",
+                  };
+                }
+                const unknownTargets = [...target].filter(
+                  (name) => !btns.some((b) => (b.innerText || "").trim() === name),
+                );
+                if (unknownTargets.length > 0) {
+                  const available = btns.map((b) => (b.innerText || "").trim());
+                  return {
+                    error: `Unknown label(s): ${unknownTargets.join(",")}. Available: ${available.join(",")}`,
+                    errorCode: "INVALID_PARAMS",
+                    extras: { unknownTargets, available },
+                  };
+                }
+
+                // 关键：逐个 click + 让 Vue 跑一个 microtask/动画帧再下一个。
+                // 直接 forEach 同步点会被 Element Plus 的 click-group 合并成"只认最后一次"。
+                const dispatchReal = (el: HTMLElement) => {
+                  const input = el.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
+                  // 点 label 比点 input 更稳：label 上有 @click.prevent + Vue 侧更新 v-model
+                  if (input) input.click();
+                  else el.click();
+                };
+                const tick = () => new Promise((r) => setTimeout(r, 40));
+
+                const toggled: string[] = [];
+                for (const b of btns) {
+                  const name = (b.innerText || "").trim();
+                  const isChecked = b.classList.contains("is-checked");
+                  const shouldCheck = target.has(name);
+                  if (isChecked === shouldCheck) continue;
+                  dispatchReal(b);
+                  toggled.push(name);
+                  await tick();
+                }
+
+                // 校验：再读一遍实际 checked 状态，要求与目标一致
+                const checkedNow = btns
+                  .filter((b) => b.classList.contains("is-checked"))
+                  .map((b) => (b.innerText || "").trim())
+                  .sort();
+                const wanted = [...target].sort();
+                const ok =
+                  checkedNow.length === wanted.length &&
+                  checkedNow.every((n, i) => n === wanted[i]);
+                if (!ok) {
+                  return {
+                    error: `Checkbox state did not converge: got [${checkedNow.join(",")}], expected [${wanted.join(",")}]`,
+                    errorCode: "COMMIT_FAILED",
+                    stage: "verify",
+                    extras: { checkedNow, wanted, toggled },
+                  };
+                }
+
+                return {
+                  result: {
+                    success: true,
+                    driver: driverId,
+                    checked: checkedNow,
+                    toggled,
+                  },
+                };
+              })();
+            }
+
             return {
               error: `Unknown driver id: ${driverId}`,
               errorCode: "INVALID_PARAMS",
