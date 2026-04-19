@@ -30,6 +30,14 @@ const screenshotReturnMode = {
   },
 };
 
+const optionalCoordSpace = {
+  coordSpace: {
+    type: "string" as const,
+    enum: ["frame", "viewport"],
+    description: "Coordinate space for x/y. Defaults to 'frame' when frameId is provided (x/y treated as frame-local and auto-offset to viewport), else 'viewport' (raw CDP viewport coordinates). @since 0.4.0",
+  },
+};
+
 function tabTools(): ToolDef[] {
   return [
     { name: "vortex_tab_list", action: "tab.list", description: "List all open browser tabs with their IDs, URLs, and titles. Use this first to find tab IDs for other commands.", schema: { type: "object", properties: {}, required: [] } },
@@ -119,14 +127,16 @@ function mouseTools(): ToolDef[] {
     {
       name: "vortex_mouse_click",
       action: "mouse.click",
-      description: "Click at specific x,y coordinates using CDP real mouse events (mousedown + mouseup sequence). Use this when dom.click doesn't trigger expected behavior (React synthetic events, anti-bot detection). For element-based clicking, prefer vortex_dom_click with useRealMouse=true.",
+      description: "Click at specific x,y coordinates using CDP real mouse events (mousedown + mouseup sequence). Use this when dom.click doesn't trigger expected behavior (React synthetic events, anti-bot detection). For element-based clicking, prefer vortex_dom_click with useRealMouse=true. When frameId is provided, x/y are treated as frame-local coordinates and automatically offset to viewport (@since 0.4.0).",
       schema: {
         type: "object",
         properties: {
-          x: { type: "number", description: "X coordinate in viewport" },
-          y: { type: "number", description: "Y coordinate in viewport" },
+          x: { type: "number", description: "X coordinate (frame-local when frameId is set, else viewport)" },
+          y: { type: "number", description: "Y coordinate (frame-local when frameId is set, else viewport)" },
           button: { type: "string", enum: ["left", "right", "middle"], description: "Mouse button", default: "left" },
           ...optionalTabId,
+          ...optionalFrameId,
+          ...optionalCoordSpace,
         },
         required: ["x", "y"],
       },
@@ -134,13 +144,15 @@ function mouseTools(): ToolDef[] {
     {
       name: "vortex_mouse_double_click",
       action: "mouse.doubleClick",
-      description: "Double-click at specific coordinates using CDP real mouse events.",
+      description: "Double-click at specific coordinates using CDP real mouse events. When frameId is provided, x/y are treated as frame-local coordinates and automatically offset to viewport (@since 0.4.0).",
       schema: {
         type: "object",
         properties: {
-          x: { type: "number", description: "X coordinate" },
-          y: { type: "number", description: "Y coordinate" },
+          x: { type: "number", description: "X coordinate (frame-local when frameId is set, else viewport)" },
+          y: { type: "number", description: "Y coordinate (frame-local when frameId is set, else viewport)" },
           ...optionalTabId,
+          ...optionalFrameId,
+          ...optionalCoordSpace,
         },
         required: ["x", "y"],
       },
@@ -148,13 +160,15 @@ function mouseTools(): ToolDef[] {
     {
       name: "vortex_mouse_move",
       action: "mouse.move",
-      description: "Move the mouse to specific coordinates. Useful for triggering hover effects that require real mouse events.",
+      description: "Move the mouse to specific coordinates. Useful for triggering hover effects that require real mouse events. When frameId is provided, x/y are treated as frame-local coordinates and automatically offset to viewport (@since 0.4.0).",
       schema: {
         type: "object",
         properties: {
-          x: { type: "number", description: "X coordinate" },
-          y: { type: "number", description: "Y coordinate" },
+          x: { type: "number", description: "X coordinate (frame-local when frameId is set, else viewport)" },
+          y: { type: "number", description: "Y coordinate (frame-local when frameId is set, else viewport)" },
           ...optionalTabId,
+          ...optionalFrameId,
+          ...optionalCoordSpace,
         },
         required: ["x", "y"],
       },
