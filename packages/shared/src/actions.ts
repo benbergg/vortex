@@ -34,6 +34,8 @@ export const DomActions = {
   GET_ATTRIBUTE: "dom.getAttribute",
   GET_SCROLL_INFO: "dom.getScrollInfo",
   WAIT_FOR_MUTATION: "dom.waitForMutation",
+  /** 等待 DOM 子树在 quietMs ms 内无任何 mutation 后返回。与 WAIT_FOR_MUTATION 语义互补。@since 0.4.0 */
+  WAIT_SETTLED: "dom.waitSettled",
   WATCH_MUTATIONS: "dom.watchMutations",
   UNWATCH_MUTATIONS: "dom.unwatchMutations",
 } as const;

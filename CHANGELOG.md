@@ -4,6 +4,20 @@
 
 ---
 
+## [Unreleased] (towards 0.4.0)
+
+### Added
+
+- **`vortex_dom_wait_settled`** 新工具：页内注入 `MutationObserver` 监视子树，在 `quietMs`（默认 300ms）内无任何 mutation 即返回。与已有 `vortex_dom_wait_for_mutation`（等待 CHANGE）互补。不传 selector 时观察 `document.body` 整棵树。返回体含 `{ settled: true, waitedMs, mutationsSeen }`。
+- 典型用法：点击筛选按钮触发 re-render 后立刻 `wait_settled({ selector: ".evaluation-list" })` 确保列表重排完成再读计数，避免把"渲染中间态"当作稳定状态。
+- `DomActions.WAIT_SETTLED` 枚举位。
+
+### Tests
+
+- 新增 `tests/dom-wait-settled.test.ts`（7 用例）：默认返回 / selector 透传 / 'DOM did not settle' → TIMEOUT / 'Element not found:' → ELEMENT_NOT_FOUND / 'document.body not found' → ELEMENT_NOT_FOUND / 任意报错 → JS_EXECUTION_ERROR / 默认 quietMs=300 + timeout=8000。
+
+---
+
 ## [0.3.0] - 2026-04-19
 
 > **发布性质**：结构型版本。主要价值是 **bench 方法论升级 + L1b 新层 + content 护栏**，bench canonical 分数因 N=3 揭示 flakiness 从 75.1 回退到 71.08（非 v0.3 代码引起；详见 Metrics 段）。B error-hint ROI 仍 null——L1b fixture 强化需在 v0.3.1 跟进。
