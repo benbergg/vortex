@@ -373,9 +373,9 @@ function observeTools(): ToolDef[] {
           },
           frames: {
             description:
-              "Which frames to scan. 'main' (default, backward compatible): only top frame. 'all-same-origin': descend into same-origin iframes. 'all': descend into all frames (cross-origin may return empty without error). Or pass an array of frameIds. Ignored when the legacy `frameId` param is set (then only that single frame is scanned). @since 0.4.0",
+              "Which frames to scan. ⭐ For SPAs where the main app lives in a cross-origin iframe but the extension has permission (e.g. host_permissions covers *.example.com), use 'all-permitted' — it filters by manifest host_permissions instead of strict origin match, and will catch iframes that 'all-same-origin' wrongly skips. Options: 'main' (default, backward compatible): only top frame. 'all-same-origin': strict same-origin descent. 'all-permitted': filter by extension host_permissions (@since 0.4.0 O-6). 'all': descend into every frame (cross-origin may return empty without error). Or pass an array of frameIds. Ignored when the legacy `frameId` param is set.",
             oneOf: [
-              { type: "string", enum: ["main", "all-same-origin", "all"] },
+              { type: "string", enum: ["main", "all-same-origin", "all-permitted", "all"] },
               { type: "array", items: { type: "number" } },
             ],
             default: "main",
