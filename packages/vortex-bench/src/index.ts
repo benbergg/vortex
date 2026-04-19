@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
 import { config as loadEnv } from "dotenv";
 import { createMcpConnection, closeMcpConnection } from "./runner/mcp-client.js";
-import { runAgent, type AgentResult } from "./runner/agent.js";
+import { runAgent, DEFAULT_SYSTEM, type AgentResult } from "./runner/agent.js";
 import { loadScenario, type Scenario } from "./runner/scenario.js";
 import { resolveProvider, type ProviderConfig } from "./runner/provider.js";
 import { startFixtureServer, type FixtureServer } from "./runner/fixtures.js";
@@ -95,11 +95,31 @@ async function runOneScenario(opts: {
 
   process.stdout.write(`\n━━━ ${scenario.id} ━━━\n`);
 
+  const disabled = scenario.expected.disabledTools ?? [];
+
   const mcp = await createMcpConnection({
     command: process.execPath,
     args: [opts.mcpBin],
     env: { ...(process.env as Record<string, string>) },
   });
+
+  if (disabled.length > 0) {
+    const allNames = new Set(mcp.tools.map((t) => t.name));
+    const unknown = disabled.filter((d) => !allNames.has(d));
+    if (unknown.length > 0) {
+      throw new Error(
+        `scenario ${scenario.id}: disabledTools contains unknown tool names: ${unknown.join(", ")}. ` +
+        `Available: ${[...allNames].sort().join(", ")}`,
+      );
+    }
+  }
+  const toolsForAgent = disabled.length > 0
+    ? mcp.tools.filter((t) => !disabled.includes(t.name))
+    : mcp.tools;
+
+  const systemPrompt = disabled.length > 0
+    ? `${DEFAULT_SYSTEM}\n\nTools unavailable in this scenario: ${disabled.join(", ")}. Do not attempt to call them.`
+    : undefined;
 
   try {
     const started = Date.now();
@@ -112,6 +132,8 @@ async function runOneScenario(opts: {
       baseURL: opts.provider.baseURL,
       maxSteps: opts.maxSteps,
       maxTokens: opts.maxTokens,
+      tools: toolsForAgent,
+      ...(systemPrompt !== undefined ? { systemPrompt } : {}),
     });
     const elapsedMs = Date.now() - started;
 

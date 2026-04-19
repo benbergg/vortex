@@ -66,7 +66,7 @@ function mcpToAnthropicTool(t: MCPTool): Anthropic.Tool {
   };
 }
 
-const DEFAULT_SYSTEM = `You are an autonomous browser-automation agent operating via the Vortex MCP toolchain.
+export const DEFAULT_SYSTEM = `You are an autonomous browser-automation agent operating via the Vortex MCP toolchain.
 Rules:
 - Use the provided tools to accomplish the user task.
 - Each tool response may include structured error fields { code, hint, recoverable, context } — read hint before retrying.
