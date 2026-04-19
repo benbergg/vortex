@@ -326,7 +326,7 @@ function observeTools(): ToolDef[] {
       name: "vortex_observe",
       action: "observe.snapshot",
       description:
-        "Get an LLM-friendly snapshot of the page in ONE call: indexed interactive elements (button/link/input/select/etc.) with role, accessible name, bbox, occlusion status (visible/occludedBy), and key attributes. Prefer this over multiple dom.query calls when exploring what the page can do. Returns a snapshotId; pair with `index` in dom.* tools to operate on elements without guessing CSS selectors. Snapshot TTL: 60s. Failures: TAB_NOT_FOUND, JS_EXECUTION_ERROR.",
+        "⭐ On any non-trivial page, call this first. Using vortex_content_get_text / _html / vortex_dom_query on large pages (>128KB) risks truncation; this tool returns a small structured index of interactive elements indexed by position. Get an LLM-friendly snapshot of the page in ONE call: indexed interactive elements (button/link/input/select/etc.) with role, accessible name, bbox, occlusion status (visible/occludedBy), and key attributes. Prefer this over multiple dom.query calls when exploring what the page can do. Returns a snapshotId; pair with `index` in dom.* tools to operate on elements without guessing CSS selectors. Snapshot TTL: 60s. Failures: TAB_NOT_FOUND, JS_EXECUTION_ERROR.",
       schema: {
         type: "object",
         properties: {
