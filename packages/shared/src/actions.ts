@@ -14,6 +14,8 @@ export const PageActions = {
   WAIT: "page.wait",
   INFO: "page.info",
   WAIT_FOR_NETWORK_IDLE: "page.waitForNetworkIdle",
+  /** XHR/Fetch 专用 idle 等待。语义上是 WAIT_FOR_NETWORK_IDLE + requestTypes=["XHR","Fetch"]。@since 0.4.0 */
+  WAIT_FOR_XHR_IDLE: "page.waitForXhrIdle",
 } as const;
 
 export const JsActions = {

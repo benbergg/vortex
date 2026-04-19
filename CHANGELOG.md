@@ -4,6 +4,28 @@
 
 ---
 
+## [Unreleased] (towards 0.4.0)
+
+### Added
+
+- **`vortex_page_wait_for_xhr_idle`** 新工具：只盯 CDP 请求 type 为 `XHR`/`Fetch` 的请求 idle，忽略 WebSocket / Image / Stylesheet / Font，专解 SPA 上"后台 telemetry 长连导致 network_idle 永不到"的痛点。默认 idleTime 200ms、timeout 10s。
+- **`vortex_page_wait_for_network_idle` 增强**：新增三个可选参数：
+  - `urlPattern: string` —— 只计数 URL 含该子串的请求
+  - `requestTypes: string[]` —— CDP 请求 type 白名单（如 `["XHR","Fetch"]`）
+  - `minRequests: number` —— 至少看到 N 个匹配请求发起过才允许 resolve，防止"页面静止时瞬间假 idle"
+- 返回体新增 `matchedRequests: number` 字段，便于调用方确认过滤器是否命中。
+
+### Changed
+
+- `waitForNetworkIdle` 内部抽象为 `awaitIdle(tabId, opts)` 通用助手，`waitForXhrIdle` 复用。
+- `awaitIdle` 按 `requestId` 集合追踪 pending，只对过滤命中的请求计数并在 `loadingFinished/loadingFailed` 时核验 id——修掉旧实现"过滤掉的请求也递减 pending 导致假 idle"的 bug。
+
+### Tests
+
+- 新增 `tests/page-wait-idle.test.ts`（7 用例）：无请求瞬间 idle / 忽略 WebSocket+Image / XHR 挂起不 idle / urlPattern 过滤 / minRequests gate / TIMEOUT / ghost loadingFinished 不误触发。使用 `vi.useFakeTimers + advanceTimersByTimeAsync`。
+
+---
+
 ## [0.3.0] - 2026-04-19
 
 > **发布性质**：结构型版本。主要价值是 **bench 方法论升级 + L1b 新层 + content 护栏**，bench canonical 分数因 N=3 揭示 flakiness 从 75.1 回退到 71.08（非 v0.3 代码引起；详见 Metrics 段）。B error-hint ROI 仍 null——L1b fixture 强化需在 v0.3.1 跟进。
