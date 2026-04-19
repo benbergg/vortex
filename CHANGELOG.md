@@ -4,6 +4,76 @@
 
 ---
 
+## [0.3.0] - 2026-04-19
+
+> **发布性质**：结构型版本。主要价值是 **bench 方法论升级 + L1b 新层 + content 护栏**，bench canonical 分数因 N=3 揭示 flakiness 从 75.1 回退到 71.08（非 v0.3 代码引起；详见 Metrics 段）。B error-hint ROI 仍 null——L1b fixture 强化需在 v0.3.1 跟进。
+
+### Added
+
+- **bench `--repeats N`**：每场景跑 N 次取 median layer-score 代表值，报 `variance.tokens/steps/elapsed_ms`（min/p50/max）+ `pass_stable`。默认 N=1 保 CI 快；baseline / 夜跑用 N=3。Env fallback：`BENCH_REPEATS`。
+- **bench `--verbose-runs`**：保留 `allRuns` 原始数据（默认丢，JSON 精简）。
+- **L1b-no-observe 场景层**：5 个镜像 L1 的禁用 observe 变体。聚合进 `aggregate.l1b`，**不**进主 `vb_index`（保 v0.2↔v0.3 可比）。首次产出独立 L1b 分数（本版 59.60）。
+- **`vortex_content_get_text` / `_html` soft size limit**：默认 128KB，可传 `maxBytes` 覆盖（范围 4KB~5MB）。截断后追加 sentinel trailer：text 走 `\n\n[VORTEX_TRUNCATED ...]`，html 走 `<!-- [VORTEX_TRUNCATED ...] -->`。采用 code-point-safe 切分（`[...str].slice(0,n).join('')`）避免 UTF-16 surrogate 破损。
+- `ExpectedSpec.disabledTools: string[]`：per-scenario MCP 工具黑名单。Runner 层过滤 + agent system prompt 声明双保险。
+- `AgentOptions.tools?: MCPTool[]`：覆盖 `mcp.tools`，给 per-scenario filter 留口子。
+- **FLAKY / INCOMPLETE 告警**：reporter 在 `pass_stable === false` 或 `incomplete === true` 时前缀高亮行首，暴露"N=1 基线掩盖的噪声"。
+- **variance regression warning**：`bench diff` 发现新 `tokens.max > baseline × 1.5` 时报 `[variance] ...` warning（不阻断发布）。
+
+### Changed
+
+- `vortex_observe` description 首行强化"Call this first on non-trivial page"（MCP schema + bench DEFAULT_SYSTEM 双向）。
+- Report `schema_version` 1 → 2；老 reader 读 v2 报告仍能看 `aggregate`；`diff.ts` 支持 v1/v2 双路径 + 向后兼容（老 baseline 视为 `runs=1`）。
+
+### Metrics（GLM-4.6V via 智谱 Anthropic 端点）
+
+> ⚠️ **对比不完全对称**：v0.2.0 canonical GLM-4.7 baseline（VB 87.0）是 N=1，v0.2.0 GLM-4.6V baseline（VB 75.1，`full-v1-glm46v-baseline.json`）也是 N=1。v0.3.0 首次引入 N=3。本版未重跑 GLM-4.7（600 万资源包在 GLM-4.6V 上）。跨模型/跨 N 对比时须保持此差异意识。
+
+| 指标 | v0.2.0 GLM-4.6V (N=1) | v0.3.0 GLM-4.6V (N=3, p50) | Δ |
+|---|---:|---:|---:|
+| **VB_Index** 主 | 75.1 | **71.08** | **-4.0** |
+| L0 | 89.8 | 89.55 | ≈ |
+| L1 | 64.4 | **49.05** | **-15.4** |
+| L2 | 61.0 | 60.55 | ≈ |
+| L3 | 91.3 | 91.33 | ≈ |
+| L1b（新）| — | **59.60** | 首次数据 |
+| A observe ROI | — | 30.25 | — |
+| **B errorHint ROI** | null | **仍 null** | ❌ v0.3.1 跟进 |
+| L2-004 GitHub tokens p50 | ~409K (max_steps) | 339K (max_steps) | 单响应 trailer 起效但未根治 |
+| Tokens total（整套）| 828K | 904K | 略增（N=3 但 scenarios 也增加 L1b 5 个） |
+
+**L1 回退根因分析**：非 v0.3 代码引起。N=1 → N=3 揭示 v0.2 canonical 的运气成分：
+- L1-002 ambiguous：v0.2 N=1 pass → v0.3 N=3 **0/3 pass**，agent 稳定陷入 max_steps
+- L1-003 disabled：v0.3 N=3 **1/3 pass (FLAKY)**
+- L1-004 offscreen：v0.3 N=3 **0/3 pass**
+
+这恰是 `--repeats` 方法论升级要暴露的信号——与其让单 shot 侥幸通过给出假 87.0，不如 N=3 揭示真实 flakiness。
+
+**B ROI 仍 null 的根因**：L1b 禁 observe 后，agent 在 max_steps 前**没触发** expectedErrorCode 路径；log 里普遍 `[ROI-B] → direct`（蒙对 selector）或 `→ direct (task failed)`（走旁路失败）。需 v0.3.1 加固 L1b fixture 让 agent **必须**通过 vortex 工具路径（见 Known Issues）。
+
+### Baselines 入 git
+
+- `packages/vortex-bench/reports/full-v1-glm46v-baseline.json` — v0.2.0 参考（N=1，不变）
+- `packages/vortex-bench/reports/full-v1-repeats3-v0.3.0-glm46v.json` — v0.3.0 canonical（N=3，含 L1b）
+
+### Known Issues / v0.3.1 待办
+
+- **B error-hint ROI 仍 null**：L1b 5 场景禁 observe 后，agent 大部分未触及 vortex 结构化错误码；fixture 需要强化为"非通过 vortex observe / vortex dom 错误处理就不能完成任务"的设计。
+- **L2-004 GitHub max_steps 未根治**：128KB 单响应截断让单次工具调用不爆 context，但 agent 30 步内多次调用累积仍超；需要 agent 端的 step budget 或 content 访问次数限流。
+- **L1-002 / L1-004 可能是 fixture bug**：N=3 稳定 0/3 值得单独审 fixture 是否对 GLM-4.6V 有歧义 selector 路径。
+
+### Breaking
+
+- Report `schema_version=2`：`Report.scenarios[i]` 含可选新字段 `runs/runs_completed/pass_rate/pass_stable/variance/representative_index/incomplete/error_runs/allRuns`；`Report.aggregate` 含可选 `l1b/incomplete_scenarios/vb_index_stability`。外部消费方需读 `schema_version` 判断。老 v1 baseline 读取兼容（reader 视作 `runs=1`）。
+
+### Internal
+
+- `metrics.ts:scoreOf` 提取为单一来源，`aggregateLayer` 改调用它（避免公式重复）
+- `src/index.ts` 加 ESM entry-point guard，防止 test import 触发 main()
+- 新增单元测试 32 个（基线 94 → 126）：`truncate.test.ts`（11）+ `aggregate-runs.test.ts`（7）+ `cli-args.test.ts`（9）+ `diff-v2.test.ts`（3）+ `scenario-disabled-tools.test.ts`（2）
+- 两轮 Codex 独立 review（session `019da345-4d48-7a91-880d-5928053df87f`）：首轮 14 问题（6 P1 + 6 P2 + 2 P3）全修；二轮 6 问题（3 P1 + 3 P2）全修
+
+---
+
 ## [0.2.0] — 2026-04-18
 
 > 在 beta.1 基础上：新增 **vortex-bench v1** 评测集（18 场景，4 层分层）、`vortex_events_drain` 工具（主动拉聚合事件绕过 1s 节流窗口）。首版 baseline = 87.0/100（GLM-4.7），drain 工具令 C event-bus ROI 从 0% 升到 100%。
