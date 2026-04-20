@@ -52,6 +52,8 @@ function withEvents(content: ContentItem[]): { content: ContentItem[] } {
   return { content };
 }
 
+let activeSnapshotId: string | null = null;
+
 const PORT = parseInt(process.env.VORTEX_PORT ?? "6800");
 const DEFAULT_TIMEOUT = parseInt(process.env.VORTEX_TIMEOUT_MS ?? "30000");
 const LARGE_IMAGE_BYTES = 500_000;   // 超过 500KB 的图片默认切 file 模式
@@ -284,6 +286,9 @@ async function handleCallTool(
         content: [{ type: "text" as const, text: `Error [${resp.error.code}]: ${resp.error.message}` }],
       };
     }
+    // 追踪活跃 snapshotId，供后续动作工具 target 翻译使用
+    const snapshotResult = resp.result as { snapshotId?: string };
+    if (snapshotResult?.snapshotId) activeSnapshotId = snapshotResult.snapshotId;
     if (detail === "compact") {
       const { renderObserveCompact } = await import("./lib/observe-render.js");
       const text = renderObserveCompact(resp.result as any);
@@ -292,6 +297,28 @@ async function handleCallTool(
     // detail=full：原 JSON pretty（与 v0.4 行为一致）
     const resultText = JSON.stringify(resp.result ?? resp, null, 2);
     return withEvents([{ type: "text" as const, text: resultText }]);
+  }
+
+  // target 翻译：@eN / @fNeM → { index, snapshotId, frameId }
+  const target = params.target as string | undefined;
+  if (target) {
+    try {
+      const { resolveTargetParam } = await import("./lib/ref-parser.js");
+      const resolved = resolveTargetParam(target, activeSnapshotId);
+      delete params.target;
+      if (resolved.selector) params.selector = resolved.selector;
+      if (resolved.index != null) {
+        params.index = resolved.index;
+        params.snapshotId = resolved.snapshotId;
+        // 跨 frame 时透传 frameId（frameId === 0 表示主 frame，不设即可）
+        if (resolved.frameId && resolved.frameId !== 0) params.frameId = resolved.frameId;
+      }
+    } catch (err) {
+      return {
+        isError: true,
+        content: [{ type: "text" as const, text: (err as Error).message }],
+      };
+    }
   }
 
   try {
