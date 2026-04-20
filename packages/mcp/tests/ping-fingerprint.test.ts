@@ -42,6 +42,7 @@ describe("MCP ping version fingerprint (@since 0.4.0)", () => {
     expect(names).toContain("vortex_dom_commit");
     expect(names).toContain("vortex_dom_wait_settled");
     expect(names).toContain("vortex_page_wait_for_xhr_idle");
+    expect(names).toContain("vortex_dom_batch");
   });
 
   it("vortex_ping description advertises version fingerprint", () => {
@@ -49,20 +50,18 @@ describe("MCP ping version fingerprint (@since 0.4.0)", () => {
     expect(ping?.description).toMatch(/mcpVersion/);
     expect(ping?.description).toMatch(/extensionVersion/);
     expect(ping?.description).toMatch(/schemaHash/);
-    expect(ping?.description).toMatch(/warning/);
+    expect(ping?.description).toMatch(/toolCount/);
   });
 
-  it("vortex_mouse_click description recommends frameId first", () => {
+  it("vortex_mouse_click description mentions frameId for iframe support", () => {
     const mc = getAllToolDefs().find((d) => d.name === "vortex_mouse_click");
-    // 首 12 个字符里必须出现 ⭐ 推荐标记（这是我们给代理的最强信号）
-    expect(mc?.description.slice(0, 12)).toContain("⭐");
     expect(mc?.description).toMatch(/frameId/);
-    expect(mc?.description.indexOf("frameId")).toBeLessThan(mc!.description.indexOf("CDP"));
+    expect(mc?.description).toMatch(/iframe/);
   });
 
-  it("vortex_observe description mentions suggestedUsage + iframe frames", () => {
+  it("vortex_observe description mentions iframe support", () => {
     const ob = getAllToolDefs().find((d) => d.name === "vortex_observe");
-    expect(ob?.description).toMatch(/suggestedUsage/);
-    expect(ob?.description).toMatch(/all-same-origin/);
+    expect(ob?.description).toMatch(/iframe/);
+    expect(ob?.description).toMatch(/frames/);
   });
 });
