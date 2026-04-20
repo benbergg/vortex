@@ -265,6 +265,35 @@ async function handleCallTool(
     }
   }
 
+  // observe.snapshot 专用分发：compact → 紧凑文本，full → 原 JSON pretty
+  if (toolDef.action === "observe.snapshot") {
+    const detail = (params.detail as "compact" | "full") ?? "compact";
+    const { tabId, timeout, ...rest } = params;
+    const effectiveTimeout = (timeout as number) ?? DEFAULT_TIMEOUT;
+    // 把 MCP 的 detail 翻译成 extension handler 内部的 format 字段
+    const resp = await sendRequest(
+      toolDef.action,
+      { ...rest, format: detail },
+      PORT,
+      tabId as number | undefined,
+      effectiveTimeout,
+    );
+    if (resp.error) {
+      return {
+        isError: true,
+        content: [{ type: "text" as const, text: `Error [${resp.error.code}]: ${resp.error.message}` }],
+      };
+    }
+    if (detail === "compact") {
+      const { renderObserveCompact } = await import("./lib/observe-render.js");
+      const text = renderObserveCompact(resp.result as any);
+      return withEvents([{ type: "text" as const, text }]);
+    }
+    // detail=full：原 JSON pretty（与 v0.4 行为一致）
+    const resultText = JSON.stringify(resp.result ?? resp, null, 2);
+    return withEvents([{ type: "text" as const, text: resultText }]);
+  }
+
   try {
     const { tabId, returnMode, timeout, ...rest } = params;
     const effectiveTimeout = (timeout as number) ?? DEFAULT_TIMEOUT;

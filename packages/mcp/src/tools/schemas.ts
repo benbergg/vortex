@@ -373,9 +373,9 @@ function observeTools(): ToolDef[] {
         properties: {
           detail: {
             type: "string",
-            enum: ["lite", "full"],
-            description: "lite: minimal fields (index, role, name, frameId). full: all fields including bbox, attrs, visibility, suggestedUsage.",
-            default: "full",
+            enum: ["compact", "full"],
+            description: "compact: Markdown-ish 紧凑文本，仅含可交互元素的 @eN/@fNeM ref（默认，省 token）。full: 完整 JSON，含 bbox/attrs/suggestedUsage（调试用）。",
+            default: "compact",
           },
           viewport: {
             type: "string",
