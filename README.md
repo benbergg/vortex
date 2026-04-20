@@ -65,7 +65,7 @@ claude mcp add vortex --scope user -- npx -y @bytenew/vortex-mcp
 
 打开 Claude Code 后让它调 `mcp__vortex__vortex_tab_list`，应能看到当前所有标签页。
 
-## 能力一览（共 64 个工具 / action）
+## 能力一览（共 **35 个工具**）
 
 按模块分组：tab、page、dom、content、js、keyboard、mouse、capture、console、network、storage、file、frames。
 

@@ -1,6 +1,6 @@
 # @bytenew/vortex-mcp
 
-通过 MCP（Model Context Protocol）把 Claude Code 接到本地 Chrome — 让 Claude 直接驱动你正在用的浏览器：导航、点击、填表、截图、抓 DOM、读 console/network、跑 JS 等共 **64 个工具**。
+通过 MCP（Model Context Protocol）把 Claude Code 接到本地 Chrome — 让 Claude 直接驱动你正在用的浏览器：导航、点击、填表、截图、抓 DOM、读 console/network、跑 JS 等共 **35 个工具**。
 
 底层基于 [Vortex](https://github.com/bytenew/vortex) 浏览器自动化套件：vortex Chrome 扩展 ↔ vortex-server（本地 WS）↔ 本 MCP server（stdio） ↔ Claude Code。
 
@@ -99,7 +99,7 @@ claude mcp list
 
 ---
 
-## 工具一览（64 个，按模块分组）
+## 工具一览（35 个，按模块分组）
 
 | 模块 | 工具前缀 | 典型用途 |
 |------|---------|---------|
