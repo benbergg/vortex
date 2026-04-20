@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>raw long</title></head><body>
+<header><button data-testid="nav-home">首页</button><button data-testid="nav-about">关于</button></header>
+<main>
+  <h1>长列表</h1>
+  <ul id="big-list"></ul>
+  <table border="1" id="big-table"><thead><tr><th>ID</th><th>名称</th><th>操作</th></tr></thead><tbody id="tbody"></tbody></table>
+</main>
+<script>
+  const ul = document.getElementById("big-list");
+  const tb = document.getElementById("tbody");
+  for (let i = 1; i <= 500; i++) {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.setAttribute("data-testid", "li-btn-" + i);
+    btn.textContent = "操作 " + i;
+    li.appendChild(btn);
+    ul.appendChild(li);
+  }
+  for (let i = 1; i <= 300; i++) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${i}</td><td>name-${i}</td><td><button data-testid="row-btn-${i}">查看</button></td>`;
+    tb.appendChild(tr);
+  }
+</script></body></html>
