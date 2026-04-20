@@ -14,7 +14,9 @@
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "bench": "node dist/index.js",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "prerecord-baseline": "pnpm --filter @bytenew/vortex-bench build && pnpm --filter @bytenew/vortex-mcp build",
+    "record-baseline": "node --experimental-strip-types scripts/record-baseline.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
