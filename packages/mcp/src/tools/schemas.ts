@@ -9,13 +9,13 @@ export interface ToolDef {
 }
 
 const optionalTabId = {
-  tabId: { type: "number" as const, description: "Tab ID (omit for active tab)." },
+  tabId: { type: "number" as const, description: "Tab ID (omit = active tab)." },
 };
 
 const optionalFrameRef = {
   frameRef: {
     type: "string" as const,
-    description: "iframe 逃生舱：`@fN`（N 为 frameId）。省略 = 主 frame。",
+    description: "`@fN` frame ref (omit = main frame).",
   },
 };
 
@@ -39,7 +39,7 @@ function diagnosticsTools(): ToolDef[] {
     {
       name: "vortex_ping",
       action: "__mcp_ping__",
-      description: "Call this FIRST. Returns: mcpVersion, extensionVersion, schemaHash, toolCount, tabCount.",
+      description: "Call FIRST. Returns mcpVersion, extensionVersion, schemaHash, toolCount, tabCount.",
       schema: { type: "object", properties: {}, required: [] },
     },
   ];
@@ -50,28 +50,26 @@ function eventsTools(): ToolDef[] {
     {
       name: "vortex_events",
       action: "__mcp_events__",
-      description: "Manage browser event subscriptions. op=subscribe|unsubscribe|drain. Events piggyback on tool responses.",
+      description: "Manage event subscriptions. op=subscribe|unsubscribe|drain. Events piggyback on responses.",
       schema: {
         type: "object",
         properties: {
           op: {
             type: "string",
             enum: ["subscribe", "unsubscribe", "drain"],
-            description: "subscribe: start listening; unsubscribe: cancel by subscriptionId; drain: flush buffered events.",
           },
           types: {
             type: "array",
             items: { type: "string" },
-            description: "Event types (for subscribe). Known: user.switched_tab, dialog.opened, download.completed, console.error, dom.mutated.",
+            description: "Event types. Known: user.switched_tab, dialog.opened, download.completed, console.error, dom.mutated.",
           },
           minLevel: {
             type: "string",
             enum: ["info", "notice", "urgent"],
-            description: "Min event level (for subscribe, default urgent).",
             default: "urgent",
           },
-          tabId: { type: "number", description: "Filter events to this tab (for subscribe)." },
-          subscriptionId: { type: "string", description: "Subscription id (for unsubscribe)." },
+          tabId: { type: "number" },
+          subscriptionId: { type: "string" },
         },
         required: ["op"],
       },
@@ -88,27 +86,25 @@ function observeTools(): ToolDef[] {
     {
       name: "vortex_observe",
       action: "observe.snapshot",
-      description: "Get interactive elements (@eN/@fNeM refs, role, name). Use frames option for iframe pages.",
+      description: "Get interactive elements (@eN/@fNeM refs, role, name). Use frames for iframes.",
       schema: {
         type: "object",
         properties: {
           detail: {
             type: "string",
             enum: ["compact", "full"],
-            description: "compact: Markdown-ish 紧凑文本（默认，省 token）。full: 完整 JSON（调试用）。",
             default: "compact",
           },
           viewport: {
             type: "string",
             enum: ["visible", "full"],
-            description: "visible: only viewport elements (default). full: all interactive elements.",
             default: "visible",
           },
-          maxElements: { type: "number", description: "Max elements per frame (default 200).", default: 200 },
-          includeAX: { type: "boolean", description: "Infer ARIA role (default true).", default: true },
-          includeText: { type: "boolean", description: "Compute accessible name (default true).", default: true },
+          maxElements: { type: "number", default: 200 },
+          includeAX: { type: "boolean", default: true },
+          includeText: { type: "boolean", default: true },
           frames: {
-            description: "Which frames to scan: 'main', 'all-same-origin', 'all-permitted', 'all', or array of frameIds.",
+            description: "'main'|'all-same-origin'|'all-permitted'|'all' or frameId[].",
             oneOf: [
               { type: "string", enum: ["main", "all-same-origin", "all-permitted", "all"] },
               { type: "array", items: { type: "number" } },
@@ -133,13 +129,13 @@ function tabTools(): ToolDef[] {
     {
       name: "vortex_tab_list",
       action: "tab.list",
-      description: "List all open browser tabs with IDs, URLs, and titles.",
+      description: "List open tabs with IDs, URLs, titles.",
       schema: { type: "object", properties: {}, required: [] },
     },
     {
       name: "vortex_tab_create",
       action: "tab.create",
-      description: "Create a new browser tab, optionally navigating to a URL. Activates by default.",
+      description: "Create tab, optionally navigate to URL. Activates by default.",
       schema: {
         type: "object",
         properties: {
@@ -152,7 +148,7 @@ function tabTools(): ToolDef[] {
     {
       name: "vortex_tab_close",
       action: "tab.close",
-      description: "Close a browser tab by its ID.",
+      description: "Close tab by ID.",
       schema: {
         type: "object",
         properties: { tabId: { type: "number" } },
@@ -171,12 +167,12 @@ function pageTools(): ToolDef[] {
     {
       name: "vortex_navigate",
       action: "page.navigate",
-      description: "Navigate to URL (default) or reload current page if reload:true.",
+      description: "Navigate to URL, or reload page if reload:true.",
       schema: {
         type: "object",
         properties: {
-          url: { type: "string", description: "URL to navigate to (omit when reload:true)." },
-          reload: { type: "boolean", description: "Set true to reload current page instead of navigating." },
+          url: { type: "string", description: "URL (omit when reload:true)." },
+          reload: { type: "boolean", description: "Reload current page." },
           waitForLoad: { type: "boolean", default: true },
           timeout: { type: "number", default: 30000 },
           ...optionalTabId,
@@ -187,13 +183,13 @@ function pageTools(): ToolDef[] {
     {
       name: "vortex_page_info",
       action: "page.info",
-      description: "Get current page URL, title, and load status.",
+      description: "Get page URL, title, load status.",
       schema: { type: "object", properties: { ...optionalTabId }, required: [] },
     },
     {
       name: "vortex_history",
       action: "page.back",
-      description: "Go back or forward in browser history. direction: 'back' (default) | 'forward'.",
+      description: "Go back or forward in browser history.",
       schema: {
         type: "object",
         properties: {
@@ -206,11 +202,11 @@ function pageTools(): ToolDef[] {
     {
       name: "vortex_wait",
       action: "page.wait",
-      description: "Wait for a CSS selector to appear, or wait a fixed timeout.",
+      description: "Wait for CSS selector to appear or wait fixed timeout.",
       schema: {
         type: "object",
         properties: {
-          target: { type: "string", description: "CSS selector or @eN ref to wait for." },
+          target: { type: "string", description: "CSS selector or @eN ref." },
           timeout: { type: "number", default: 10000 },
           ...optionalTabId,
           ...optionalFrameId,
@@ -221,7 +217,7 @@ function pageTools(): ToolDef[] {
     {
       name: "vortex_wait_idle",
       action: "page.waitForXhrIdle",
-      description: "Wait for network/XHR/DOM to become idle. kind: 'xhr' (default) | 'network' | 'dom'.",
+      description: "Wait for network/XHR/DOM idle. kind: 'xhr' (default) | 'network' | 'dom'.",
       schema: {
         type: "object",
         properties: {
@@ -229,11 +225,10 @@ function pageTools(): ToolDef[] {
             type: "string",
             enum: ["xhr", "network", "dom"],
             default: "xhr",
-            description: "xhr: XHR/Fetch idle (best for SPAs). network: all network idle. dom: DOM mutation settled.",
           },
-          idleMs: { type: "number", description: "Idle window in ms (default 200 for xhr, 500 for network, 300 for dom)." },
+          idleMs: { type: "number" },
           timeout: { type: "number", default: 10000 },
-          target: { type: "string", description: "CSS selector or @eN ref (for kind=dom)." },
+          target: { type: "string" },
           ...optionalTabId,
         },
         required: [],
@@ -266,7 +261,7 @@ function domTools(): ToolDef[] {
     {
       name: "vortex_type",
       action: "dom.type",
-      description: "Type text character by character into element. Use vortex_fill for faster input.",
+      description: "Type text char-by-char into element. Use vortex_fill for faster input.",
       schema: {
         type: "object",
         properties: {
@@ -282,7 +277,7 @@ function domTools(): ToolDef[] {
     {
       name: "vortex_fill",
       action: "dom.fill",
-      description: "Set field value directly. Use kind for framework components (daterange/datetimerange/cascader/select/checkbox-group → dom.commit).",
+      description: "Set field value directly. Use kind for framework components (daterange/datetimerange/cascader/select/checkbox-group).",
       schema: {
         type: "object",
         properties: {
@@ -291,7 +286,7 @@ function domTools(): ToolDef[] {
           kind: {
             type: "string",
             enum: ["daterange", "datetimerange", "cascader", "select", "checkbox-group"],
-            description: "Omit for plain inputs. Provide for framework components.",
+            description: "Omit for plain inputs.",
           },
           fallbackToNative: { type: "boolean", default: false },
           timeout: { type: "number", default: 8000 },
@@ -304,7 +299,7 @@ function domTools(): ToolDef[] {
     {
       name: "vortex_select",
       action: "dom.select",
-      description: "Select an option in a <select> dropdown by value.",
+      description: "Select option in <select> dropdown by value.",
       schema: {
         type: "object",
         properties: {
@@ -319,7 +314,7 @@ function domTools(): ToolDef[] {
     {
       name: "vortex_hover",
       action: "dom.hover",
-      description: "Move mouse over element to trigger hover effects.",
+      description: "Hover over element to trigger hover effects.",
       schema: {
         type: "object",
         properties: {
@@ -361,7 +356,7 @@ function domTools(): ToolDef[] {
     {
       name: "vortex_fill_form",
       action: "dom.fill",
-      description: "Fill multiple form fields in sequence. Each field: {target, value, kind?}.",
+      description: "Fill multiple form fields. Each: {target, value, kind?}.",
       schema: {
         type: "object",
         properties: {
@@ -389,11 +384,11 @@ function domTools(): ToolDef[] {
     {
       name: "vortex_press",
       action: "keyboard.press",
-      description: "Press a key or keyboard shortcut (e.g. 'Enter', 'Ctrl+S', 'Tab').",
+      description: "Press key or shortcut (e.g. 'Enter', 'Ctrl+S', 'Tab').",
       schema: {
         type: "object",
         properties: {
-          key: { type: "string", description: "Key name or shortcut combo (e.g. 'Enter', 'Ctrl+A')." },
+          key: { type: "string", description: "Key or combo ('Enter', 'Ctrl+A')." },
           ...optionalTabId,
         },
         required: ["key"],
@@ -411,12 +406,12 @@ function contentTools(): ToolDef[] {
     {
       name: "vortex_get_text",
       action: "content.getText",
-      description: "Get visible text from page or element. Use maxBytes to limit size.",
+      description: "Get visible text from page or element.",
       schema: {
         type: "object",
         properties: {
           ...targetRef,
-          maxBytes: { type: "integer", description: "Max chars (default 16KB).", minimum: 4096, maximum: 5242880, default: 16384 },
+          maxBytes: { type: "integer", minimum: 4096, maximum: 5242880, default: 16384 },
           ...optionalTabId,
           ...optionalFrameId,
           ...optionalFrameRef,
@@ -427,12 +422,12 @@ function contentTools(): ToolDef[] {
     {
       name: "vortex_get_html",
       action: "content.getHTML",
-      description: "Get outer HTML from page or element. Use maxBytes to limit size.",
+      description: "Get outer HTML from page or element.",
       schema: {
         type: "object",
         properties: {
           ...targetRef,
-          maxBytes: { type: "integer", description: "Max chars (default 16KB).", minimum: 4096, maximum: 5242880, default: 16384 },
+          maxBytes: { type: "integer", minimum: 4096, maximum: 5242880, default: 16384 },
           ...optionalTabId,
           ...optionalFrameId,
           ...optionalFrameRef,
@@ -452,12 +447,12 @@ function jsTools(): ToolDef[] {
     {
       name: "vortex_evaluate",
       action: "js.evaluate",
-      description: "Execute JavaScript in page context. Set async:true to use await (evaluateAsync).",
+      description: "Execute JavaScript in page context. Set async:true for await support.",
       schema: {
         type: "object",
         properties: {
           code: { type: "string" },
-          async: { type: "boolean", description: "Set true to use js.evaluateAsync (supports await).", default: false },
+          async: { type: "boolean", description: "Use evaluateAsync.", default: false },
           ...optionalTabId,
           ...optionalFrameId,
           ...optionalFrameRef,
@@ -477,15 +472,15 @@ function mouseTools(): ToolDef[] {
     {
       name: "vortex_mouse_click",
       action: "mouse.click",
-      description: "Click at x,y (CDP real mouse events). Use frameId for iframe (x/y are frame-local). clickCount=2 for double-click.",
+      description: "Click at x,y (CDP real mouse). Use frameId for iframe coords. clickCount=2 for double-click.",
       schema: {
         type: "object",
         properties: {
           x: { type: "number" },
           y: { type: "number" },
           button: { type: "string", enum: ["left", "right", "middle"], default: "left" },
-          clickCount: { type: "number", default: 1, description: "1=single, 2=double click." },
-          coordSpace: { type: "string", enum: ["frame", "viewport"], description: "Coordinate space for x/y." },
+          clickCount: { type: "number", default: 1 },
+          coordSpace: { type: "string", enum: ["frame", "viewport"] },
           ...optionalTabId,
           ...optionalFrameId,
         },
@@ -520,7 +515,7 @@ function captureTools(): ToolDef[] {
     {
       name: "vortex_screenshot",
       action: "capture.screenshot",
-      description: "Take screenshot of page or specific element (provide target). returnMode: inline|file.",
+      description: "Screenshot page or element (provide target). returnMode: inline|file.",
       schema: {
         type: "object",
         properties: {
@@ -539,7 +534,6 @@ function captureTools(): ToolDef[] {
           returnMode: {
             type: "string",
             enum: ["inline", "file"],
-            description: "inline: return image (>500KB auto-fallback to file). file: save and return path.",
             default: "inline",
           },
           ...optionalTabId,
@@ -561,7 +555,7 @@ function consoleTools(): ToolDef[] {
     {
       name: "vortex_console",
       action: "console.getLogs",
-      description: "Get or clear console logs. op: 'get' (default) | 'clear'. Filter by level: log|warn|error.",
+      description: "Get or clear console logs. op: 'get' (default) | 'clear'. Filter by level.",
       schema: {
         type: "object",
         properties: {
@@ -580,14 +574,13 @@ function networkTools(): ToolDef[] {
     {
       name: "vortex_network",
       action: "network.getLogs",
-      description: "Get/filter/clear network logs. op: 'get' | 'filter' | 'clear'. get+filter → network.filter.",
+      description: "Get/filter/clear network logs. op: 'get' | 'filter' | 'clear'.",
       schema: {
         type: "object",
         properties: {
           op: { type: "string", enum: ["get", "filter", "clear"], default: "get" },
           filter: {
             type: "object",
-            description: "Filter params for op=filter (url, method, statusMin, statusMax, includeResources).",
             properties: {
               url: { type: "string" },
               method: { type: "string" },
@@ -605,7 +598,7 @@ function networkTools(): ToolDef[] {
     {
       name: "vortex_network_response_body",
       action: "network.getResponseBody",
-      description: "Get full response body of a network request by requestId.",
+      description: "Get response body of network request by requestId.",
       schema: {
         type: "object",
         properties: {
@@ -634,11 +627,10 @@ function storageTools(): ToolDef[] {
           scope: {
             type: "string",
             enum: ["cookie", "local", "session"],
-            description: "cookie: getCookies; local: getLocalStorage; session: getSessionStorage.",
           },
           url: { type: "string" },
           domain: { type: "string" },
-          key: { type: "string", description: "Storage key (for local/session; omit to get all)." },
+          key: { type: "string" },
           ...optionalTabId,
         },
         required: ["scope"],
@@ -647,16 +639,16 @@ function storageTools(): ToolDef[] {
     {
       name: "vortex_storage_set",
       action: "storage.setCookie",
-      description: "Set or delete cookie/localStorage/sessionStorage. scope: 'cookie'|'local'|'session'. op='delete' to remove cookie.",
+      description: "Set/delete cookie/localStorage/sessionStorage. scope: 'cookie'|'local'|'session'.",
       schema: {
         type: "object",
         properties: {
           scope: { type: "string", enum: ["cookie", "local", "session"] },
-          op: { type: "string", enum: ["set", "delete"], default: "set", description: "delete: only for cookies." },
+          op: { type: "string", enum: ["set", "delete"], default: "set" },
           url: { type: "string" },
-          name: { type: "string", description: "Cookie name (for cookie scope)." },
+          name: { type: "string" },
           value: { type: "string" },
-          key: { type: "string", description: "Storage key (for local/session scope)." },
+          key: { type: "string" },
           domain: { type: "string" },
           path: { type: "string" },
           secure: { type: "boolean" },
@@ -676,8 +668,8 @@ function storageTools(): ToolDef[] {
         type: "object",
         properties: {
           op: { type: "string", enum: ["export", "import"] },
-          domain: { type: "string", description: "Domain to export (for op=export)." },
-          data: { type: "object", description: "Session data to restore (for op=import)." },
+          domain: { type: "string" },
+          data: { type: "object" },
           ...optionalTabId,
         },
         required: ["op"],
@@ -695,7 +687,7 @@ function fileTools(): ToolDef[] {
     {
       name: "vortex_file_upload",
       action: "file.upload",
-      description: "Upload a file to a file input element. fileContent must be base64 encoded.",
+      description: "Upload file to input element. fileContent must be base64.",
       schema: {
         type: "object",
         properties: {
@@ -711,7 +703,7 @@ function fileTools(): ToolDef[] {
     {
       name: "vortex_file_download",
       action: "file.download",
-      description: "Trigger a file download by URL.",
+      description: "Trigger file download by URL.",
       schema: {
         type: "object",
         properties: {
@@ -745,7 +737,7 @@ function framesTools(): ToolDef[] {
     {
       name: "vortex_frames_list",
       action: "frames.list",
-      description: "List all frames in the tab. Returns { frameId, url, parentFrameId }.",
+      description: "List frames in tab. Returns { frameId, url, parentFrameId }.",
       schema: { type: "object", properties: { ...optionalTabId }, required: [] },
     },
   ];
