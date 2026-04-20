@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>登录 + 级联 - Element Plus fixture</title>
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+  <style>body{margin:0;font-family:sans-serif}#app{max-width:400px;margin:40px auto}</style>
+</head>
+<body>
+  <div id="app">
+    <h2>登录</h2>
+    <el-form :model="form" label-width="80">
+      <el-form-item label="账号"><el-input v-model="form.username" data-testid="user-input" /></el-form-item>
+      <el-form-item label="密码"><el-input type="password" v-model="form.password" data-testid="pass-input" /></el-form-item>
+      <el-form-item label="机构">
+        <el-cascader v-model="form.org" :options="orgs" data-testid="org-cascader" placeholder="选择机构" />
+      </el-form-item>
+      <el-form-item label="权限">
+        <el-checkbox-group v-model="form.perms" data-testid="perms-group">
+          <el-checkbox label="read">只读</el-checkbox>
+          <el-checkbox label="write">写入</el-checkbox>
+          <el-checkbox label="admin">管理员</el-checkbox>
+        </el-checkbox-group>
+      </el-form-item>
+      <el-form-item>
+        <el-checkbox v-model="form.agree" data-testid="agree-check">同意 <a href="#">服务条款</a></el-checkbox>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" :disabled="!form.agree" data-testid="login-btn">登录</el-button>
+      </el-form-item>
+    </el-form>
+  </div>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://unpkg.com/element-plus"></script>
+  <script>
+    const { createApp, reactive } = Vue;
+    createApp({
+      setup() {
+        const form = reactive({ username: "", password: "", org: [], perms: [], agree: false });
+        const orgs = [
+          { value: "cn", label: "中国", children: [
+            { value: "bj", label: "北京", children: [{ value: "hd", label: "海淀区" }] },
+            { value: "sh", label: "上海", children: [{ value: "pd", label: "浦东新区" }] },
+          ]},
+        ];
+        return { form, orgs };
+      },
+    }).use(ElementPlus).mount("#app");
+  </script>
+</body>
+</html>
