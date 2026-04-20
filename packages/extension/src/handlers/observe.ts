@@ -443,6 +443,7 @@ export function registerObserveHandlers(router: ActionRouter): void {
         (args.viewport as "visible" | "full" | undefined) ?? "visible";
       const includeText = (args.includeText as boolean | undefined) ?? true;
       const includeAX = (args.includeAX as boolean | undefined) ?? true;
+      const format = (args.format as "compact" | "full" | undefined) ?? "full";
 
       const frameTargets = await resolveTargetFrames(tid, explicitFrameId, framesParam);
       if (frameTargets.length === 0) {
@@ -482,15 +483,19 @@ export function registerObserveHandlers(router: ActionRouter): void {
 
       // 分配跨 frame 全局 index（按 frameTargets 顺序）
       // 每个元素附加 suggestedUsage：给 LLM 直接可用的下一步命令，避免再自行推断应传 frameId。
-      const elementsOut: Array<
-        Omit<ScannedElement, "_sel"> & {
-          frameId: number;
-          suggestedUsage: {
-            click: string;
-            domClick: string;
-          };
-        }
-      > = [];
+      type CompactElementOut = {
+        index: number;
+        tag: string;
+        role: string;
+        name: string;
+        state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean };
+        frameId: number;
+      };
+      type FullElementOut = Omit<ScannedElement, "_sel"> & {
+        frameId: number;
+        suggestedUsage: { click: string; domClick: string };
+      };
+      const elementsOut: Array<CompactElementOut | FullElementOut> = [];
       const elementMap: SnapshotElement[] = [];
       let cursor = 0;
       let totalCandidates = 0;
@@ -525,26 +530,38 @@ export function registerObserveHandlers(router: ActionRouter): void {
           const globalIdx = cursor++;
           const centerX = e.bbox.x + Math.round(e.bbox.w / 2);
           const centerY = e.bbox.y + Math.round(e.bbox.h / 2);
-          elementsOut.push({
-            index: globalIdx,
-            tag: e.tag,
-            role: e.role,
-            name: e.name,
-            bbox: e.bbox,
-            visible: e.visible,
-            inViewport: e.inViewport,
-            occludedBy: e.occludedBy,
-            attrs: e.attrs,
-            ...(e.state ? { state: e.state } : {}),
-            frameId: s.frameId,
-            // LLM-friendly 下一步命令提示。coordSpace="frame" 默认按 frameId 自动换算。
-            suggestedUsage: {
-              // 首选：按 snapshot index 路由（最稳，不怕选择器变化）
-              domClick: `vortex_dom_click({ index: ${globalIdx}, snapshotId: "<this-snapshot-id>" })`,
-              // 需要真实鼠标事件时：frame-local 坐标 + frameId，server 自动换算
-              click: `vortex_mouse_click({ x: ${centerX}, y: ${centerY}, frameId: ${s.frameId} })`,
-            },
-          });
+          if (format === "compact") {
+            elementsOut.push({
+              index: globalIdx,
+              tag: e.tag,
+              role: e.role,
+              name: e.name,
+              ...(e.state ? { state: e.state } : {}),
+              frameId: s.frameId,
+            });
+          } else {
+            // 保持 v0.4 full 结构：完整字段 + suggestedUsage
+            elementsOut.push({
+              index: globalIdx,
+              tag: e.tag,
+              role: e.role,
+              name: e.name,
+              bbox: e.bbox,
+              visible: e.visible,
+              inViewport: e.inViewport,
+              occludedBy: e.occludedBy,
+              attrs: e.attrs,
+              ...(e.state ? { state: e.state } : {}),
+              frameId: s.frameId,
+              // LLM-friendly 下一步命令提示。coordSpace="frame" 默认按 frameId 自动换算。
+              suggestedUsage: {
+                // 首选：按 snapshot index 路由（最稳，不怕选择器变化）
+                domClick: `vortex_dom_click({ index: ${globalIdx}, snapshotId: "<this-snapshot-id>" })`,
+                // 需要真实鼠标事件时：frame-local 坐标 + frameId，server 自动换算
+                click: `vortex_mouse_click({ x: ${centerX}, y: ${centerY}, frameId: ${s.frameId} })`,
+              },
+            });
+          }
           elementMap.push({
             index: globalIdx,
             selector: e._sel,
