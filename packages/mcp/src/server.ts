@@ -13,6 +13,8 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { sendRequest } from "./client.js";
 import { getToolDefs, getToolDef } from "./tools/registry.js";
+import { dispatchNewTool } from "./tools/dispatch.js";
+export { dispatchNewTool };
 
 const require_ = createRequire(import.meta.url);
 const MCP_VERSION: string = (require_("../../package.json") as { version: string }).version;
@@ -154,56 +156,57 @@ async function handleCallTool(
 
   const params = (args ?? {}) as Record<string, unknown>;
 
-  // 特殊 tool: events 订阅管理（MCP 本地状态，不经过 vortex-server）
-  if (toolDef.action === "__mcp_events_subscribe__") {
-    const subId = eventStore.subscribe({
-      types: params.types as string[] | undefined,
-      minLevel: params.minLevel as VtxEventLevel | undefined,
-      tabId: params.tabId as number | undefined,
-    });
-    return withEvents([{
-      type: "text" as const,
-      text: JSON.stringify({
-        subscriptionId: subId,
-        note: "Events will be piggybacked to subsequent tool responses in a `[vortex-events]` text item.",
-      }, null, 2),
-    }]);
-  }
-
-  if (toolDef.action === "__mcp_events_unsubscribe__") {
-    const ok = eventStore.unsubscribe(params.subscriptionId as string);
-    return withEvents([{
-      type: "text" as const,
-      text: JSON.stringify({ unsubscribed: ok }, null, 2),
-    }]);
-  }
-
-  // 特殊 tool: events drain（强制 flush dispatcher + 拉 eventStore buffer）
-  if (toolDef.action === "__mcp_events_drain__") {
-    let flushed: { notice: number; info: number } = { notice: 0, info: 0 };
-    try {
-      const resp = await sendRequest("events.drain", {}, PORT, undefined, 5000);
-      const result = (resp.result ?? {}) as { flushed?: { notice: number; info: number } };
-      if (result.flushed) flushed = result.flushed;
-    } catch (err) {
-      // flush 失败仍尝试 drain 本地 buffer（可能已有之前 ingest 的事件）
-      const msg = err instanceof Error ? err.message : String(err);
+  // 特殊 tool: vortex_events（合并原三个 __mcp_events_*__ 分支）
+  if (toolDef.name === "vortex_events") {
+    const op = params.op as string;
+    if (op === "subscribe") {
+      const subId = eventStore.subscribe({
+        types: params.types as string[] | undefined,
+        minLevel: params.minLevel as VtxEventLevel | undefined,
+        tabId: params.tabId as number | undefined,
+      });
+      return withEvents([{
+        type: "text" as const,
+        text: JSON.stringify({
+          subscriptionId: subId,
+          note: "Events will be piggybacked to subsequent tool responses in a `[vortex-events]` text item.",
+        }, null, 2),
+      }]);
+    }
+    if (op === "unsubscribe") {
+      const ok = eventStore.unsubscribe(params.subscriptionId as string);
+      return withEvents([{
+        type: "text" as const,
+        text: JSON.stringify({ unsubscribed: ok }, null, 2),
+      }]);
+    }
+    if (op === "drain") {
+      let flushed: { notice: number; info: number } = { notice: 0, info: 0 };
+      try {
+        const resp = await sendRequest("events.drain", {}, PORT, undefined, 5000);
+        const result = (resp.result ?? {}) as { flushed?: { notice: number; info: number } };
+        if (result.flushed) flushed = result.flushed;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const events = eventStore.drain();
+        return {
+          content: [{
+            type: "text" as const,
+            text: JSON.stringify({ events, flushed, note: `flush failed: ${msg}` }, null, 2),
+          }],
+        };
+      }
       const events = eventStore.drain();
       return {
         content: [{
           type: "text" as const,
-          text: JSON.stringify({ events, flushed, note: `flush failed: ${msg}` }, null, 2),
+          text: JSON.stringify({ events, flushed }, null, 2),
         }],
       };
     }
-    // 顺序保证：ws FIFO → extension 的 dispatcher.flushAll 发出的 events
-    // 在 action response 之前到达 mcp 端，此时已经 ingest 到 eventStore
-    const events = eventStore.drain();
     return {
-      content: [{
-        type: "text" as const,
-        text: JSON.stringify({ events, flushed }, null, 2),
-      }],
+      isError: true,
+      content: [{ type: "text" as const, text: `Unknown events op: ${op}` }],
     };
   }
 
@@ -299,6 +302,57 @@ async function handleCallTool(
     return withEvents([{ type: "text" as const, text: resultText }]);
   }
 
+  // 特殊 tool: vortex_fill_form（MCP 侧循环，依次调 dom.fill / dom.commit）
+  if (toolDef.name === "vortex_fill_form") {
+    const fields = params.fields as Array<{ target?: string; value: unknown; kind?: string }>;
+    const { tabId, timeout } = params;
+    const effectiveTimeout = (timeout as number) ?? DEFAULT_TIMEOUT;
+    const results: { index: number; ok: boolean }[] = [];
+    for (let i = 0; i < fields.length; i++) {
+      const f = fields[i];
+      // 翻译 target
+      let fieldParams: Record<string, unknown> = { value: f.value };
+      if (f.target) {
+        if (f.target.startsWith("@")) {
+          try {
+            const { resolveTargetParam } = await import("./lib/ref-parser.js");
+            const resolved = resolveTargetParam(f.target, activeSnapshotId);
+            if (resolved.selector) fieldParams.selector = resolved.selector;
+            if (resolved.index != null) {
+              fieldParams.index = resolved.index;
+              fieldParams.snapshotId = resolved.snapshotId;
+              if (resolved.frameId && resolved.frameId !== 0) fieldParams.frameId = resolved.frameId;
+            }
+          } catch (err) {
+            return {
+              isError: true,
+              content: [{ type: "text" as const, text: `field[${i}] target error: ${(err as Error).message}` }],
+            };
+          }
+        } else {
+          fieldParams.selector = f.target;
+        }
+      }
+      // TODO: kind 支持（dom.commit）留待后续版本 #0000
+      const action = "dom.fill";
+      const resp = await sendRequest(action, fieldParams, PORT, tabId as number | undefined, effectiveTimeout);
+      results.push({ index: i, ok: !resp.error });
+      if (resp.error) {
+        return {
+          isError: true,
+          content: [{
+            type: "text" as const,
+            text: `field[${i}] failed: [${resp.error.code}] ${resp.error.message}`,
+          }],
+        };
+      }
+    }
+    return withEvents([{
+      type: "text" as const,
+      text: JSON.stringify({ filledCount: results.length }, null, 2),
+    }]);
+  }
+
   // target 翻译：@eN / @fNeM → { index, snapshotId, frameId }
   const target = params.target as string | undefined;
   if (target) {
@@ -338,9 +392,15 @@ async function handleCallTool(
   try {
     const { tabId, returnMode, timeout, ...rest } = params;
     const effectiveTimeout = (timeout as number) ?? DEFAULT_TIMEOUT;
+
+    // dispatch 映射：新工具名 → 正确 action + 参数 reshape
+    const mapped = dispatchNewTool(toolDef.name, rest);
+    const action = mapped ? mapped.action : toolDef.action;
+    const mappedParams = mapped ? mapped.params : rest;
+
     const resp = await sendRequest(
-      toolDef.action,
-      rest,
+      action,
+      mappedParams,
       PORT,
       tabId as number | undefined,
       effectiveTimeout,
@@ -376,7 +436,7 @@ async function handleCallTool(
             : "inline";
 
         if (mode === "file") {
-          const prefix = toolDef.action.replace(/\./g, "-");
+          const prefix = action.replace(/\./g, "-");
           const { path, bytes: savedBytes } = saveBase64Image(result.dataUrl, prefix);
           return withEvents([{
             type: "text" as const,
