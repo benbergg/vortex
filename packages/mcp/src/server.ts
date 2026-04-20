@@ -321,6 +321,20 @@ async function handleCallTool(
     }
   }
 
+  // frameRef 翻译：@fN → frameId
+  const frameRef = params.frameRef as string | undefined;
+  if (frameRef) {
+    const m = frameRef.match(/^@f(\d+)$/);
+    if (!m) {
+      return {
+        isError: true,
+        content: [{ type: "text" as const, text: `Invalid frameRef: ${frameRef} (expected @fN)` }],
+      };
+    }
+    delete params.frameRef;
+    params.frameId = parseInt(m[1], 10);
+  }
+
   try {
     const { tabId, returnMode, timeout, ...rest } = params;
     const effectiveTimeout = (timeout as number) ?? DEFAULT_TIMEOUT;
@@ -334,11 +348,15 @@ async function handleCallTool(
 
     // Action 执行错误
     if (resp.error) {
+      const code = resp.error.code;
+      const hint = code === "STALE_SNAPSHOT"
+        ? "\nHint: DOM 已变更，ref 失效。请重新调用 vortex_observe 获取新 snapshot。"
+        : "";
       return {
         isError: true,
         content: [{
           type: "text" as const,
-          text: `Error [${resp.error.code}]: ${resp.error.message}`,
+          text: `Error [${code}]: ${resp.error.message}${hint}`,
         }],
       };
     }

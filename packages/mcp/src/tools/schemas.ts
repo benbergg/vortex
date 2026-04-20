@@ -12,6 +12,13 @@ const optionalTabId = {
   tabId: { type: "number" as const, description: "Tab ID (omit for active tab)." },
 };
 
+const optionalFrameRef = {
+  frameRef: {
+    type: "string" as const,
+    description: "iframe 逃生舱：`@fN`（N 为 frameId）。省略 = 主 frame。",
+  },
+};
+
 const optionalFrameId = {
   frameId: { type: "number" as const, description: "Frame ID for iframes." },
 };
@@ -138,8 +145,8 @@ function domTools(): ToolDef[] {
 
 function contentTools(): ToolDef[] {
   return [
-    { name: "vortex_content_get_text", action: "content.getText", description: "Get visible text from page or element. Use maxBytes to limit response size.", schema: { type: "object", properties: { selector: { type: "string" }, maxBytes: { type: "integer", description: "Max characters (4096-5242880, default 16KB)", minimum: 4096, maximum: 5242880, default: 16384 }, ...optionalTabId, ...optionalFrameId }, required: [] } },
-    { name: "vortex_content_get_html", action: "content.getHTML", description: "Get outer HTML from page or element. Use maxBytes to limit response size.", schema: { type: "object", properties: { selector: { type: "string" }, maxBytes: { type: "integer", description: "Max characters (4096-5242880, default 16KB)", minimum: 4096, maximum: 5242880, default: 16384 }, ...optionalTabId, ...optionalFrameId }, required: [] } },
+    { name: "vortex_content_get_text", action: "content.getText", description: "Get visible text from page or element. Use maxBytes to limit response size.", schema: { type: "object", properties: { selector: { type: "string" }, maxBytes: { type: "integer", description: "Max characters (4096-5242880, default 16KB)", minimum: 4096, maximum: 5242880, default: 16384 }, ...optionalTabId, ...optionalFrameId, ...optionalFrameRef }, required: [] } },
+    { name: "vortex_content_get_html", action: "content.getHTML", description: "Get outer HTML from page or element. Use maxBytes to limit response size.", schema: { type: "object", properties: { selector: { type: "string" }, maxBytes: { type: "integer", description: "Max characters (4096-5242880, default 16KB)", minimum: 4096, maximum: 5242880, default: 16384 }, ...optionalTabId, ...optionalFrameId, ...optionalFrameRef }, required: [] } },
     { name: "vortex_content_get_accessibility_tree", action: "content.getAccessibilityTree", description: "Get the accessibility tree of the page.", schema: { type: "object", properties: { ...optionalTabId, ...optionalFrameId }, required: [] } },
     { name: "vortex_content_get_element_text", action: "content.getElementText", description: "Get the text content of a specific element.", schema: { type: "object", properties: { selector: { type: "string" }, ...targetRef, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
     { name: "vortex_content_get_computed_style", action: "content.getComputedStyle", description: "Get computed CSS properties of an element.", schema: { type: "object", properties: { selector: { type: "string" }, ...targetRef, properties: { type: "array", items: { type: "string" } }, ...optionalTabId, ...optionalFrameId }, required: ["selector"] } },
@@ -148,8 +155,8 @@ function contentTools(): ToolDef[] {
 
 function jsTools(): ToolDef[] {
   return [
-    { name: "vortex_js_evaluate", action: "js.evaluate", description: "Execute JavaScript in the page context.", schema: { type: "object", properties: { code: { type: "string" }, ...optionalTabId, ...optionalFrameId }, required: ["code"] } },
-    { name: "vortex_js_evaluate_async", action: "js.evaluateAsync", description: "Execute async JavaScript (can use await).", schema: { type: "object", properties: { code: { type: "string" }, ...optionalTabId, ...optionalFrameId }, required: ["code"] } },
+    { name: "vortex_js_evaluate", action: "js.evaluate", description: "Execute JavaScript in the page context.", schema: { type: "object", properties: { code: { type: "string" }, ...optionalTabId, ...optionalFrameId, ...optionalFrameRef }, required: ["code"] } },
+    { name: "vortex_js_evaluate_async", action: "js.evaluateAsync", description: "Execute async JavaScript (can use await).", schema: { type: "object", properties: { code: { type: "string" }, ...optionalTabId, ...optionalFrameId, ...optionalFrameRef }, required: ["code"] } },
     { name: "vortex_js_call_function", action: "js.callFunction", description: "Call a named function on the page with arguments.", schema: { type: "object", properties: { name: { type: "string" }, args: { type: "array", items: {} }, ...optionalTabId, ...optionalFrameId }, required: ["name"] } },
   ];
 }
@@ -217,7 +224,7 @@ function mouseTools(): ToolDef[] {
 
 function captureTools(): ToolDef[] {
   return [
-    { name: "vortex_capture_screenshot", action: "capture.screenshot", description: "Take a screenshot of the visible page area. Large images (>500KB) auto-save to file.", schema: { type: "object", properties: { format: { type: "string", enum: ["png", "jpeg"], default: "png" }, fullPage: { type: "boolean" }, clip: { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, width: { type: "number" }, height: { type: "number" } } }, ...screenshotReturnMode, ...optionalTabId }, required: [] }, returnsImage: true },
+    { name: "vortex_capture_screenshot", action: "capture.screenshot", description: "Take a screenshot of the visible page area. Large images (>500KB) auto-save to file.", schema: { type: "object", properties: { format: { type: "string", enum: ["png", "jpeg"], default: "png" }, fullPage: { type: "boolean" }, clip: { type: "object", properties: { x: { type: "number" }, y: { type: "number" }, width: { type: "number" }, height: { type: "number" } } }, ...screenshotReturnMode, ...optionalTabId, ...optionalFrameRef }, required: [] }, returnsImage: true },
     { name: "vortex_capture_element", action: "capture.element", description: "Take a screenshot of a specific element.", schema: { type: "object", properties: { selector: { type: "string" }, ...targetRef, ...screenshotReturnMode, ...optionalTabId, ...optionalFrameId }, required: ["selector"] }, returnsImage: true },
     { name: "vortex_capture_gif_start", action: "capture.gifStart", description: "Start collecting GIF frames.", schema: { type: "object", properties: { fps: { type: "number", default: 2 }, ...optionalTabId }, required: [] } },
     { name: "vortex_capture_gif_frame", action: "capture.gifFrame", description: "Manually capture a GIF frame.", schema: { type: "object", properties: { ...optionalTabId }, required: [] } },
