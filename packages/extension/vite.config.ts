@@ -8,7 +8,7 @@ const pkg = JSON.parse(
 ) as { version: string };
 
 export default defineConfig({
-  plugins: [crx({ manifest })],
+  plugins: [crx({ manifest: { ...manifest, version: pkg.version } })],
   define: {
     __EXTENSION_VERSION__: JSON.stringify(pkg.version),
   },
