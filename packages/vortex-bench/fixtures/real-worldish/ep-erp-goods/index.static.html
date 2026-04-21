@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>ep-erp-goods static</title></head><body>
+<div id="app"><form class="el-form">
+  <div class="el-form-item"><label>SKU</label>
+    <div class="el-input"><input type="text" data-testid="sku-input" placeholder="搜索 SKU"></div>
+  </div>
+  <div class="el-form-item"><label>状态</label>
+    <div class="el-select"><input readonly data-testid="status-select" placeholder="选择状态"></div>
+  </div>
+  <div class="el-form-item"><label>创建时间</label>
+    <div class="el-date-editor"><input data-testid="date-range" placeholder="开始日期"><input placeholder="结束日期"></div>
+  </div>
+  <button type="button" data-testid="search-btn" class="el-button el-button--primary">查询</button>
+  <button type="button" data-testid="add-btn" class="el-button">新增商品</button>
+</form>
+<table><thead><tr><th>SKU</th><th>名称</th><th>价格</th><th>操作</th></tr></thead>
+<tbody>
+  <tr><td>SKU-001</td><td>iPhone 15</td><td>5999</td>
+    <td><button data-testid="edit-SKU-001" class="el-button el-button--small">编辑</button>
+        <button data-testid="delete-SKU-001" class="el-button el-button--danger">删除</button></td></tr>
+  <tr><td>SKU-002</td><td>MacBook Pro</td><td>14999</td>
+    <td><button data-testid="edit-SKU-002">编辑</button><button data-testid="delete-SKU-002">删除</button></td></tr>
+  <tr><td>SKU-003</td><td>iPad Air</td><td>4599</td>
+    <td><button data-testid="edit-SKU-003" class="el-button el-button--small">编辑</button>
+        <button data-testid="delete-SKU-003" class="el-button el-button--danger">删除</button></td></tr>
+</tbody></table>
+<nav><button data-testid="page-prev">上一页</button><button>1</button><button>2</button><button data-testid="page-next">下一页</button></nav>
+</div></body></html>

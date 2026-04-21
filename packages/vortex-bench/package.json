@@ -6,13 +6,17 @@
   "bin": {
     "vortex-bench": "dist/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "clean": "rm -rf dist",
     "bench": "node dist/index.js",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "prerecord-baseline": "pnpm --filter @bytenew/vortex-bench build && pnpm --filter @bytenew/vortex-mcp build",
+    "record-baseline": "node --experimental-strip-types scripts/record-baseline.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
@@ -23,7 +27,10 @@
   },
   "devDependencies": {
     "@types/express": "^4.17.0",
+    "@types/jsdom": "^28.0.1",
     "@types/node": "^20.0.0",
+    "js-tiktoken": "^1.0.21",
+    "jsdom": "^29.0.2",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
   }

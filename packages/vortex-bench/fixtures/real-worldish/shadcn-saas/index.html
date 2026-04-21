@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>shadcn-saas fixture</title>
+<style>
+body{margin:0;font-family:system-ui,sans-serif;background:#fafafa}
+.container{max-width:900px;margin:40px auto;padding:24px;background:white;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.tabs{display:flex;border-bottom:1px solid #e5e5e5;margin-bottom:24px}
+.tab{padding:12px 16px;cursor:pointer;border-bottom:2px solid transparent}
+.tab[aria-selected="true"]{border-bottom-color:#000;font-weight:600}
+.field{margin-bottom:16px}
+.field label{display:block;font-weight:500;margin-bottom:4px}
+.input,.combo{width:100%;padding:8px 12px;border:1px solid #e5e5e5;border-radius:4px;font:inherit}
+.btn{padding:8px 16px;border-radius:4px;border:1px solid #e5e5e5;background:white;cursor:pointer}
+.btn-primary{background:#000;color:white;border-color:#000}
+.popover{position:relative;display:inline-block}
+.popover-content{position:absolute;top:100%;left:0;margin-top:4px;padding:8px;background:white;border:1px solid #e5e5e5;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.1);display:none}
+.popover.open .popover-content{display:block}
+</style></head><body>
+<div class="container">
+  <h1>账号设置</h1>
+  <div class="tabs" role="tablist">
+    <div class="tab" role="tab" aria-selected="true" data-testid="tab-profile">个人资料</div>
+    <div class="tab" role="tab" aria-selected="false" data-testid="tab-security">安全</div>
+    <div class="tab" role="tab" aria-selected="false" data-testid="tab-billing">账单</div>
+    <div class="tab" role="tab" aria-selected="false" data-testid="tab-team">团队</div>
+  </div>
+  <form>
+    <div class="field"><label>姓名</label><input class="input" data-testid="field-name" placeholder="请输入姓名"></div>
+    <div class="field"><label>邮箱</label><input class="input" type="email" data-testid="field-email" required></div>
+    <div class="field"><label>国家</label>
+      <div class="popover" data-testid="country-popover">
+        <button type="button" class="btn combo" data-testid="country-trigger">选择国家</button>
+        <div class="popover-content">
+          <div role="option" data-testid="country-cn">中国</div>
+          <div role="option" data-testid="country-us">美国</div>
+          <div role="option" data-testid="country-jp">日本</div>
+        </div>
+      </div>
+    </div>
+    <div class="field"><label>时区</label><select class="input" data-testid="field-tz">
+      <option value="utc+8">Asia/Shanghai (UTC+8)</option>
+      <option value="utc-8">America/Los_Angeles (UTC-8)</option>
+    </select></div>
+    <button class="btn btn-primary" type="button" data-testid="btn-save">保存</button>
+    <button class="btn" type="button" data-testid="btn-cancel">取消</button>
+  </form>
+</div>
+</body></html>
