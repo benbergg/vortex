@@ -169,6 +169,8 @@ async function scanOneFrame(
           "[role=radio]",
           "[role=tab]",
           "[role=menuitem]",
+          "[role=treeitem]",
+          "[role=option]",
           "[tabindex]:not([tabindex='-1'])",
           "[contenteditable]",
         ].join(",");
@@ -224,6 +226,13 @@ async function scanOneFrame(
           }
           if (el.tagName === "IMG") {
             return el.getAttribute("alt") || el.getAttribute("title") || "";
+          }
+          // role=treeitem 的 innerText 会包含 expanded 子节点的文本（"华东\n上海\n..."），
+          // 取直接子代的 click 区文字（Element Plus: .el-tree-node__content）。
+          const role = el.getAttribute("role");
+          if (role === "treeitem") {
+            const content = el.querySelector(":scope > .el-tree-node__content") as HTMLElement | null;
+            if (content) return (content.innerText || "").trim().slice(0, 80);
           }
           return (el.innerText || "").trim().slice(0, 80);
         }

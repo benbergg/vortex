@@ -61,7 +61,7 @@ pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 basel
 | el-date-picker-daterange | 日期段 | ✓ | CDP 真鼠标 + 年箭头跨年加速 |
 | el-date-picker-datetimerange | 日期时间段 | ✓ | 同上 + time input 预设 + OK 轮询 |
 | el-form-composite | 组合表单 | ✓ | label 匹配（中文"高"），driver 直接吃 string[] checkbox |
-| el-tree | 树形节点 | ✓ | page-side .click() 展开 + node-click 触发 |
+| el-tree | 树形节点 | ✓ | observe 现在收 `[role=treeitem]`，accessible name 取 .el-tree-node__content |
 | el-table | 多选 + 展开行 + 行内按钮 | ✓ | `:nth-child + .el-button` 链式定位 |
 | el-dialog-nested | dialog 内套 select | ✓ | dialog + 嵌套 select 完整走通 |
 | el-upload | 文件上传 | ✓ | `vortex_file_upload` |
