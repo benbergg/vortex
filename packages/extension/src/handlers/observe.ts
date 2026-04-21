@@ -159,9 +159,12 @@ async function scanOneFrame(
         const INTERACTIVE_SELECTORS = [
           "button",
           "a[href]",
-          "input:not([type=hidden])",
+          // 排除 radio/checkbox：Element Plus 等组件库把它们 visually hidden，
+          // 真正可点的是包它们的 <label>（下方收）。普通 input 仍正常收。
+          "input:not([type=hidden]):not([type=radio]):not([type=checkbox])",
           "select",
           "textarea",
+          "label:has(input[type=radio]), label:has(input[type=checkbox])",
           "[role=button]",
           "[role=link]",
           "[role=textbox]",
@@ -219,6 +222,12 @@ async function scanOneFrame(
             if (id) {
               const lbl = document.querySelector(`label[for="${id}"]`);
               if (lbl) return (lbl as HTMLElement).innerText?.trim().slice(0, 80) ?? "";
+            }
+            // radio / checkbox 通常包在 <label> 里（Element Plus el-radio / el-checkbox 风格）
+            const t = (el as HTMLInputElement).type;
+            if (t === "radio" || t === "checkbox") {
+              const wrapLabel = el.closest("label");
+              if (wrapLabel) return (wrapLabel.innerText || "").trim().slice(0, 80);
             }
             return (
               el.getAttribute("placeholder") || el.getAttribute("title") || ""
