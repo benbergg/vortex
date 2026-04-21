@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-21T13:13:14.405Z",
+  "generatedAt": "2026-04-21T13:18:54.378Z",
   "playgroundUrl": "http://localhost:5173",
   "cases": [
     {
@@ -8,7 +8,7 @@
       "callCount": 5,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1317
+      "durationMs": 5383
     },
     {
       "case": "el-date-picker-daterange",
@@ -16,7 +16,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 7452
+      "durationMs": 12303
     },
     {
       "case": "el-date-picker-datetimerange",
@@ -24,7 +24,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 27652
+      "durationMs": 23262
     },
     {
       "case": "el-dialog-nested",
@@ -32,7 +32,7 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1614
+      "durationMs": 1853
     },
     {
       "case": "el-dropdown",
@@ -40,15 +40,15 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1208
+      "durationMs": 1319
     },
     {
       "case": "el-form-composite",
       "passed": true,
-      "callCount": 15,
-      "fallbackToEvaluate": 2,
+      "callCount": 13,
+      "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1143
+      "durationMs": 1719
     },
     {
       "case": "el-select-multiple",
@@ -56,7 +56,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1032
+      "durationMs": 1078
     },
     {
       "case": "el-select-single",
@@ -64,7 +64,7 @@
       "callCount": 5,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 951
+      "durationMs": 1106
     },
     {
       "case": "el-table",
@@ -72,7 +72,7 @@
       "callCount": 8,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1215
+      "durationMs": 1354
     },
     {
       "case": "el-tree",
@@ -80,7 +80,7 @@
       "callCount": 13,
       "fallbackToEvaluate": 2,
       "observeMissedPopperItems": 2,
-      "durationMs": 2405
+      "durationMs": 2667
     },
     {
       "case": "el-upload",
@@ -88,7 +88,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1114
+      "durationMs": 1383
     }
   ]
 }

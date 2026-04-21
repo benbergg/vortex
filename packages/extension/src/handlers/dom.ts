@@ -1224,20 +1224,29 @@ export function registerDomHandlers(
 
             // -------- Element Plus checkbox-group driver (O-10, @since 0.4.0) --------
             if (driverId === "element-plus-checkbox-group") {
-              const v = val as { values?: string[] };
-              if (!v || !Array.isArray(v.values)) {
+              // 接受两种形状：value: string[]（推荐，简洁）或 { values: string[] }（兼容旧）
+              const v = val as { values?: string[] } | string[];
+              const labels: string[] | null = Array.isArray(v)
+                ? (v as string[])
+                : Array.isArray(v?.values)
+                  ? (v.values as string[])
+                  : null;
+              if (!labels) {
                 return {
-                  error: `value must be { values: string[] }, got ${JSON.stringify(v)}`,
+                  error: `value must be string[] or { values: string[] }, got ${JSON.stringify(v)}`,
                   errorCode: "INVALID_PARAMS",
                 };
               }
-              const target = new Set(v.values.map((s) => String(s).trim()));
+              const target = new Set(labels.map((s) => String(s).trim()));
 
               return (async () => {
-                const btns = Array.from(root.querySelectorAll(".el-checkbox-button")) as HTMLElement[];
+                // 支持 button 风格（.el-checkbox-button）和 label 风格（.el-checkbox）
+                const btns = Array.from(
+                  root.querySelectorAll(".el-checkbox-button, .el-checkbox"),
+                ) as HTMLElement[];
                 if (btns.length === 0) {
                   return {
-                    error: "No .el-checkbox-button children found under .el-checkbox-group",
+                    error: "No .el-checkbox-button or .el-checkbox children under .el-checkbox-group",
                     errorCode: "COMMIT_FAILED",
                     stage: "resolve-buttons",
                   };
