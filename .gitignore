@@ -4,3 +4,12 @@ dist/
 .DS_Store
 .gstack/
 .worktrees/
+
+# IDE / 工具本地状态
+.idea/
+.serena/
+.context/
+
+# opencode 插件 + playwright-mcp 缓存
+packages/mcp/opencode.json
+packages/mcp/.playwright-mcp/
