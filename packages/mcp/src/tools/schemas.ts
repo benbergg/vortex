@@ -86,17 +86,19 @@ function observeTools(): ToolDef[] {
     {
       name: "vortex_observe",
       action: "observe.snapshot",
-      description: "Get interactive elements (@eN/@fNeM refs, role, name). Use frames for iframes.",
+      description: "Get interactive elements (@eN/@fNeM refs, role, name). If too few results (e.g. iframes or below-fold), try frames='all-same-origin' or viewport='full' before falling back to get_html.",
       schema: {
         type: "object",
         properties: {
           detail: {
             type: "string",
+            description: "'compact'=Markdown (token-efficient, default); 'full'=JSON with bbox/attrs (debug).",
             enum: ["compact", "full"],
             default: "compact",
           },
           viewport: {
             type: "string",
+            description: "'visible'=in-viewport only (fast); 'full'=whole document (use when content below the fold).",
             enum: ["visible", "full"],
             default: "visible",
           },
@@ -104,7 +106,7 @@ function observeTools(): ToolDef[] {
           includeAX: { type: "boolean", default: true },
           includeText: { type: "boolean", default: true },
           frames: {
-            description: "'main'|'all-same-origin'|'all-permitted'|'all' or frameId[].",
+            description: "Default 'main' skips iframes. Use 'all-same-origin' for SPAs embedding iframes; 'all-permitted' adds cross-origin frames the extension can reach.",
             oneOf: [
               { type: "string", enum: ["main", "all-same-origin", "all-permitted", "all"] },
               { type: "array", items: { type: "number" } },
