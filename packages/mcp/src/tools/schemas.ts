@@ -279,16 +279,16 @@ function domTools(): ToolDef[] {
     {
       name: "vortex_fill",
       action: "dom.fill",
-      description: "Set field value directly. Use kind for framework components (daterange/datetimerange/cascader/select/checkbox-group).",
+      description: "Set field value directly. Use kind for framework components. value shape depends on kind: daterange/datetimerange={start,end}; cascader=[level1,level2,...]; select/checkbox-group=string|string[].",
       schema: {
         type: "object",
         properties: {
           ...targetRef,
-          value: {},
+          value: { description: "Plain value for inputs; {start,end} for date ranges; array for cascader/multi-select." },
           kind: {
             type: "string",
             enum: ["daterange", "datetimerange", "cascader", "select", "checkbox-group"],
-            description: "Omit for plain inputs.",
+            description: "Omit for plain inputs. Targets Element Plus / Ant Design composite widgets.",
           },
           fallbackToNative: { type: "boolean", default: false },
           timeout: { type: "number", default: 8000 },
