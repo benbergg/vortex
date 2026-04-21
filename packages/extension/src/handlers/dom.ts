@@ -7,6 +7,7 @@ import { resolveTarget, resolveTargetOptional } from "../lib/resolve-target.js";
 import {
   FILL_REJECT_PATTERNS,
   findDriver,
+  COMMIT_DRIVERS,
   type CommitKind,
 } from "../patterns/index.js";
 
@@ -924,16 +925,33 @@ export function registerDomHandlers(
       if (!kind) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: kind");
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const driver = findDriver(kind);
-      if (!driver)
+      if (!driver) {
+        const known = COMMIT_DRIVERS.map((d) => d.kind);
         throw vtxError(
           VtxErrorCode.INVALID_PARAMS,
-          `No commit driver for kind=${kind}. Known: ${["datetimerange", "daterange", "cascader", "select"].join(", ")}`,
+          `No commit driver for kind=${kind}. Known: ${known.join(", ")}`,
         );
+      }
 
       const __t = resolveTarget(args);
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+
+      // daterange/datetimerange 走 CDP 真鼠标路径：dispatchMouseEvent 是 untrusted,
+      // Element Plus 某些 handler 检查 isTrusted 后不同步 v-model。
+      if (driver.kind === "daterange" || driver.kind === "datetimerange") {
+        return await runDateRangeDriverCDP({
+          tid,
+          frameId,
+          selector,
+          closestSelector: driver.closestSelector,
+          isDateTime: driver.kind === "datetimerange",
+          value: value as { start?: string; end?: string },
+          timeout,
+          debuggerMgr,
+        });
+      }
 
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
@@ -969,9 +987,28 @@ export function registerDomHandlers(
 
           function readHeaderYM(hdr: Element | null | undefined): { year: number; month: number } | null {
             if (!hdr) return null;
-            const t = (hdr as HTMLElement).innerText || "";
-            const m = t.match(/(\d{4})\D+(\d{1,2})/);
-            return m ? { year: +m[1], month: +m[2] } : null;
+            const raw = (hdr as HTMLElement).innerText || hdr.textContent || "";
+            const t = raw.toLowerCase();
+            // 先抓 4 位 year
+            const yMatch = t.match(/\b(\d{4})\b/);
+            if (!yMatch) return null;
+            const year = +yMatch[1];
+            // 中文 "2026 年 4 月" 或 "2026年4月"：year 后的数字月
+            const numAfter = t.match(/\d{4}\D+(\d{1,2})/);
+            if (numAfter && +numAfter[1] >= 1 && +numAfter[1] <= 12) {
+              return { year, month: +numAfter[1] };
+            }
+            // 英文全月名（Element Plus 默认英文 locale 输出 "2026 April"）
+            const EN_MONTHS = [
+              "january", "february", "march", "april", "may", "june",
+              "july", "august", "september", "october", "november", "december",
+            ];
+            for (let i = 0; i < EN_MONTHS.length; i++) {
+              if (new RegExp(`\\b${EN_MONTHS[i]}\\b`).test(t)) {
+                return { year, month: i + 1 };
+              }
+            }
+            return null;
           }
 
           function monthDelta(a: { year: number; month: number }, b: { year: number; month: number }): number {
@@ -1014,10 +1051,13 @@ export function registerDomHandlers(
                 extras: { matchCount: els.length },
               };
             const target = els[0] as HTMLElement;
-            const root = target.closest(closestSelector) as HTMLElement | null;
+            // 允许 target 自身/祖先，或 target 子孙匹配 closestSelector。
+            // 这样 agent 可以把 [data-testid=wrapper] 作为 target，不必精确指到 driver 根节点。
+            const root = (target.closest(closestSelector) ??
+              target.querySelector(closestSelector)) as HTMLElement | null;
             if (!root)
               return {
-                error: `Target does not match driver closestSelector "${closestSelector}"`,
+                error: `Target does not match driver closestSelector "${closestSelector}" (neither ancestor nor descendant)`,
                 errorCode: "UNSUPPORTED_TARGET",
                 extras: { driverId },
               };
@@ -1250,6 +1290,92 @@ export function registerDomHandlers(
               })();
             }
 
+            // -------- Element Plus el-select driver --------
+            if (driverId === "element-plus-select") {
+              const labels = Array.isArray(val)
+                ? (val as unknown[]).map((v) => String(v))
+                : [String(val)];
+              const isMultiple = Array.isArray(val) || root.classList.contains("is-multiple");
+
+              // trigger：el-select 2.x 是 .el-select__wrapper，老版本是 .select-trigger
+              const wrapper =
+                (root.querySelector(".el-select__wrapper") as HTMLElement | null) ??
+                (root.querySelector(".select-trigger") as HTMLElement | null) ??
+                (root as HTMLElement);
+
+              return (async () => {
+                // 1. 点 wrapper 打开 popper
+                wrapper.scrollIntoView({ block: "center", inline: "center" });
+                dispatchMouseClick(wrapper);
+
+                // 2. 等当前 select 的 dropdown 出现并可见
+                //    el-select 的 wrapper 有 aria-controls 指向 popper id
+                const popperId = wrapper.getAttribute("aria-controls");
+                const dropdown = await waitFor(() => {
+                  if (popperId) {
+                    const el = document.getElementById(popperId);
+                    if (el && el.getBoundingClientRect().width > 0) return el as HTMLElement;
+                  }
+                  // fallback：扫所有可见 dropdown，取第一个
+                  const all = document.querySelectorAll(".el-select-dropdown");
+                  for (const d of Array.from(all)) {
+                    if ((d as HTMLElement).getBoundingClientRect().width > 0) return d as HTMLElement;
+                  }
+                  return null;
+                }, timeoutMs);
+                if (!dropdown) {
+                  return {
+                    error: "Select dropdown did not open within timeout",
+                    errorCode: "COMMIT_FAILED",
+                    stage: "open-dropdown",
+                  };
+                }
+
+                // 3. 每个 label 找对应 option click
+                const clicked: string[] = [];
+                const unknown: string[] = [];
+                for (const label of labels) {
+                  const items = Array.from(
+                    dropdown.querySelectorAll(".el-select-dropdown__item"),
+                  ) as HTMLElement[];
+                  const hit = items.find((it) => (it.textContent || "").trim() === label);
+                  if (!hit) {
+                    unknown.push(label);
+                    continue;
+                  }
+                  dispatchMouseClick(hit);
+                  clicked.push(label);
+                  await sleep(40); // 让 Vue 跑一个 tick 再点下一个
+                }
+
+                // 4. multi-select 点 wrapper 关闭 popper；single-select 会自动关
+                if (isMultiple && dropdown.getBoundingClientRect().width > 0) {
+                  dispatchMouseClick(wrapper);
+                  await sleep(40);
+                }
+
+                if (unknown.length > 0) {
+                  const available = Array.from(
+                    dropdown.querySelectorAll(".el-select-dropdown__item"),
+                  ).map((i) => ((i as HTMLElement).textContent || "").trim());
+                  return {
+                    error: `Unknown option label(s): ${unknown.join(", ")}. Available: ${available.join(", ")}`,
+                    errorCode: "INVALID_PARAMS",
+                    extras: { unknown, available },
+                  };
+                }
+
+                return {
+                  result: {
+                    success: true,
+                    driver: driverId,
+                    multiple: isMultiple,
+                    clicked,
+                  },
+                };
+              })();
+            }
+
             return {
               error: `Unknown driver id: ${driverId}`,
               errorCode: "INVALID_PARAMS",
@@ -1279,4 +1405,308 @@ export function registerDomHandlers(
       return res?.result;
     },
   });
+}
+
+// ---- daterange / datetimerange CDP 真鼠标驱动 ----
+// 原因：Element Plus 的 date picker 某些 handler 检查 event.isTrusted。
+// scripting.executeScript + dispatchMouseEvent 得到的是 untrusted 事件，
+// UI 看着有动作（day cell 能选中）但 v-model 不更新。只有 CDP
+// Input.dispatchMouseEvent 产生的 isTrusted=true 事件能完整驱动。
+
+function parseYMDLocal(s: string): { year: number; month: number; day: number } | null {
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (!m) return null;
+  return { year: +m[1], month: +m[2], day: +m[3] };
+}
+
+async function runDateRangeDriverCDP(opts: {
+  tid: number;
+  frameId: number | undefined;
+  selector: string;
+  closestSelector: string;
+  isDateTime: boolean;
+  value: { start?: string; end?: string };
+  timeout: number;
+  debuggerMgr: DebuggerManager;
+}): Promise<unknown> {
+  const { tid, frameId, selector, closestSelector, isDateTime, value, timeout, debuggerMgr } = opts;
+
+  if (!value?.start || !value?.end) {
+    throw vtxError(VtxErrorCode.INVALID_PARAMS, `value must be { start, end }, got ${JSON.stringify(value)}`);
+  }
+  const ts = parseYMDLocal(value.start);
+  const te = parseYMDLocal(value.end);
+  if (!ts || !te) {
+    throw vtxError(
+      VtxErrorCode.INVALID_PARAMS,
+      `value.start/end must start with YYYY-MM-DD, got ${value.start} / ${value.end}`,
+    );
+  }
+
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+  // page-side 查询 helper：传入 top-level func 字面量
+  async function pageQuery<T>(
+    fn: (...args: unknown[]) => T,
+    args: unknown[] = [],
+  ): Promise<T> {
+    const r = await chrome.scripting.executeScript({
+      target: buildExecuteTarget(tid, frameId),
+      func: fn,
+      args,
+      world: "MAIN",
+    });
+    return r[0]?.result as T;
+  }
+
+  // CDP 真鼠标 click at page-coords
+  async function clickBBox(cx: number, cy: number): Promise<void> {
+    const { x: ox, y: oy } = await getIframeOffset(tid, frameId);
+    const x = cx + ox;
+    const y = cy + oy;
+    await debuggerMgr.attach(tid);
+    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
+    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
+      type: "mousePressed", x, y, button: "left", clickCount: 1,
+    });
+    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
+      type: "mouseReleased", x, y, button: "left", clickCount: 1,
+    });
+  }
+
+  // step 1: resolve root + start input bbox
+  const openInfo = await pageQuery(
+    (sel, closestSel) => {
+      const els = document.querySelectorAll(sel as string);
+      if (els.length === 0) return { err: `Element not found: ${sel}` };
+      if (els.length > 1) return { err: `Selector "${sel}" matched ${els.length} elements` };
+      const target = els[0] as HTMLElement;
+      const root = (target.closest(closestSel as string) ??
+        target.querySelector(closestSel as string)) as HTMLElement | null;
+      if (!root) return { err: `Target does not match driver closestSelector "${closestSel}"` };
+      const sIn = root.querySelector("input.el-range-input") as HTMLElement | null;
+      if (!sIn) return { err: "Range inputs not found under .el-date-editor" };
+      sIn.scrollIntoView({ block: "center", inline: "center" });
+      const r = sIn.getBoundingClientRect();
+      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    },
+    [selector, closestSelector],
+  );
+  if ("err" in openInfo) {
+    throw vtxError(VtxErrorCode.COMMIT_FAILED, openInfo.err, { selector });
+  }
+  await clickBBox(openInfo.cx, openInfo.cy);
+
+  // step 2: wait picker visible
+  const deadline = Date.now() + timeout;
+  let panelReady = false;
+  while (Date.now() < deadline) {
+    const ok = await pageQuery(() => {
+      const p = document.querySelector(".el-date-range-picker");
+      if (!p) return false;
+      const r = p.getBoundingClientRect();
+      // Vue transition 完成后 height 才撑开（enter-to），100 为稳态阈值
+      return r.width > 100 && r.height > 100;
+    });
+    if (ok) { panelReady = true; break; }
+    await sleep(50);
+  }
+  if (!panelReady) {
+    throw vtxError(VtxErrorCode.COMMIT_FAILED, "Picker did not open within timeout", {
+      selector, extras: { stage: "open-picker" },
+    });
+  }
+
+  // helper: 读取某个 panel 的 YM + arrow bbox
+  async function readPanelState(hdrIndex: 0 | 1): Promise<{
+    year: number; month: number;
+    arrLeft: { cx: number; cy: number } | null;
+    arrRight: { cx: number; cy: number } | null;
+  } | { err: string }> {
+    return pageQuery(
+      (idx) => {
+        const p = document.querySelector(".el-date-range-picker");
+        if (!p) return { err: "no panel" };
+        const hdrs = p.querySelectorAll(".el-date-range-picker__header");
+        const hdr = hdrs[idx as number];
+        if (!hdr) return { err: `no header[${idx}]` };
+        const raw = ((hdr as HTMLElement).innerText || hdr.textContent || "").toLowerCase();
+        const y = raw.match(/\b(\d{4})\b/);
+        if (!y) return { err: `no year in "${raw}"` };
+        const year = +y[1];
+        let month: number | null = null;
+        const numAfter = raw.match(/\d{4}\D+(\d{1,2})/);
+        if (numAfter && +numAfter[1] >= 1 && +numAfter[1] <= 12) {
+          month = +numAfter[1];
+        } else {
+          const EN = ["january","february","march","april","may","june","july","august","september","october","november","december"];
+          for (let i = 0; i < 12; i++) {
+            if (new RegExp(`\\b${EN[i]}\\b`).test(raw)) { month = i + 1; break; }
+          }
+        }
+        if (month === null) return { err: `no month in "${raw}"` };
+        const aL = p.querySelector(".arrow-left") as HTMLElement | null;
+        const aR = p.querySelector(".arrow-right") as HTMLElement | null;
+        const toC = (el: HTMLElement | null) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+        };
+        return { year, month, arrLeft: toC(aL), arrRight: toC(aR) };
+      },
+      [hdrIndex],
+    );
+  }
+
+  async function navigateMonth(
+    hdrIndex: 0 | 1,
+    target: { year: number; month: number },
+  ): Promise<void> {
+    for (let safety = 60; safety > 0; safety--) {
+      const info = await readPanelState(hdrIndex);
+      if ("err" in info) throw vtxError(VtxErrorCode.COMMIT_FAILED, `read header ${hdrIndex}: ${info.err}`);
+      const delta = (info.year - target.year) * 12 + (info.month - target.month);
+      if (delta === 0) return;
+      const btn = delta > 0 ? info.arrLeft : info.arrRight;
+      if (!btn) throw vtxError(VtxErrorCode.COMMIT_FAILED, `arrow button missing (delta=${delta})`);
+      await clickBBox(btn.cx, btn.cy);
+      await sleep(80);
+    }
+    throw vtxError(VtxErrorCode.COMMIT_FAILED, `navigate month safety overflow for hdr ${hdrIndex}`);
+  }
+
+  // helper: 点某侧 panel 的某天
+  async function clickDayCell(side: "left" | "right", day: number): Promise<void> {
+    const info = await pageQuery(
+      (s, d) => {
+        const content = document.querySelector(`.el-date-range-picker__content.is-${s}`);
+        if (!content) return { err: `no ${s} content` };
+        const tds = content.querySelectorAll("td");
+        for (const td of Array.from(tds)) {
+          const cls = (td as HTMLElement).className;
+          if (cls.includes("disabled") || cls.includes("prev-month") || cls.includes("next-month")) continue;
+          const cell = ((td as HTMLElement).querySelector(".cell") as HTMLElement) ?? (td as HTMLElement);
+          if ((cell.innerText || "").trim() === String(d)) {
+            const r = (td as HTMLElement).getBoundingClientRect();
+            return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+          }
+        }
+        return { err: `day ${d} not found in ${s} panel` };
+      },
+      [side, day],
+    );
+    if ("err" in info) throw vtxError(VtxErrorCode.COMMIT_FAILED, info.err);
+    await clickBBox(info.cx, info.cy);
+  }
+
+  // step 3: navigate left to start month
+  await navigateMonth(0, { year: ts.year, month: ts.month });
+  // step 4: click start day
+  await clickDayCell("left", ts.day);
+  await sleep(80);
+
+  const sameMonth = ts.year === te.year && ts.month === te.month;
+  if (sameMonth) {
+    // start/end 同月份：不翻 right（Element Plus 强制 right > left，
+    // 翻 right 回到 start 月会反向把 left 推到更早月，污染 start click 的 panel）
+    await clickDayCell("left", te.day);
+  } else {
+    // step 5: navigate right to end month
+    await navigateMonth(1, { year: te.year, month: te.month });
+    // step 6: click end day
+    await clickDayCell("right", te.day);
+  }
+  await sleep(80);
+
+  // step 7: datetime 场景点"确定"
+  if (isDateTime) {
+    const okInfo = await pageQuery(() => {
+      const p = document.querySelector(".el-date-range-picker");
+      if (!p || !p.classList.contains("has-time")) return null;
+      const btns = Array.from(p.querySelectorAll("button")) as HTMLElement[];
+      const hit = btns.find((b) => {
+        const t = (b.innerText || "").trim();
+        return t === "确定" || t === "OK";
+      });
+      if (!hit) return { err: "no confirm button" };
+      const r = hit.getBoundingClientRect();
+      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    });
+    if (okInfo && "cx" in okInfo) {
+      await clickBBox(okInfo.cx, okInfo.cy);
+      await sleep(150);
+    }
+  }
+
+  // step 8a: 等 picker close (height 归 0 或 element 消失)，Element Plus 在 close 时 emit
+  // 对外 change event 让 v-model commit。verify 前必须等这一步。
+  const closeDeadline = Date.now() + 2000;
+  while (Date.now() < closeDeadline) {
+    const closed = await pageQuery(() => {
+      const p = document.querySelector(".el-date-range-picker");
+      if (!p) return true;
+      return p.getBoundingClientRect().height === 0;
+    });
+    if (closed) break;
+    await sleep(50);
+  }
+  await sleep(150); // 额外一个 Vue tick，让 v-model commit 稳
+
+  // step 8b: verify input values
+  const verifyDeadline = Date.now() + 2000;
+  let verified:
+    | { sVal: string; eVal: string; ok: boolean; expectStart: string; expectEnd: string }
+    | null = null;
+  while (Date.now() < verifyDeadline) {
+    const info = await pageQuery(
+      (sel, closestSel, tsJson, teJson) => {
+        const els = document.querySelectorAll(sel as string);
+        const target = els[0] as HTMLElement | undefined;
+        if (!target) return { err: "target gone" };
+        const root = (target.closest(closestSel as string) ??
+          target.querySelector(closestSel as string)) as HTMLElement | null;
+        if (!root) return { err: "root gone" };
+        const ins = root.querySelectorAll("input.el-range-input");
+        const sIn = ins[0] as HTMLInputElement | undefined;
+        const eIn = ins[1] as HTMLInputElement | undefined;
+        if (!sIn || !eIn) return { err: "inputs gone" };
+        const tsv = JSON.parse(tsJson as string);
+        const tev = JSON.parse(teJson as string);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const expectStart = `${tsv.year}-${pad(tsv.month)}-${pad(tsv.day)}`;
+        const expectEnd = `${tev.year}-${pad(tev.month)}-${pad(tev.day)}`;
+        return {
+          sVal: sIn.value,
+          eVal: eIn.value,
+          ok: sIn.value.startsWith(expectStart) && eIn.value.startsWith(expectEnd),
+          expectStart, expectEnd,
+        };
+      },
+      [selector, closestSelector, JSON.stringify(ts), JSON.stringify(te)],
+    );
+    if ("err" in info) {
+      throw vtxError(VtxErrorCode.COMMIT_FAILED, info.err);
+    }
+    if (info.ok) {
+      verified = info;
+      break;
+    }
+    verified = info; // 最近一次状态，便于 else 报错
+    await sleep(100);
+  }
+  if (!verified || !verified.ok) {
+    throw vtxError(
+      VtxErrorCode.COMMIT_FAILED,
+      `Inputs did not commit: got "${verified?.sVal}" / "${verified?.eVal}", expected to start with "${verified?.expectStart}" / "${verified?.expectEnd}"`,
+      { selector, extras: { stage: "verify" } },
+    );
+  }
+
+  return {
+    success: true,
+    driver: isDateTime ? "element-plus-datetimerange" : "element-plus-daterange",
+    startValue: verified.sVal,
+    endValue: verified.eVal,
+    transport: "cdp-real-mouse",
+  };
 }

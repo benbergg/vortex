@@ -47,6 +47,13 @@ export const COMMIT_DRIVERS: CommitDriverSpec[] = [
     summary:
       "Element Plus <el-checkbox-group>: idempotent toggle. Pass {values: string[]} — driver diffs current checked labels with target, clicks each sequentially with a microtask gap so Vue reactivity catches every toggle (avoids the 'forEach click batched → only one toggled' trap).",
   },
+  {
+    id: "element-plus-select",
+    kind: "select",
+    closestSelector: ".el-select",
+    summary:
+      "Element Plus <el-select>: opens popper via wrapper click, matches option(s) by visible label text, clicks each. value: string (single) | string[] (multiple). Closes popper after multi-select.",
+  },
 ];
 
 export function findDriver(
