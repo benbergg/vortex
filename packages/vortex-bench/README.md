@@ -82,7 +82,8 @@ pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 basel
 
 | 优先级 | 问题 | 信号 |
 |--------|------|------|
-| 🔴 P0 | **driver 用 `dispatchEvent(MouseEvent)` 触发的 click 是 `isTrusted=false`**，Element Plus 的 date picker 翻月后不会同步 v-model（UI 层有动作，Vue 状态不更新）；需走 CDP `Input.dispatchMouseEvent` 走真鼠标路径 | daterange/datetimerange 卡 "(未设置)"，单跑 daterange 偶尔 pass（flaky）|
+| ✅ done | driver click 从 `dispatchEvent(MouseEvent)` 改为 CDP 真鼠标 `Input.dispatchMouseEvent`（isTrusted=true） | daterange ✓ 修好 |
+| 🔴 P0 | **datetimerange 需要 time picker 子流程**：day click 后 Start/End Time inputs 仍空，OK button disabled；需 driver 额外实现"点开 time popper → 选 HH/MM/SS → 确定"整条链 | datetimerange 仍 ✗（但 driver 现在明确报告 "OK button still disabled" 作为可定位的 failure）|
 | 🟠 P1 | `kind=cascader` 未注册 + cascader trigger 对 JS `.click()` 不响应 | el-cascader 完全 fail |
 | 🟠 P1 | `kind=checkbox-group` spec 需要 `.el-checkbox-group` 作 root，但 form 里是 `[data-testid="form-tags"] > .el-checkbox-group`。closestSelector 已改宽松，但 driver 接受 `{values:[]}` 格式，case 传 `value=[...]` 失败 | form-composite 里 checkbox 空 |
 | 🟠 P1 | `vortex_fill` plain 模式对 Vue `<el-input>` 不 dispatch 'input' 事件 → v-model 不响应（当前 workaround 用 `vortex_type` 逐字符输入）| form-composite 的 name |

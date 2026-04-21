@@ -1618,23 +1618,95 @@ async function runDateRangeDriverCDP(opts: {
   }
   await sleep(80);
 
+  // step 6.5: datetime 场景，day click 后还需显式 set Time inputs 才会 enable OK。
+  // 从 value.start/end 解析 "HH:MM:SS" 部分，用 nativeInputValueSetter + dispatch input
+  // 让 Element Plus 识别为用户键入。
+  if (isDateTime) {
+    const startTimeStr = (value.start.split(" ")[1] ?? "00:00:00").trim() || "00:00:00";
+    const endTimeStr = (value.end.split(" ")[1] ?? "00:00:00").trim() || "00:00:00";
+    const setRes = await pageQuery(
+      (startTime, endTime) => {
+        const p = document.querySelector(".el-date-range-picker");
+        if (!p) return { err: "no panel for time set" };
+        const inputs = Array.from(p.querySelectorAll("input.el-input__inner")) as HTMLInputElement[];
+        const sT = inputs.find((i) =>
+          ["Start Time", "开始时间"].includes(i.placeholder),
+        );
+        const eT = inputs.find((i) =>
+          ["End Time", "结束时间"].includes(i.placeholder),
+        );
+        if (!sT || !eT) {
+          return {
+            err: `time inputs not found, placeholders: ${inputs.map((i) => i.placeholder).join("|")}`,
+          };
+        }
+        const proto = HTMLInputElement.prototype as unknown as { value: unknown };
+        const descriptor = Object.getOwnPropertyDescriptor(proto, "value");
+        const setter = descriptor?.set as ((v: string) => void) | undefined;
+        if (!setter) return { err: "no native value setter" };
+        const set = (el: HTMLInputElement, v: string) => {
+          setter.call(el, v);
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        };
+        set(sT, startTime as string);
+        set(eT, endTime as string);
+        return { ok: true };
+      },
+      [startTimeStr, endTimeStr],
+    );
+    if (setRes && "err" in setRes) {
+      throw vtxError(VtxErrorCode.COMMIT_FAILED, `set time inputs: ${setRes.err}`, {
+        selector, extras: { stage: "set-time" },
+      });
+    }
+    await sleep(100);
+  }
+
   // step 7: datetime 场景点"确定"
   if (isDateTime) {
-    const okInfo = await pageQuery(() => {
-      const p = document.querySelector(".el-date-range-picker");
-      if (!p || !p.classList.contains("has-time")) return null;
-      const btns = Array.from(p.querySelectorAll("button")) as HTMLElement[];
-      const hit = btns.find((b) => {
-        const t = (b.innerText || "").trim();
-        return t === "确定" || t === "OK";
+    // 轮询等 OK button enable（两个 day click 后 Element Plus 需要 nextTick 才更新 disabled 状态）
+    const okDeadline = Date.now() + 2000;
+    let okInfo:
+      | { cx: number; cy: number; disabled: boolean }
+      | { err: string }
+      | null = null;
+    while (Date.now() < okDeadline) {
+      okInfo = await pageQuery(() => {
+        const p = document.querySelector(".el-date-range-picker");
+        if (!p || !p.classList.contains("has-time")) return null;
+        const btns = Array.from(p.querySelectorAll("button")) as HTMLElement[];
+        const hit = btns.find((b) => {
+          const t = (b.innerText || "").trim();
+          return t === "确定" || t === "OK";
+        });
+        if (!hit) return { err: "no confirm button" };
+        const r = hit.getBoundingClientRect();
+        const btn = hit as HTMLButtonElement;
+        const disabled =
+          btn.disabled ||
+          btn.classList.contains("is-disabled") ||
+          btn.hasAttribute("disabled");
+        return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, disabled };
       });
-      if (!hit) return { err: "no confirm button" };
-      const r = hit.getBoundingClientRect();
-      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
-    });
-    if (okInfo && "cx" in okInfo) {
+      if (okInfo && "disabled" in okInfo && !okInfo.disabled) break;
+      await sleep(100);
+    }
+    if (okInfo && "err" in okInfo) {
+      throw vtxError(VtxErrorCode.COMMIT_FAILED, okInfo.err, {
+        selector, extras: { stage: "confirm" },
+      });
+    }
+    if (okInfo && "disabled" in okInfo) {
+      if (okInfo.disabled) {
+        throw vtxError(
+          VtxErrorCode.COMMIT_FAILED,
+          "OK/确定 button still disabled after selecting start+end days (time inputs may need explicit set)",
+          { selector, extras: { stage: "confirm" } },
+        );
+      }
       await clickBBox(okInfo.cx, okInfo.cy);
-      await sleep(150);
+      await sleep(200);
     }
   }
 
