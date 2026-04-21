@@ -50,21 +50,21 @@ pnpm -F @bytenew/vortex-bench bench diff        # 和 baseline.json 比
 pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 baseline
 ```
 
-## 覆盖矩阵（v0.6.0 baseline：11 case / 6 pass / 5 fail）
+## 覆盖矩阵（baseline：11 case / 8 pass / 3 fail）
 
 | case | widget | 状态 | 信号 |
 |------|--------|------|------|
-| el-dropdown | teleport menu | ✓ | observe 抓 popper（偶尔 flaky，见 P4）|
-| el-select-single | 单选 | ✓ | fill kind=select 直接写入 ✓ |
-| el-select-multiple | 多选 tag | ✓ | fill kind=select value=[...] ✓ |
-| el-cascader | 级联 3 级 | ✗ | fallback 点 trigger 面板打不开 |
-| el-date-picker-daterange | 日期段 | ✗ | driver 翻月完成但 v-model 不更新（isTrusted=false 被拒）|
-| el-date-picker-datetimerange | 日期时间段 | ✗ | 同上 |
-| el-form-composite | 组合表单 | ✗ | name/level ✓，checkbox-group 未实现 |
-| el-tree | 树形节点 | ✗ | missed=2 点 label 未展开子节点 |
-| el-table | 多选 + 展开行 + 行内按钮 | ✓ | `:nth-child + .el-button` 链式定位一次过 |
+| el-dropdown | teleport menu | ✓ | observe 抓 popper |
+| el-select-single | 单选 | ✓ | fill kind=select |
+| el-select-multiple | 多选 tag | ✓ | fill kind=select value=[...] |
+| el-cascader | 级联 3 级 | ✓ | CDP 打开 panel + page-side 逐级 click |
+| el-date-picker-daterange | 日期段 | ✓ | CDP 真鼠标 + 英文月名 + close-wait |
+| el-date-picker-datetimerange | 日期时间段 | ✗ | day click ok，需实现 time picker 子流程 |
+| el-form-composite | 组合表单 | ✗ | name/level/switch ✓，checkbox-group 未实现 |
+| el-tree | 树形节点 | ✗ | 点 label 未展开子节点 |
+| el-table | 多选 + 展开行 + 行内按钮 | ✓ | `:nth-child + .el-button` 链式定位 |
 | el-dialog-nested | dialog 内套 select | ✓ | dialog + 嵌套 select 完整走通 |
-| el-upload | 文件上传 | ✓ | `vortex_file_upload` 驱动健全 |
+| el-upload | 文件上传 | ✓ | `vortex_file_upload` |
 
 ## v0.6.0 → (latest) 修复记录
 

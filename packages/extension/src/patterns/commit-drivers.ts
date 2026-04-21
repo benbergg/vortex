@@ -54,6 +54,13 @@ export const COMMIT_DRIVERS: CommitDriverSpec[] = [
     summary:
       "Element Plus <el-select>: opens popper via wrapper click, matches option(s) by visible label text, clicks each. value: string (single) | string[] (multiple). Closes popper after multi-select.",
   },
+  {
+    id: "element-plus-cascader",
+    kind: "cascader",
+    closestSelector: ".el-cascader",
+    summary:
+      "Element Plus <el-cascader>: CDP real-mouse click the trigger to open panel (el-cascader root ignores untrusted click), then walks the label path level-by-level. value: string[] (label path, e.g. ['华东','上海','浦东']).",
+  },
 ];
 
 export function findDriver(
