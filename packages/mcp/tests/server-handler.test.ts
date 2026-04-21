@@ -28,20 +28,22 @@ describe("handleCallTool routing logic", () => {
     expect(ping!.action).toBe("__mcp_ping__");
   });
 
-  it("__mcp_events_subscribe__ action does not go through WS", async () => {
+  it("__mcp_events__ action does not go through WS (v0.5 unified events tool)", async () => {
     const { sendRequest } = await import("../src/client.js");
     const { eventStore } = await import("../src/lib/event-store.js");
     vi.mocked(sendRequest).mockResolvedValue({} as any);
 
-    const sub = getToolDef("vortex_events_subscribe");
-    expect(sub?.action).toBe("__mcp_events_subscribe__");
+    // v0.5: subscribe / unsubscribe / drain 合并到 vortex_events({op})，action 统一 __mcp_events__
+    const events = getToolDef("vortex_events");
+    expect(events?.action).toBe("__mcp_events__");
 
     expect(eventStore.subscribe).not.toHaveBeenCalled();
   });
 
-  it("__mcp_events_unsubscribe__ action routes to eventStore", async () => {
-    const unsub = getToolDef("vortex_events_unsubscribe");
-    expect(unsub?.action).toBe("__mcp_events_unsubscribe__");
+  it("vortex_events schema carries the op discriminator", () => {
+    const events = getToolDef("vortex_events");
+    const schema = events?.schema as { properties?: { op?: { enum?: string[] } } };
+    expect(schema?.properties?.op?.enum).toEqual(["subscribe", "unsubscribe", "drain"]);
   });
 
   it("__mcp_ping__ action routes to ping handler", () => {

@@ -15,71 +15,49 @@ describe("getToolDefs", () => {
     expect(a).toEqual(b);
   });
 
-  it("includes all required vortex_* prefixed tools", () => {
+  it("includes all required vortex_* prefixed tools (v0.5 set of 35)", () => {
     const names = getToolDefs().map((d) => d.name);
-    expect(names).toContain("vortex_ping");
-    expect(names).toContain("vortex_tab_list");
-    expect(names).toContain("vortex_page_navigate");
-    expect(names).toContain("vortex_dom_click");
-    expect(names).toContain("vortex_dom_query");
-    expect(names).toContain("vortex_dom_query_all");
-    expect(names).toContain("vortex_dom_fill");
-    expect(names).toContain("vortex_dom_type");
-    expect(names).toContain("vortex_dom_select");
-    expect(names).toContain("vortex_dom_scroll");
-    expect(names).toContain("vortex_dom_hover");
-    expect(names).toContain("vortex_dom_get_attribute");
-    expect(names).toContain("vortex_dom_get_scroll_info");
-    expect(names).toContain("vortex_dom_wait_for_mutation");
-    expect(names).toContain("vortex_dom_wait_settled");
-    expect(names).toContain("vortex_dom_commit");
-    expect(names).toContain("vortex_dom_batch");
-    expect(names).toContain("vortex_dom_watch_mutations");
-    expect(names).toContain("vortex_dom_unwatch_mutations");
-    expect(names).toContain("vortex_content_get_text");
-    expect(names).toContain("vortex_content_get_html");
-    expect(names).toContain("vortex_content_get_accessibility_tree");
-    expect(names).toContain("vortex_content_get_element_text");
-    expect(names).toContain("vortex_content_get_computed_style");
-    expect(names).toContain("vortex_js_evaluate");
-    expect(names).toContain("vortex_js_evaluate_async");
-    expect(names).toContain("vortex_js_call_function");
-    expect(names).toContain("vortex_keyboard_press");
-    expect(names).toContain("vortex_keyboard_shortcut");
-    expect(names).toContain("vortex_mouse_click");
-    expect(names).toContain("vortex_mouse_double_click");
-    expect(names).toContain("vortex_mouse_move");
-    expect(names).toContain("vortex_capture_screenshot");
-    expect(names).toContain("vortex_capture_element");
-    expect(names).toContain("vortex_capture_gif_start");
-    expect(names).toContain("vortex_capture_gif_frame");
-    expect(names).toContain("vortex_capture_gif_stop");
-    expect(names).toContain("vortex_console_get_logs");
-    expect(names).toContain("vortex_console_get_errors");
-    expect(names).toContain("vortex_console_clear");
-    expect(names).toContain("vortex_network_get_logs");
-    expect(names).toContain("vortex_network_get_errors");
-    expect(names).toContain("vortex_network_filter");
-    expect(names).toContain("vortex_network_get_response_body");
-    expect(names).toContain("vortex_network_clear");
-    expect(names).toContain("vortex_storage_get_cookies");
-    expect(names).toContain("vortex_storage_set_cookie");
-    expect(names).toContain("vortex_storage_delete_cookie");
-    expect(names).toContain("vortex_storage_get_local_storage");
-    expect(names).toContain("vortex_storage_set_local_storage");
-    expect(names).toContain("vortex_storage_get_session_storage");
-    expect(names).toContain("vortex_storage_set_session_storage");
-    expect(names).toContain("vortex_storage_export_session");
-    expect(names).toContain("vortex_storage_import_session");
-    expect(names).toContain("vortex_file_upload");
-    expect(names).toContain("vortex_file_download");
-    expect(names).toContain("vortex_file_get_downloads");
-    expect(names).toContain("vortex_frames_list");
-    expect(names).toContain("vortex_frames_find");
-    expect(names).toContain("vortex_observe");
-    expect(names).toContain("vortex_events_subscribe");
-    expect(names).toContain("vortex_events_unsubscribe");
-    expect(names).toContain("vortex_events_drain");
+    // v0.5.0 合并后的完整 35 工具名单（按 schemas.ts 定义顺序）
+    const expected = [
+      "vortex_ping",
+      "vortex_events",
+      "vortex_observe",
+      "vortex_tab_list",
+      "vortex_tab_create",
+      "vortex_tab_close",
+      "vortex_navigate",
+      "vortex_page_info",
+      "vortex_history",
+      "vortex_wait",
+      "vortex_wait_idle",
+      "vortex_click",
+      "vortex_type",
+      "vortex_fill",
+      "vortex_select",
+      "vortex_hover",
+      "vortex_batch",
+      "vortex_fill_form",
+      "vortex_press",
+      "vortex_get_text",
+      "vortex_get_html",
+      "vortex_evaluate",
+      "vortex_mouse_click",
+      "vortex_mouse_move",
+      "vortex_screenshot",
+      "vortex_console",
+      "vortex_network",
+      "vortex_network_response_body",
+      "vortex_storage_get",
+      "vortex_storage_set",
+      "vortex_storage_session",
+      "vortex_file_upload",
+      "vortex_file_download",
+      "vortex_file_list_downloads",
+      "vortex_frames_list",
+    ];
+    for (const name of expected) {
+      expect(names).toContain(name);
+    }
   });
 
   it("each tool has name, action, description, and schema", () => {
@@ -106,10 +84,8 @@ describe("getToolDefs", () => {
   });
 
   it("image-returning tools are marked with returnsImage=true", () => {
-    const screenshot = getToolDef("vortex_capture_screenshot");
+    const screenshot = getToolDef("vortex_screenshot");
     expect(screenshot?.returnsImage).toBe(true);
-    const element = getToolDef("vortex_capture_element");
-    expect(element?.returnsImage).toBe(true);
   });
 
   it("non-image tools do not have returnsImage flag", () => {
@@ -117,13 +93,13 @@ describe("getToolDefs", () => {
     expect(tabList?.returnsImage).toBeUndefined();
   });
 
-  it("has at least 60 tools", () => {
-    expect(getToolDefs().length).toBeGreaterThanOrEqual(60);
+  it("has exactly 35 tools (v0.5 consolidated set)", () => {
+    expect(getToolDefs().length).toBe(35);
   });
 
-  it("dom.batch is included for batch operations", () => {
+  it("batch tool is included for batch DOM operations", () => {
     const names = getToolDefs().map((d) => d.name);
-    expect(names).toContain("vortex_dom_batch");
+    expect(names).toContain("vortex_batch");
   });
 });
 
@@ -141,15 +117,14 @@ describe("getToolDef", () => {
     expect(getToolDef("vortex_")).toBeUndefined();
   });
 
-  it("returns internal MCP action tools correctly", () => {
-    expect(getToolDef("vortex_events_subscribe")?.action).toBe("__mcp_events_subscribe__");
-    expect(getToolDef("vortex_events_unsubscribe")?.action).toBe("__mcp_events_unsubscribe__");
-    expect(getToolDef("vortex_events_drain")?.action).toBe("__mcp_events_drain__");
+  it("returns internal MCP action tools correctly (v0.5 unified events)", () => {
+    // v0.5: 三个 events_* 工具合并为 vortex_events({op})，action 统一为 __mcp_events__
+    expect(getToolDef("vortex_events")?.action).toBe("__mcp_events__");
     expect(getToolDef("vortex_ping")?.action).toBe("__mcp_ping__");
   });
 
   it("schema inputSchema is valid JSON Schema object", () => {
-    const def = getToolDef("vortex_page_navigate");
+    const def = getToolDef("vortex_navigate");
     expect(def?.schema).toHaveProperty("type", "object");
     expect(def?.schema).toHaveProperty("properties");
     expect(def?.schema).toHaveProperty("required");
