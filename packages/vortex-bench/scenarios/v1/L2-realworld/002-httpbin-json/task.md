@@ -1,1 +1,0 @@
-Use the browser's active tab. Navigate to `https://httpbin.org/json`. The page returns a JSON document describing a slideshow. Read the JSON and in your final text include: the author field and the total number of slides. Stop when done.

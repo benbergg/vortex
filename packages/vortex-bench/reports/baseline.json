@@ -1,560 +1,99 @@
 {
-  "schema_version": 1,
-  "dataset_version": "v1",
-  "generated_at": "2026-04-18T12:17:08.285Z",
-  "git_commit": "6cab88e",
-  "provider": {
-    "name": "zhipu",
-    "model": "glm-4.7",
-    "baseURL": "https://open.bigmodel.cn/api/anthropic"
-  },
-  "scenarios": [
+  "generatedAt": "2026-04-21T09:58:51.060Z",
+  "playgroundUrl": "http://localhost:5173",
+  "cases": [
     {
-      "id": "001-basic-click",
-      "layer": "L0",
-      "pass": true,
-      "metrics": {
-        "correctness": 1,
-        "efficiency": 0.5,
-        "robustness": 1,
-        "utilization": 0.875,
-        "encountered_expected_error": false,
-        "used_observe": true,
-        "used_events": false,
-        "unique_tool_count": 3
-      },
-      "agent": {
-        "steps": 4,
-        "inputTokens": 10976,
-        "outputTokens": 91,
-        "toolCalls": [
-          "vortex_page_navigate",
-          "vortex_observe",
-          "vortex_dom_click"
-        ],
-        "errorCodes": [],
-        "terminationReason": "done",
-        "elapsedMs": 4281
-      },
-      "judge_checks": [
-        {
-          "ok": true,
-          "name": "agent_success"
-        },
-        {
-          "ok": true,
-          "name": "url_contains(\"?done=1\")"
-        },
-        {
-          "ok": true,
-          "name": "no_error_codes"
-        }
-      ]
+      "case": "el-cascader",
+      "passed": false,
+      "callCount": 15,
+      "fallbackToEvaluate": 4,
+      "observeMissedPopperItems": 0,
+      "durationMs": 2960,
+      "failureReason": "result 区应包含 \"华东/上海/浦东\"，实际: \"选中路径：[]\""
     },
     {
-      "id": "002-fill-form",
-      "layer": "L0",
-      "pass": true,
-      "metrics": {
-        "correctness": 1,
-        "efficiency": 0.5833333333333333,
-        "robustness": 1,
-        "utilization": 1,
-        "encountered_expected_error": false,
-        "used_observe": true,
-        "used_events": false,
-        "unique_tool_count": 4
-      },
-      "agent": {
-        "steps": 5,
-        "inputTokens": 12293,
-        "outputTokens": 250,
-        "toolCalls": [
-          "vortex_page_navigate",
-          "vortex_observe",
-          "vortex_dom_fill",
-          "vortex_dom_fill",
-          "vortex_dom_click"
-        ],
-        "errorCodes": [],
-        "terminationReason": "done",
-        "elapsedMs": 7609
-      },
-      "judge_checks": [
-        {
-          "ok": true,
-          "name": "agent_success"
-        },
-        {
-          "ok": true,
-          "name": "text_in_page(\"OK name=Alice email=alice@exam\")"
-        },
-        {
-          "ok": true,
-          "name": "no_error_codes"
-        }
-      ]
+      "case": "el-date-picker-daterange",
+      "passed": false,
+      "callCount": 7,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 31762,
+      "failureReason": "result 区应包含 \"start=2024-01-01\"，实际: \"(未设置)\""
     },
     {
-      "id": "003-read-text",
-      "layer": "L0",
-      "pass": true,
-      "metrics": {
-        "correctness": 1,
-        "efficiency": 0.5,
-        "robustness": 1,
-        "utilization": 0.25,
-        "encountered_expected_error": false,
-        "used_observe": false,
-        "used_events": false,
-        "unique_tool_count": 2
-      },
-      "agent": {
-        "steps": 3,
-        "inputTokens": 100,
-        "outputTokens": 73,
-        "toolCalls": [
-          "vortex_page_navigate",
-          "vortex_content_get_text"
-        ],
-        "errorCodes": [],
-        "terminationReason": "done",
-        "elapsedMs": 14343
-      },
-      "judge_checks": [
-        {
-          "ok": true,
-          "name": "agent_success"
-        },
-        {
-          "ok": true,
-          "name": "url_contains(\"/smoke/read-text\")"
-        },
-        {
-          "ok": true,
-          "name": "text_in_page(\"VORTEX_SMOKE_42\")"
-        },
-        {
-          "ok": true,
-          "name": "no_error_codes"
-        }
-      ]
+      "case": "el-date-picker-datetimerange",
+      "passed": false,
+      "callCount": 7,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 31692,
+      "failureReason": "result 区应包含 \"start=2024-01-01 00:00:00\"，实际: \"(未设置)\""
     },
     {
-      "id": "004-navigate",
-      "layer": "L0",
-      "pass": true,
-      "metrics": {
-        "correctness": 1,
-        "efficiency": 0.4,
-        "robustness": 1,
-        "utilization": 1,
-        "encountered_expected_error": false,
-        "used_observe": true,
-        "used_events": false,
-        "unique_tool_count": 4
-      },
-      "agent": {
-        "steps": 6,
-        "inputTokens": 1248,
-        "outputTokens": 204,
-        "toolCalls": [
-          "vortex_page_navigate",
-          "vortex_observe",
-          "vortex_dom_click",
-          "vortex_page_info",
-          "vortex_observe"
-        ],
-        "errorCodes": [],
-        "terminationReason": "done",
-        "elapsedMs": 6357
-      },
-      "judge_checks": [
-        {
-          "ok": true,
-          "name": "agent_success"
-        },
-        {
-          "ok": true,
-          "name": "url_contains(\"/smoke/navigate/page2\")"
-        },
-        {
-          "ok": true,
-          "name": "text_in_page(\"REACHED\")"
-        },
-        {
-          "ok": true,
-          "name": "no_error_codes"
-        }
-      ]
+      "case": "el-dialog-nested",
+      "passed": true,
+      "callCount": 9,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1668
     },
     {
-      "id": "005-wait-dynamic",
-      "layer": "L0",
-      "pass": true,
-      "metrics": {
-        "correctness": 1,
-        "efficiency": 0.4,
-        "robustness": 1,
-        "utilization": 1,
-        "encountered_expected_error": false,
-        "used_observe": true,
-        "used_events": false,
-        "unique_tool_count": 5
-      },
-      "agent": {
-        "steps": 6,
-        "inputTokens": 1438,
-        "outputTokens": 243,
-        "toolCalls": [
-          "vortex_page_navigate",
-          "vortex_page_wait",
-          "vortex_observe",
-          "vortex_content_get_text",
-          "vortex_dom_query_all"
-        ],
-        "errorCodes": [],
-        "terminationReason": "done",
-        "elapsedMs": 20813
-      },
-      "judge_checks": [
-        {
-          "ok": true,
-          "name": "agent_success"
-        },
-        {
-          "ok": true,
-          "name": "url_contains(\"/smoke/wait-dynamic\")"
-        },
-        {
-          "ok": true,
-          "name": "text_in_page(\"LOADED\")"
-        },
-        {
-          "ok": true,
-          "name": "no_error_codes"
-        }
-      ]
+      "case": "el-dropdown",
+      "passed": true,
+      "callCount": 9,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1293
     },
     {
-      "id": "001-occluded",
-      "layer": "L1",
-      "pass": true,
-      "expectedErrorCode": "ELEMENT_OCCLUDED",
-      "metrics": {
-        "correctness": 1,
-        "efficiency": 0.5333333333333333,
-        "robustness": 1,
-        "utilization": 1,
-        "encountered_expected_error": false,
-        "used_observe": true,
-        "used_events": false,
-        "unique_tool_count": 4
-      },
-      "agent": {
-        "steps": 7,
-        "inputTokens": 1807,
-        "outputTokens": 259,
-        "toolCalls": [
-          "vortex_page_navigate",
-          "vortex_observe",
-          "vortex_dom_click",
-          "vortex_observe",
-          "vortex_dom_click",
-          "vortex_page_info"
-        ],
-        "errorCodes": [],
-        "terminationReason": "done",
-        "elapsedMs": 8929
-      },
-      "judge_checks": [
-        {
-          "ok": true,
-          "name": "agent_success"
-        },
-        {
-          "ok": true,
-          "name": "url_contains(\"?done=1\")"
-        }
-      ]
+      "case": "el-form-composite",
+      "passed": false,
+      "callCount": 18,
+      "fallbackToEvaluate": 4,
+      "observeMissedPopperItems": 0,
+      "durationMs": 2327,
+      "failureReason": "result 区应包含 \"alpha\"，实际: \"提交：{\\\"name\\\":\\\"test-name\\\",\\\"level\\\":\\\"high\\\",\\\"enabled\\\":false,\\\"tags\\\":[]}\""
     },
     {
-      "id": "002-ambiguous",
-      "layer": "L1",
-      "pass": true,
-      "expectedErrorCode": "SELECTOR_AMBIGUOUS",
-      "metrics": {
-        "correctness": 1,
-        "efficiency": 0.6,
-        "robustness": 1,
-        "utilization": 1,
-        "encountered_expected_error": false,
-        "used_observe": true,
-        "used_events": false,
-        "unique_tool_count": 5
-      },
-      "agent": {
-        "steps": 6,
-        "inputTokens": 2089,
-        "outputTokens": 250,
-        "toolCalls": [
-          "vortex_page_navigate",
-          "vortex_observe",
-          "vortex_content_get_text",
-          "vortex_dom_click",
-          "vortex_page_info"
-        ],
-        "errorCodes": [],
-        "terminationReason": "done",
-        "elapsedMs": 7075
-      },
-      "judge_checks": [
-        {
-          "ok": true,
-          "name": "agent_success"
-        },
-        {
-          "ok": true,
-          "name": "url_contains(\"?done=1\")"
-        }
-      ]
+      "case": "el-select-multiple",
+      "passed": true,
+      "callCount": 6,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1141
     },
     {
-      "id": "003-disabled",
-      "layer": "L1",
-      "pass": true,
-      "expectedErrorCode": "ELEMENT_DISABLED",
-      "metrics": {
-        "correctness": 1,
-        "efficiency": 0.5333333333333333,
-        "robustness": 1,
-        "utilization": 1,
-        "encountered_expected_error": false,
-        "used_observe": true,
-        "used_events": false,
-        "unique_tool_count": 6
-      },
-      "agent": {
-        "steps": 7,
-        "inputTokens": 1729,
-        "outputTokens": 404,
-        "toolCalls": [
-          "vortex_page_navigate",
-          "vortex_observe",
-          "vortex_content_get_text",
-          "vortex_dom_fill",
-          "vortex_dom_fill",
-          "vortex_dom_click",
-          "vortex_page_info"
-        ],
-        "errorCodes": [],
-        "terminationReason": "done",
-        "elapsedMs": 9038
-      },
-      "judge_checks": [
-        {
-          "ok": true,
-          "name": "agent_success"
-        },
-        {
-          "ok": true,
-          "name": "url_contains(\"?done=1\")"
-        }
-      ]
+      "case": "el-select-single",
+      "passed": true,
+      "callCount": 5,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1372
     },
     {
-      "id": "004-offscreen",
-      "layer": "L1",
-      "pass": true,
-      "expectedErrorCode": "ELEMENT_OFFSCREEN",
-      "metrics": {
-        "correctness": 1,
-        "efficiency": 0.4666666666666667,
-        "robustness": 1,
-        "utilization": 1,
-        "encountered_expected_error": false,
-        "used_observe": true,
-        "used_events": false,
-        "unique_tool_count": 6
-      },
-      "agent": {
-        "steps": 8,
-        "inputTokens": 1600,
-        "outputTokens": 216,
-        "toolCalls": [
-          "vortex_page_navigate",
-          "vortex_observe",
-          "vortex_content_get_text",
-          "vortex_dom_scroll",
-          "vortex_observe",
-          "vortex_dom_click",
-          "vortex_page_info"
-        ],
-        "errorCodes": [],
-        "terminationReason": "done",
-        "elapsedMs": 114195
-      },
-      "judge_checks": [
-        {
-          "ok": true,
-          "name": "agent_success"
-        },
-        {
-          "ok": true,
-          "name": "url_contains(\"?done=1\")"
-        }
-      ]
+      "case": "el-table",
+      "passed": true,
+      "callCount": 8,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1334
     },
     {
-      "id": "005-not-found",
-      "layer": "L1",
-      "pass": true,
-      "expectedErrorCode": "ELEMENT_NOT_FOUND",
-      "metrics": {
-        "correctness": 1,
-        "efficiency": 0.6666666666666667,
-        "robustness": 1,
-        "utilization": 1,
-        "encountered_expected_error": false,
-        "used_observe": true,
-        "used_events": false,
-        "unique_tool_count": 4
-      },
-      "agent": {
-        "steps": 5,
-        "inputTokens": 963,
-        "outputTokens": 188,
-        "toolCalls": [
-          "vortex_page_navigate",
-          "vortex_observe",
-          "vortex_dom_click",
-          "vortex_page_info"
-        ],
-        "errorCodes": [],
-        "terminationReason": "done",
-        "elapsedMs": 17802
-      },
-      "judge_checks": [
-        {
-          "ok": true,
-          "name": "agent_success"
-        },
-        {
-          "ok": true,
-          "name": "url_contains(\"?done=1\")"
-        }
-      ]
+      "case": "el-tree",
+      "passed": false,
+      "callCount": 15,
+      "fallbackToEvaluate": 2,
+      "observeMissedPopperItems": 2,
+      "durationMs": 2849,
+      "failureReason": "result 区应包含 \"浦东\"，实际: \"选中节点：华东\""
+    },
+    {
+      "case": "el-upload",
+      "passed": true,
+      "callCount": 6,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1159
     }
-  ],
-  "aggregate": {
-    "layers": {
-      "L0": {
-        "layer": "L0",
-        "count": 5,
-        "pass": 5,
-        "correctness": 1,
-        "efficiency": 0.4766666666666667,
-        "robustness": 1,
-        "utilization": 0.825,
-        "score": 90.4
-      },
-      "L1": {
-        "layer": "L1",
-        "count": 5,
-        "pass": 5,
-        "correctness": 1,
-        "efficiency": 0.5599999999999999,
-        "robustness": 1,
-        "utilization": 1,
-        "score": 93.4
-      }
-    },
-    "roi": {
-      "observe": 90,
-      "errorHint": null,
-      "eventBus": null
-    },
-    "vb_index": 91.9,
-    "usage": {
-      "tokens_total": 36421,
-      "tokens_input": 34243,
-      "tokens_output": 2178,
-      "steps_p50": 6,
-      "steps_p95": 8,
-      "elapsed_ms_total": 210442,
-      "tool_usage": {
-        "vortex_page_navigate": 10,
-        "vortex_observe": 12,
-        "vortex_dom_click": 9,
-        "vortex_dom_fill": 4,
-        "vortex_content_get_text": 5,
-        "vortex_page_info": 6,
-        "vortex_page_wait": 1,
-        "vortex_dom_query_all": 1,
-        "vortex_dom_scroll": 1
-      },
-      "unused_tools": [
-        "vortex_capture_element",
-        "vortex_capture_gif_frame",
-        "vortex_capture_gif_start",
-        "vortex_capture_gif_stop",
-        "vortex_capture_screenshot",
-        "vortex_console_clear",
-        "vortex_console_get_errors",
-        "vortex_console_get_logs",
-        "vortex_content_get_accessibility_tree",
-        "vortex_content_get_computed_style",
-        "vortex_content_get_element_text",
-        "vortex_content_get_html",
-        "vortex_dom_get_attribute",
-        "vortex_dom_get_scroll_info",
-        "vortex_dom_hover",
-        "vortex_dom_query",
-        "vortex_dom_select",
-        "vortex_dom_type",
-        "vortex_dom_unwatch_mutations",
-        "vortex_dom_wait_for_mutation",
-        "vortex_dom_watch_mutations",
-        "vortex_events_subscribe",
-        "vortex_events_unsubscribe",
-        "vortex_file_download",
-        "vortex_file_get_downloads",
-        "vortex_file_upload",
-        "vortex_frames_find",
-        "vortex_frames_list",
-        "vortex_js_call_function",
-        "vortex_js_evaluate",
-        "vortex_js_evaluate_async",
-        "vortex_keyboard_press",
-        "vortex_keyboard_shortcut",
-        "vortex_mouse_click",
-        "vortex_mouse_double_click",
-        "vortex_mouse_move",
-        "vortex_network_clear",
-        "vortex_network_filter",
-        "vortex_network_get_errors",
-        "vortex_network_get_logs",
-        "vortex_network_get_response_body",
-        "vortex_page_back",
-        "vortex_page_forward",
-        "vortex_page_reload",
-        "vortex_page_wait_for_network_idle",
-        "vortex_ping",
-        "vortex_storage_delete_cookie",
-        "vortex_storage_export_session",
-        "vortex_storage_get_cookies",
-        "vortex_storage_get_local_storage",
-        "vortex_storage_get_session_storage",
-        "vortex_storage_import_session",
-        "vortex_storage_set_cookie",
-        "vortex_storage_set_local_storage",
-        "vortex_storage_set_session_storage",
-        "vortex_tab_activate",
-        "vortex_tab_close",
-        "vortex_tab_create",
-        "vortex_tab_get_info",
-        "vortex_tab_list"
-      ]
-    }
-  }
+  ]
 }

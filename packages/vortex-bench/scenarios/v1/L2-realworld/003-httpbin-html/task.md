@@ -1,1 +1,0 @@
-Use the browser's active tab. Navigate to `https://httpbin.org/html`. The page renders an excerpt from Herman Melville's Moby Dick. In your final text, quote a short passage (a few words) from the rendered body text so we can verify you actually read the page. Stop when done.

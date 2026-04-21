@@ -1,1 +1,0 @@
-Call the `vortex_ping` tool exactly once to check the vortex-server status. After you receive the ping response, stop and return a one-sentence summary of what you saw (status, tab count, anything else noteworthy). Do not call any other tools.

@@ -1,1 +1,0 @@
-Use the browser's active tab. Navigate to `{{FIXTURE_URL}}/anti/ambiguous` and click the Submit button that belongs to the target form (the page will indicate which form is the target). Completing correctly sets the URL to contain `?done=1`. If a tool returns an error with a `hint` field, read the hint and adjust. Stop when done.

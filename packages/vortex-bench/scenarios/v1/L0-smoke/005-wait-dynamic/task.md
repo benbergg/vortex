@@ -1,1 +1,0 @@
-Use the browser's active tab. Navigate to `{{FIXTURE_URL}}/smoke/wait-dynamic`. The page will take a moment to show a "LOADED" element. Wait for it to appear, then stop. In your final response, confirm the LOADED element was visible.

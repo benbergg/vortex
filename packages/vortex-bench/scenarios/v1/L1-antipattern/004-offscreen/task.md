@@ -1,1 +1,0 @@
-Use the browser's active tab. Navigate to `{{FIXTURE_URL}}/anti/offscreen`, then click the Submit button so the URL contains `?done=1`. If a tool returns an error with a `hint` field, follow the hint. Stop when done.

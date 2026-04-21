@@ -1,194 +1,134 @@
-// 两份 report 比较 + 回退阈值判定。
-// 默认阈值（可 env 覆盖）：
-//   VB_Index ↓ > 3       → warning
-//   任一层 ↓ > 5         → critical
-//   任一 ROI ↓ > 10      → critical
-//   总 cost (tokens) ↑ > 30% → warning（cost 无法直接算美元，用 tokens 代理）
+// baseline.json vs latest 的差异判定。
+// 阈值策略：critical 阻 CI，warning 提醒，其他 ok。
 
-import type { Report } from "./reporter.js";
+import type { BenchReport, CaseDiff, CaseMetrics, MetricDiff, Severity } from "../types.js";
 
-export interface DiffRegression {
-  severity: "critical" | "warning";
-  message: string;
-}
+export function diffReports(baseline: BenchReport, latest: BenchReport): CaseDiff[] {
+  const baseMap = new Map(baseline.cases.map((c) => [c.case, c]));
+  const latestMap = new Map(latest.cases.map((c) => [c.case, c]));
+  const allNames = new Set([...baseMap.keys(), ...latestMap.keys()]);
 
-export interface DiffResult {
-  vb_index_delta: number;
-  layer_deltas: Record<string, number>;
-  roi_deltas: {
-    observe: number;
-    errorHint: number | null;
-    eventBus: number | null;
-  };
-  tokens_delta_pct: number;
-  regressions: DiffRegression[];
-}
-
-const DEFAULT_THRESHOLDS = {
-  vbIndex: 3,
-  layer: 5,
-  roi: 10,
-  tokensPct: 30,
-};
-
-export function diffReports(
-  baseline: Report,
-  latest: Report,
-  thresholds = DEFAULT_THRESHOLDS,
-): DiffResult {
-  const vbDelta = latest.aggregate.vb_index - baseline.aggregate.vb_index;
-
-  const layerDeltas: Record<string, number> = {};
-  const allLayers = new Set([
-    ...Object.keys(baseline.aggregate.layers),
-    ...Object.keys(latest.aggregate.layers),
-  ]);
-  for (const l of allLayers) {
-    const b = baseline.aggregate.layers[l];
-    const a = latest.aggregate.layers[l];
-    if (!b || !a || b.count === 0 || a.count === 0) continue;
-    layerDeltas[l] = a.score - b.score;
-  }
-
-  const roiDeltas = {
-    observe: latest.aggregate.roi.observe - baseline.aggregate.roi.observe,
-    errorHint: deltaNullable(
-      baseline.aggregate.roi.errorHint,
-      latest.aggregate.roi.errorHint,
-    ),
-    eventBus: deltaNullable(
-      baseline.aggregate.roi.eventBus,
-      latest.aggregate.roi.eventBus,
-    ),
-  };
-
-  const bTokens = baseline.aggregate.usage.tokens_total;
-  const lTokens = latest.aggregate.usage.tokens_total;
-  const tokensPct = bTokens === 0 ? 0 : ((lTokens - bTokens) / bTokens) * 100;
-
-  // 判定
-  const regressions: DiffRegression[] = [];
-  if (vbDelta < -thresholds.vbIndex) {
-    regressions.push({
-      severity: "warning",
-      message: `VB_Index ↓ ${Math.abs(vbDelta).toFixed(1)} (threshold ${thresholds.vbIndex})`,
-    });
-  }
-  for (const [l, d] of Object.entries(layerDeltas)) {
-    if (d < -thresholds.layer) {
-      regressions.push({
-        severity: "critical",
-        message: `Layer ${l} score ↓ ${Math.abs(d).toFixed(1)} (threshold ${thresholds.layer})`,
-      });
+  const out: CaseDiff[] = [];
+  for (const name of [...allNames].sort()) {
+    const before = baseMap.get(name);
+    const after = latestMap.get(name);
+    if (!before && after) {
+      out.push({ case: name, status: "added", changes: [] });
+    } else if (before && !after) {
+      out.push({ case: name, status: "removed", changes: [] });
+    } else if (before && after) {
+      const changes = compareCases(before, after);
+      const status = classify(changes);
+      out.push({ case: name, status, changes });
     }
   }
-  if (roiDeltas.observe < -thresholds.roi) {
-    regressions.push({
-      severity: "critical",
-      message: `ROI A observe ↓ ${Math.abs(roiDeltas.observe).toFixed(1)}%`,
-    });
-  }
-  if (roiDeltas.errorHint !== null && roiDeltas.errorHint < -thresholds.roi) {
-    regressions.push({
-      severity: "critical",
-      message: `ROI B error-hint ↓ ${Math.abs(roiDeltas.errorHint).toFixed(1)}%`,
-    });
-  }
-  if (roiDeltas.eventBus !== null && roiDeltas.eventBus < -thresholds.roi) {
-    regressions.push({
-      severity: "critical",
-      message: `ROI C event-bus ↓ ${Math.abs(roiDeltas.eventBus).toFixed(1)}%`,
-    });
-  }
-  if (tokensPct > thresholds.tokensPct) {
-    regressions.push({
-      severity: "warning",
-      message: `Tokens ↑ ${tokensPct.toFixed(1)}% (threshold ${thresholds.tokensPct}%)`,
-    });
-  }
+  return out;
+}
 
-  // v2 variance regression 检查：latest scenario 有 variance 字段时，对比 baseline tokens
-  for (const latestScenario of latest.scenarios) {
-    const baselineScenario = baseline.scenarios.find((b) => b.id === latestScenario.id);
-    if (!baselineScenario) continue;
-    const latestV = (latestScenario as any).variance as
-      | { tokens: { min: number; p50: number; max: number } }
-      | undefined;
-    const baselineTokens =
-      baselineScenario.agent.inputTokens + baselineScenario.agent.outputTokens;
-    if (latestV?.tokens?.max !== undefined && baselineTokens > 0) {
-      const threshold = baselineTokens * 1.5;
-      if (latestV.tokens.max > threshold) {
-        regressions.push({
-          severity: "warning",
-          message: `[variance] ${latestScenario.id} tokens.max ${latestV.tokens.max} exceeds baseline ${baselineTokens} × 1.5 (${threshold})`,
-        });
-      }
-    }
-  }
+function compareCases(before: CaseMetrics, after: CaseMetrics): MetricDiff[] {
+  const diffs: MetricDiff[] = [];
+  diffs.push(boolDiff("passed", before.passed, after.passed));
+  diffs.push(numDiff("callCount", before.callCount, after.callCount, thresholdsCallCount));
+  diffs.push(numDiff("fallbackToEvaluate", before.fallbackToEvaluate, after.fallbackToEvaluate, thresholdsFallback));
+  diffs.push(numDiff("observeMissedPopperItems", before.observeMissedPopperItems, after.observeMissedPopperItems, thresholdsObserveMiss));
+  diffs.push(numDiff("durationMs", before.durationMs, after.durationMs, thresholdsDuration(before.durationMs)));
+  return diffs;
+}
 
-  return {
-    vb_index_delta: vbDelta,
-    layer_deltas: layerDeltas,
-    roi_deltas: roiDeltas,
-    tokens_delta_pct: tokensPct,
-    regressions,
+function boolDiff(metric: keyof CaseMetrics, before: boolean, after: boolean): MetricDiff {
+  const severity: Severity = before === true && after === false ? "critical" : "ok";
+  return { metric, before, after, delta: before === after ? 0 : 1, severity };
+}
+
+function numDiff(
+  metric: keyof CaseMetrics,
+  before: number,
+  after: number,
+  th: (delta: number) => Severity,
+): MetricDiff {
+  const delta = after - before;
+  return { metric, before, after, delta, severity: th(delta) };
+}
+
+function thresholdsCallCount(delta: number): Severity {
+  if (delta <= 0) return "ok";
+  if (delta <= 2) return "warning";
+  return "critical";
+}
+
+function thresholdsFallback(delta: number): Severity {
+  // fallback 不应增加：只要 +1 就是 critical（说明 vortex 能力退化）
+  if (delta <= 0) return "ok";
+  return "critical";
+}
+
+function thresholdsObserveMiss(delta: number): Severity {
+  if (delta <= 0) return "ok";
+  return "critical";
+}
+
+function thresholdsDuration(baseMs: number) {
+  // duration 受 Chrome 状态 / playground Vite 编译缓存 / extension 冷启动影响，波动大。
+  // 只记录变化但不单独触发 regressed —— 真退化信号看 passed/fallback/missedPopper。
+  return (delta: number): Severity => {
+    if (delta <= 0) return "ok";
+    const pct = baseMs > 0 ? delta / baseMs : 0;
+    // 只有翻倍以上涨幅才给 warning；不给 critical（避免 runtime 噪音炸 CI）
+    return pct > 1.0 ? "warning" : "ok";
   };
 }
 
-export function renderDiffMarkdown(
-  baseline: Report,
-  latest: Report,
-  d: DiffResult,
-): string {
-  const lines: string[] = [];
-  const arrow = (x: number) => (x > 0 ? "↑" : x < 0 ? "↓" : "·");
-  lines.push(
-    `# Bench diff`,
-    ``,
-    `Baseline: \`${baseline.generated_at}\`  ·  Latest: \`${latest.generated_at}\``,
-    ``,
-    `- **VB_Index**: ${baseline.aggregate.vb_index.toFixed(1)} → ${latest.aggregate.vb_index.toFixed(1)} (${arrow(d.vb_index_delta)} ${Math.abs(d.vb_index_delta).toFixed(1)})`,
+function classify(changes: MetricDiff[]): CaseDiff["status"] {
+  // 忽略 duration 的严重度，只看能力退化（pass/fallback/missedPopper）
+  const nonDuration = changes.filter((c) => c.metric !== "durationMs");
+  const hasCritical = nonDuration.some((c) => c.severity === "critical");
+  const hasWarning = nonDuration.some((c) => c.severity === "warning");
+  const passedNowOk = changes.some(
+    (c) => c.metric === "passed" && c.before === false && c.after === true,
   );
-  lines.push(``, `## Layers`, ``);
-  lines.push(`| Layer | Baseline | Latest | Δ |`);
-  lines.push(`|-------|---------:|-------:|--:|`);
-  for (const [l, delta] of Object.entries(d.layer_deltas)) {
-    const b = baseline.aggregate.layers[l]?.score ?? 0;
-    const a = latest.aggregate.layers[l]?.score ?? 0;
+  const metricImproved = changes.some(
+    (c) =>
+      typeof c.delta === "number" &&
+      c.delta < 0 &&
+      (c.metric === "fallbackToEvaluate" || c.metric === "observeMissedPopperItems"),
+  );
+  // 优先级：真退化 (critical) > 实质改进 (passed / fallback / missed) > 小退化 (warning)
+  if (hasCritical) return "regressed";
+  if (passedNowOk || metricImproved) return "improved";
+  if (hasWarning) return "regressed";
+  return "unchanged";
+}
+
+export function renderDiffTable(diffs: CaseDiff[]): string {
+  const lines: string[] = [];
+  lines.push("| case | status | callCount | fallback | missedPopper | duration |");
+  lines.push("|------|--------|-----------|----------|--------------|----------|");
+  for (const d of diffs) {
+    if (d.status === "added") {
+      lines.push(`| ${d.case} | ➕ added | — | — | — | — |`);
+      continue;
+    }
+    if (d.status === "removed") {
+      lines.push(`| ${d.case} | ➖ removed | — | — | — | — |`);
+      continue;
+    }
+    const fmt = (m: keyof CaseMetrics) => {
+      const ch = d.changes.find((c) => c.metric === m);
+      if (!ch) return "—";
+      if (ch.delta === 0) return `${ch.after}`;
+      const mark = ch.severity === "critical" ? "⛔" : ch.severity === "warning" ? "⚠️" : "✅";
+      const sign = typeof ch.delta === "number" && ch.delta > 0 ? "+" : "";
+      return `${ch.before} → ${ch.after} ${mark}${sign}${ch.delta}`;
+    };
+    const statusIcon =
+      d.status === "regressed" ? "🔴 regressed" : d.status === "improved" ? "🟢 improved" : "= unchanged";
     lines.push(
-      `| ${l} | ${b.toFixed(1)} | ${a.toFixed(1)} | ${arrow(delta)} ${Math.abs(delta).toFixed(1)} |`,
+      `| ${d.case} | ${statusIcon} | ${fmt("callCount")} | ${fmt("fallbackToEvaluate")} | ${fmt("observeMissedPopperItems")} | ${fmt("durationMs")} |`,
     );
   }
-  lines.push(``, `## ROI Δ`, ``);
-  lines.push(`- A observe: ${arrow(d.roi_deltas.observe)} ${Math.abs(d.roi_deltas.observe).toFixed(1)}%`);
-  lines.push(
-    `- B error-hint: ${d.roi_deltas.errorHint === null ? "N/A" : `${arrow(d.roi_deltas.errorHint)} ${Math.abs(d.roi_deltas.errorHint).toFixed(1)}%`}`,
-  );
-  lines.push(
-    `- C event-bus: ${d.roi_deltas.eventBus === null ? "N/A" : `${arrow(d.roi_deltas.eventBus)} ${Math.abs(d.roi_deltas.eventBus).toFixed(1)}%`}`,
-  );
-  lines.push(``);
-  lines.push(`**Tokens**: ${arrow(d.tokens_delta_pct)} ${Math.abs(d.tokens_delta_pct).toFixed(1)}%`);
-  lines.push(``);
-
-  if (d.regressions.length === 0) {
-    lines.push(`✅ No regressions detected.`);
-  } else {
-    lines.push(`## ⚠️ Regressions`, ``);
-    for (const r of d.regressions) {
-      const tag = r.severity === "critical" ? "🔴 critical" : "🟡 warning";
-      lines.push(`- ${tag}: ${r.message}`);
-    }
-  }
-
   return lines.join("\n");
 }
 
-function deltaNullable(
-  base: number | null,
-  latest: number | null,
-): number | null {
-  if (base === null || latest === null) return null;
-  return latest - base;
+export function hasCritical(diffs: CaseDiff[]): boolean {
+  return diffs.some((d) => d.changes.some((c) => c.severity === "critical"));
 }

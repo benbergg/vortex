@@ -1,1 +1,0 @@
-Use the browser's active tab. Navigate to `{{FIXTURE_URL}}/anti/disabled`. Submit the form so that the URL ends up containing `?done=1`. If a tool returns an error with a `hint` field, read the hint carefully to figure out what's needed. Stop when done.

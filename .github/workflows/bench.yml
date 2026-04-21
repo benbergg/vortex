@@ -1,38 +1,24 @@
 name: vortex-bench
 
-# 说明：vortex-bench 依赖 "真实 Chrome + vortex 扩展已加载激活 + vortex-server ws 6800"。
-# GitHub Actions 的 ubuntu-latest 默认没有这套环境。要让 CI 自动跑需额外工作：
-#   - 用 Xvfb + chromium + 持久化 profile 加载 unpacked 扩展
-#   - headless 模式下让 ws server 能被扩展 service worker 连上
-#   - 处理 service worker 在空闲时休眠
-# 这些不在 v1 范围内，所以本 workflow 使用 workflow_dispatch 手动触发，
-# 待后续补 headless runner 后再改 `on: pull_request`。
-#
-# 本地跑：
-#   packages/vortex-bench/scripts/bench-ci.sh
-# 见 packages/vortex-bench/README.md 的 "CI 与回归防护" 章节。
+# v0.6 起 bench 改为 mechanical playground（Vite + Element Plus + MCP 断言脚本）。
+# 仍然依赖 "真实 Chrome + vortex extension 已激活 + vortex-server ws 6800"，
+# GitHub Actions 默认 runner 无法直接跑。本 workflow 是占位，提醒本地运行。
 
 on:
   workflow_dispatch:
-    inputs:
-      scenario_root:
-        description: "Scenario root to run"
-        required: true
-        default: "packages/vortex-bench/scenarios/v1"
-        type: string
 
 jobs:
   bench-placeholder:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Remind about manual setup
+      - name: Remind about local run
         run: |
           cat <<'EOT'
-          ⚠️  vortex-bench v1 在 CI 里需要真实 Chrome + extension + vortex-server。
-          标准 ubuntu runner 无法直接跑。
-          请在开发机本地运行：
-            packages/vortex-bench/scripts/bench-ci.sh
-          或 fork 加 headless runner（未来工作）。
+          ⚠️  vortex-bench v0.6 需要真实 Chrome + extension + vortex-server。
+          本地运行：
+            pnpm -F @bytenew/vortex-bench playground    # 独立终端
+            pnpm -F @bytenew/vortex-bench bench run --all
+          见 packages/vortex-bench/README.md。
           EOT
-          exit 78  # neutral: neither success nor failure
+          exit 78  # neutral

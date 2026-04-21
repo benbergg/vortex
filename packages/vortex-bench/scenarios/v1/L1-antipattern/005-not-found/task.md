@@ -1,1 +1,0 @@
-Use the browser's active tab. Navigate to `{{FIXTURE_URL}}/anti/not-found`. Click the button that submits the order so the URL contains `?done=1`. If a tool returns an error with a `hint` field, read the hint to figure out the real button identity. Stop when done.

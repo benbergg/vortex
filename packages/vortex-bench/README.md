@@ -1,121 +1,107 @@
 # @bytenew/vortex-bench
 
-vortex 工具链评测集 v1。私有包，不发 npm。
+vortex 工具链的 **mechanical bench** —— 通过 Element Plus playground + TypeScript 断言脚本，零 LLM 成本地回归测试 vortex MCP 工具。
 
-## 定位
+## 为什么推倒旧 bench 重建
 
-用 LLM agent 跑一组标准化场景，输出 VB_Index（0~100）+ 四维指标 + A/B/C 三件 ROI 独立分，作为：
+v0.5.0 之前是 LLM-driven agent bench（ReAct loop + MiniMax/Claude），单场景 L2 $3、L3 $8，且 express 静态 fixture 跟真实 SPA 踩坑（Element Plus teleport popper / fill kind=select）完全错位。v0.6.0 换成：
 
-- 回归防护（协议/handler 改动是否带来指标回退）
-- 设计 ROI 数字物证（`vortex_observe` / 错误 hint / 事件总线到底有没有让 agent 更好用）
-- 工具使用画像（哪些 MCP 工具高频 / 从没被调用过）
+- **Playground**：Vite + Vue3 + Element Plus，真 SPA，真组件库
+- **Case**：TypeScript 脚本直接 call MCP 工具 + 断言，不走 LLM
+- **指标**：`callCount` / `fallbackToEvaluate` / `observeMissedPopperItems` / `durationMs`
+- **基线**：`baseline.json`，diff 超阈值退 non-zero
 
-## 场景分层
-
-| 层 | 类型 | 数量 | 频率 | 单次成本 |
-|----|------|------|------|----------|
-| L0 | repo 内 fixture 静态站 | 5 | 每 PR | ~$0.2 |
-| L1 | fixture 故意撞错验证 hint 自愈 | 5 | 每 PR | ~$0.3 |
-| L2 | 公开真实站点 | 5 | 夜间 | ~$3 |
-| L3 | 登录后 / 多 tab | 5 | 手动/月度 | ~$8 |
-
-L0/L1 全部程序化 judge（零 LLM 判定费）。L2 程序为主 + LLM 兜底。L3 LLM judge 为主。
-
-## 运行
-
-前置：将 `MINIMAX_API_KEY` 放到 shell env（如 `~/.zshrc`）。
-
-```bash
-pnpm -F @bytenew/vortex-bench build
-
-# 跑单场景
-pnpm -F @bytenew/vortex-bench bench run scenarios/v1/L0-smoke/001-basic-click
-
-# 跑某层全部
-pnpm -F @bytenew/vortex-bench bench run --layer L0
-
-# CI 通用（PR 跑）
-pnpm -F @bytenew/vortex-bench bench run --layer L0 --layer L1
-
-# 打分 + diff
-pnpm -F @bytenew/vortex-bench bench score reports/latest.json
-pnpm -F @bytenew/vortex-bench bench diff reports/baseline.json reports/latest.json
-```
-
-## 配置
-
-见 `.env.example`。最常调：
-
-- `BENCH_MODEL`：默认 `MiniMax-M2.7`，可切 `MiniMax-M2.7-highspeed` / Claude Sonnet（需同时改 `BENCH_BASE_URL`）
-- `BENCH_MAX_STEPS` / `BENCH_MAX_COST_USD`：单场景硬停阈值
+v0.5.x 的 VB_Index 打分体系归档在 git 历史里（tag `v0.5.0`），不再维护。
 
 ## 目录
 
 ```
 packages/vortex-bench/
-├── scenarios/v1/             # 数据集锁定 v1
-│   ├── L0-smoke/
-│   ├── L1-antipattern/
-│   ├── L2-realworld/
-│   └── L3-session/
-├── fixtures/                 # L0/L1 的 express 静态站点
+├── playground/              # Vite dev server，跑在 localhost:5173
+│   ├── src/pages/           # 每个 widget 一个 .vue
+│   └── vite.config.ts
+├── cases/                   # 每个 case 一个 .case.ts（tsx 直接跑）
 ├── src/
-│   ├── index.ts              # CLI 入口
+│   ├── index.ts             # CLI 入口
 │   └── runner/
-│       ├── agent.ts          # ReAct loop
-│       ├── mcp-client.ts     # @modelcontextprotocol/sdk stdio
-│       ├── metrics.ts        # 四维指标 + ROI 收集
-│       ├── scoring.ts        # VB_Index 公式（纯函数）
-│       ├── judge.ts          # 程序化断言 API
-│       ├── judge-llm.ts      # LLM judge 兜底
-│       ├── reporter.ts       # JSON + MD 报告
-│       └── diff.ts           # 回退阈值判定
-└── reports/                  # baseline.json 入 git，其他 gitignored
+│       ├── mcp-client.ts    # MCP stdio（保留自旧 bench）
+│       ├── trace.ts         # 工具调用记录（保留自旧 bench）
+│       ├── run-case.ts      # 跑一个 case 收集指标
+│       └── diff.ts          # baseline 对比
+├── reports/baseline.json    # 基准指标
+└── package.json
 ```
 
-## 打分
+## 前置
 
-四维指标（0~1）按权重合成 Layer_Score：
+- 真实 Chrome + vortex extension 已加载激活
+- vortex-server 已起在 ws 6800
 
-```
-Layer_Score = 60·Correctness + 15·Efficiency + 15·Robustness + 10·Utilization
-```
+## 使用
 
-总指数：
+```bash
+# 1. 起 playground（独立终端长跑）
+pnpm -F @bytenew/vortex-bench playground        # localhost:5173
 
-```
-VB_Index = 0.25·L0 + 0.25·L1 + 0.30·L2 + 0.20·L3
-```
-
-详见设计文档 §5.5。
-
-## LLM judge 兜底
-
-L0/L1 用纯声明式程序断言，零 LLM 费用。L2/L3 的文本类任务（如"提取商品名"）可以在 `expected.json` 加 `llmRubric` 字段：
-
-```json
-{
-  "layer": "L2",
-  "assertions": [{ "type": "agent_success" }],
-  "llmRubric": "The agent's final text must contain the product name and price, and explicitly state that the item is in stock."
-}
+# 2. 跑 case（另一终端）
+pnpm -F @bytenew/vortex-bench bench run el-dropdown
+pnpm -F @bytenew/vortex-bench bench run --all
+pnpm -F @bytenew/vortex-bench bench diff        # 和 baseline.json 比
+pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 baseline
 ```
 
-运行时会额外调 provider LLM 判定，`llm_judge` 作为一个 check 加到报告里，最终 pass 为 **程序 judge AND LLM judge**。
+## 覆盖矩阵（v0.6.0 baseline：11 case / 6 pass / 5 fail）
 
-## CI 与回归防护
+| case | widget | 状态 | 信号 |
+|------|--------|------|------|
+| el-dropdown | teleport menu | ✓ | observe 抓 popper（偶尔 flaky，见 P4）|
+| el-select-single | 单选 | ✓ | fill kind=select 直接写入 ✓ |
+| el-select-multiple | 多选 tag | ✓ | fill kind=select value=[...] ✓ |
+| el-cascader | 级联 3 级 | ✗ | fallback 点 trigger 面板打不开 |
+| el-date-picker-daterange | 日期段 | ✗ | driver 翻月完成但 v-model 不更新（isTrusted=false 被拒）|
+| el-date-picker-datetimerange | 日期时间段 | ✗ | 同上 |
+| el-form-composite | 组合表单 | ✗ | name/level ✓，checkbox-group 未实现 |
+| el-tree | 树形节点 | ✗ | missed=2 点 label 未展开子节点 |
+| el-table | 多选 + 展开行 + 行内按钮 | ✓ | `:nth-child + .el-button` 链式定位一次过 |
+| el-dialog-nested | dialog 内套 select | ✓ | dialog + 嵌套 select 完整走通 |
+| el-upload | 文件上传 | ✓ | `vortex_file_upload` 驱动健全 |
 
-vortex-bench 依赖 **真实 Chrome + vortex 扩展 + vortex-server ws**，GitHub Actions 标准 runner 目前跑不起来（需要 Xvfb/持久化浏览器 profile/service worker 唤起策略）。v1 策略：
+## v0.6.0 → (latest) 修复记录
 
-- **本地 pre-push**：跑 `packages/vortex-bench/scripts/bench-ci.sh`
-  - 自动 build → 跑 L0+L1 → 对比 `reports/baseline.json` → 按阈值退出（0 OK / 2 critical）
-- **GitHub Actions**：`.github/workflows/bench.yml` 为 `workflow_dispatch` 占位，提醒手动走本地脚本。未来补 headless runner 后改为 PR 自动触发。
+**本轮 vortex 修复（3 case 从 ✗ 变 ✓ + 1 case fallback 降 0）**
 
-### 回退阈值
+| commit 目标 | 改动 | 影响 case |
+|------------|------|-----------|
+| 注册 `element-plus-select` driver | `COMMIT_DRIVERS` 加 spec + page-side 实现（open trigger → match label → click → close for multi）| select-single fb 2→0、select-multiple ✗→✓、dialog-nested ✗→✓ |
+| `readHeaderYM` 兼容英文月名 | 加英文全月名字典 + 中文"年月"并存 | datetimerange/daterange driver 翻月正确 |
+| `closestSelector` 放宽：自身/祖先 / 子孙 | `target.closest(sel) ?? target.querySelector(sel)` | select driver 支持外层 `[data-testid]` 作 target |
+| 错误消息动态生成 | `Known: ${COMMIT_DRIVERS.map(d => d.kind).join(", ")}` 替换硬编码 | 消除"声称支持却拒绝"自相矛盾 |
+| diff classifier 改 priority | 真改进（passed/fallback/missed 降）优先于 warning；duration 波动不判 regressed | 让 improve 能被看见 |
 
-| 条件 | 级别 |
-|------|------|
-| `VB_Index ↓ > 3` | warning |
-| 任一层 score ↓ > 5 | **critical**（阻合并）|
-| 任一 ROI ↓ > 10 | **critical** |
-| tokens ↑ > 30% | warning |
+## 下一批 vortex 待优化点
+
+| 优先级 | 问题 | 信号 |
+|--------|------|------|
+| 🔴 P0 | **driver 用 `dispatchEvent(MouseEvent)` 触发的 click 是 `isTrusted=false`**，Element Plus 的 date picker 翻月后不会同步 v-model（UI 层有动作，Vue 状态不更新）；需走 CDP `Input.dispatchMouseEvent` 走真鼠标路径 | daterange/datetimerange 卡 "(未设置)"，单跑 daterange 偶尔 pass（flaky）|
+| 🟠 P1 | `kind=cascader` 未注册 + cascader trigger 对 JS `.click()` 不响应 | el-cascader 完全 fail |
+| 🟠 P1 | `kind=checkbox-group` spec 需要 `.el-checkbox-group` 作 root，但 form 里是 `[data-testid="form-tags"] > .el-checkbox-group`。closestSelector 已改宽松，但 driver 接受 `{values:[]}` 格式，case 传 `value=[...]` 失败 | form-composite 里 checkbox 空 |
+| 🟠 P1 | `vortex_fill` plain 模式对 Vue `<el-input>` 不 dispatch 'input' 事件 → v-model 不响应（当前 workaround 用 `vortex_type` 逐字符输入）| form-composite 的 name |
+| 🟡 P2 | el-tree 点 label 后 `expand-on-click-node` 没生效，或 observe 刷新跟不上，子节点看不到 | el-tree missed=2 |
+| 🟡 P2 | observe 对主 frame 的 teleport popper 偶尔捕捉不到（flaky）| el-dropdown fb/missed 跳动 |
+
+> **最高 ROI**：P0 用 CDP 真鼠标重写 driver 的 click。一次改动能同时救活 daterange / datetimerange / 以及未来所有基于动画/picker 的 Element Plus 组件。
+
+> 性能问题（每 case 30s）已在 v0.6.0 通过"navigate 前先 about:blank"解决，基线下每 case ~5-10s。
+
+## 使用流程
+
+```bash
+# 开发流：改 vortex → 跑 bench → 看 diff
+pnpm -F @bytenew/vortex-bench playground   # 独立终端
+pnpm bench run --all                       # 跑全部 case → latest.json
+pnpm bench diff                            # 和 baseline.json 比
+
+# 修 vortex 验证改进：
+# 若 diff 出现 improved，说明修复生效，再：
+pnpm bench baseline                        # 把 latest 当新 baseline
+```
