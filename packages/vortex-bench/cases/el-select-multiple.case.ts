@@ -29,7 +29,7 @@ const def: CaseDefinition = {
         code: `(() => {
           const w = document.querySelector('[data-testid="target-select-multiple"]');
           const t = w?.querySelector('.el-select__wrapper') || w?.querySelector('input');
-          if (t) { (t as HTMLElement).click(); return 'ok'; }
+          if (t) { (t).click(); return 'ok'; }
           return 'no-trigger';
         })()`,
       });

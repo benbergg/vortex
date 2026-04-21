@@ -42,7 +42,7 @@ const def: CaseDefinition = {
         code: `(() => {
           const w = document.querySelector('[data-testid="inside-select"]');
           const t = w?.querySelector('.el-select__wrapper') || w?.querySelector('input');
-          (t as HTMLElement | null)?.click();
+          (t)?.click();
           return 'ok';
         })()`,
       });

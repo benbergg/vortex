@@ -30,7 +30,7 @@ const def: CaseDefinition = {
         code: `(() => {
           const w = document.querySelector('[data-testid="target-cascader"]');
           const t = w?.querySelector('.el-cascader__search-input, input');
-          if (t) { (t as HTMLElement).click(); return 'ok'; }
+          if (t) { (t).click(); return 'ok'; }
           return 'no-trigger';
         })()`,
       });

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-21T12:42:49.101Z",
+  "generatedAt": "2026-04-21T12:55:41.128Z",
   "playgroundUrl": "http://localhost:5173",
   "cases": [
     {
@@ -8,7 +8,7 @@
       "callCount": 5,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 3348
+      "durationMs": 2108
     },
     {
       "case": "el-date-picker-daterange",
@@ -16,7 +16,7 @@
       "callCount": 7,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 31530,
+      "durationMs": 31454,
       "failureReason": "result 区应包含 \"start=2024-01-01\"，实际: \"(未设置)\""
     },
     {
@@ -25,7 +25,7 @@
       "callCount": 7,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 31655,
+      "durationMs": 31580,
       "failureReason": "result 区应包含 \"start=2024-01-01 00:00:00\"，实际: \"(未设置)\""
     },
     {
@@ -34,7 +34,7 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1708
+      "durationMs": 1621
     },
     {
       "case": "el-dropdown",
@@ -42,16 +42,16 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1581
+      "durationMs": 1495
     },
     {
       "case": "el-form-composite",
       "passed": false,
-      "callCount": 18,
+      "callCount": 17,
       "fallbackToEvaluate": 4,
       "observeMissedPopperItems": 0,
-      "durationMs": 2404,
-      "failureReason": "result 区应包含 \"alpha\"，实际: \"提交：{\\\"name\\\":\\\"test-name\\\",\\\"level\\\":\\\"high\\\",\\\"enabled\\\":false,\\\"tags\\\":[]}\""
+      "durationMs": 2079,
+      "failureReason": "result 区应包含 \"high\"，实际: \"提交：{\\\"name\\\":\\\"test-name\\\",\\\"level\\\":\\\"\\\",\\\"enabled\\\":true,\\\"tags\\\":[\\\"alpha\\\",\\\"beta\\\"]}\""
     },
     {
       "case": "el-select-multiple",
@@ -59,7 +59,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1018
+      "durationMs": 1166
     },
     {
       "case": "el-select-single",
@@ -67,7 +67,7 @@
       "callCount": 5,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1003
+      "durationMs": 944
     },
     {
       "case": "el-table",
@@ -75,16 +75,15 @@
       "callCount": 8,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1244
+      "durationMs": 1255
     },
     {
       "case": "el-tree",
-      "passed": false,
-      "callCount": 15,
+      "passed": true,
+      "callCount": 13,
       "fallbackToEvaluate": 2,
       "observeMissedPopperItems": 2,
-      "durationMs": 2844,
-      "failureReason": "result 区应包含 \"浦东\"，实际: \"选中节点：华东\""
+      "durationMs": 2620
     },
     {
       "case": "el-upload",
@@ -92,7 +91,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1091
+      "durationMs": 1205
     }
   ]
 }

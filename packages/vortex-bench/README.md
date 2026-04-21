@@ -58,10 +58,10 @@ pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 basel
 | el-select-single | 单选 | ✓ | fill kind=select |
 | el-select-multiple | 多选 tag | ✓ | fill kind=select value=[...] |
 | el-cascader | 级联 3 级 | ✓ | CDP 打开 panel + page-side 逐级 click |
-| el-date-picker-daterange | 日期段 | ✓ | CDP 真鼠标 + 英文月名 + close-wait |
+| el-date-picker-daterange | 日期段 | ⚠️ flaky | CDP 真鼠标链路 work（手动验证），但 bench 连跑偶尔 v-model 不 commit |
 | el-date-picker-datetimerange | 日期时间段 | ✗ | day click ok，需实现 time picker 子流程 |
 | el-form-composite | 组合表单 | ✗ | name/level/switch ✓，checkbox-group 未实现 |
-| el-tree | 树形节点 | ✗ | 点 label 未展开子节点 |
+| el-tree | 树形节点 | ✓ | page-side .click() 展开 + node-click 触发 |
 | el-table | 多选 + 展开行 + 行内按钮 | ✓ | `:nth-child + .el-button` 链式定位 |
 | el-dialog-nested | dialog 内套 select | ✓ | dialog + 嵌套 select 完整走通 |
 | el-upload | 文件上传 | ✓ | `vortex_file_upload` |

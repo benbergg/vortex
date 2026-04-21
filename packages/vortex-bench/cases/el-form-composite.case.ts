@@ -34,7 +34,7 @@ const def: CaseDefinition = {
         code: `(() => {
           const w = document.querySelector('[data-testid="form-level"]');
           const t = w?.querySelector('.el-select__wrapper') || w?.querySelector('input');
-          (t as HTMLElement | null)?.click();
+          (t)?.click();
           return 'ok';
         })()`,
       });
@@ -77,7 +77,7 @@ const def: CaseDefinition = {
             if (!wrap) return 'no-wrap';
             for (const label of wrap.querySelectorAll('.el-checkbox')) {
               if (label.textContent?.includes(${JSON.stringify(v)})) {
-                (label as HTMLElement).click(); return 'ok';
+                (label).click(); return 'ok';
               }
             }
             return 'not-found';

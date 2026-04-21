@@ -25,7 +25,7 @@ async function clickTreeNode(ctx: Parameters<typeof run>[0], label: string): Pro
       code: `(() => {
         for (const el of document.querySelectorAll('.el-tree-node__label')) {
           if (el.textContent?.trim() === ${JSON.stringify(label)} && el.getBoundingClientRect().width > 0) {
-            (el as HTMLElement).click();
+            (el).click();
             return 'ok';
           }
         }
