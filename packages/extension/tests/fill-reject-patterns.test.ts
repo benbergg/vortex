@@ -9,12 +9,23 @@ describe("FILL_REJECT_PATTERNS registry", () => {
     expect(ids).toContain("ant-design-range-picker");
   });
 
-  it("all patterns have non-empty id/selector/reason/suggestedTool", () => {
+  it("all patterns have non-empty id/selector/reason/suggestedTool/fixExample", () => {
     for (const p of FILL_REJECT_PATTERNS) {
       expect(p.id).toBeTruthy();
       expect(p.closestSelector).toBeTruthy();
       expect(p.reason.length).toBeGreaterThan(10);
       expect(p.suggestedTool).toMatch(/^vortex_/);
+      expect(p.fixExample.length).toBeGreaterThan(10);
+    }
+  });
+
+  it("suggestedTool / fixExample point at v0.5 vortex_fill (not v0.4 vortex_dom_commit)", () => {
+    for (const p of FILL_REJECT_PATTERNS) {
+      expect(p.suggestedTool).not.toMatch(/vortex_dom_commit/);
+      expect(p.fixExample).not.toMatch(/vortex_dom_commit/);
+      expect(p.suggestedTool).toMatch(/vortex_fill/);
+      expect(p.fixExample).toMatch(/vortex_fill/);
+      expect(p.fixExample).toMatch(/kind:/);
     }
   });
 

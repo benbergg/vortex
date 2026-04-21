@@ -450,10 +450,13 @@ export function registerDomHandlers(
                 if (hit) {
                   return {
                     errorCode: "UNSUPPORTED_TARGET",
-                    error: `dom_fill rejected on framework-controlled target (${p.id}): ${p.reason}`,
+                    error:
+                      `dom_fill rejected on framework-controlled target (${p.id}): ${p.reason} ` +
+                      `Retry with ${p.suggestedTool}. Example: ${p.fixExample}`,
                     extras: {
                       pattern: p.id,
                       suggestedTool: p.suggestedTool,
+                      fixExample: p.fixExample,
                       selector: sel,
                     },
                   };
