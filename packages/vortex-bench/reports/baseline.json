@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-21T12:55:41.128Z",
+  "generatedAt": "2026-04-21T13:13:14.405Z",
   "playgroundUrl": "http://localhost:5173",
   "cases": [
     {
@@ -8,25 +8,23 @@
       "callCount": 5,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 2108
+      "durationMs": 1317
     },
     {
       "case": "el-date-picker-daterange",
-      "passed": false,
-      "callCount": 7,
+      "passed": true,
+      "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 31454,
-      "failureReason": "result 区应包含 \"start=2024-01-01\"，实际: \"(未设置)\""
+      "durationMs": 7452
     },
     {
       "case": "el-date-picker-datetimerange",
-      "passed": false,
-      "callCount": 7,
+      "passed": true,
+      "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 31580,
-      "failureReason": "result 区应包含 \"start=2024-01-01 00:00:00\"，实际: \"(未设置)\""
+      "durationMs": 27652
     },
     {
       "case": "el-dialog-nested",
@@ -34,7 +32,7 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1621
+      "durationMs": 1614
     },
     {
       "case": "el-dropdown",
@@ -42,16 +40,15 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1495
+      "durationMs": 1208
     },
     {
       "case": "el-form-composite",
-      "passed": false,
-      "callCount": 17,
-      "fallbackToEvaluate": 4,
+      "passed": true,
+      "callCount": 15,
+      "fallbackToEvaluate": 2,
       "observeMissedPopperItems": 0,
-      "durationMs": 2079,
-      "failureReason": "result 区应包含 \"high\"，实际: \"提交：{\\\"name\\\":\\\"test-name\\\",\\\"level\\\":\\\"\\\",\\\"enabled\\\":true,\\\"tags\\\":[\\\"alpha\\\",\\\"beta\\\"]}\""
+      "durationMs": 1143
     },
     {
       "case": "el-select-multiple",
@@ -59,7 +56,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1166
+      "durationMs": 1032
     },
     {
       "case": "el-select-single",
@@ -67,7 +64,7 @@
       "callCount": 5,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 944
+      "durationMs": 951
     },
     {
       "case": "el-table",
@@ -75,7 +72,7 @@
       "callCount": 8,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1255
+      "durationMs": 1215
     },
     {
       "case": "el-tree",
@@ -83,7 +80,7 @@
       "callCount": 13,
       "fallbackToEvaluate": 2,
       "observeMissedPopperItems": 2,
-      "durationMs": 2620
+      "durationMs": 2405
     },
     {
       "case": "el-upload",
@@ -91,7 +88,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1205
+      "durationMs": 1114
     }
   ]
 }

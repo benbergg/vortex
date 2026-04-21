@@ -16,13 +16,13 @@ const def: CaseDefinition = {
       text: "test-name",
     });
 
-    // 2. level 选 "高"（走 el-select）
+    // 2. level 选 "高"（走 el-select，driver 按 label 匹配故传中文 label）
     let levelOk = false;
     try {
       const res = await ctx.call("vortex_fill", {
         target: "[data-testid=\"form-level\"]",
         kind: "select",
-        value: "high",
+        value: "高",
       });
       const text = extractText(res);
       levelOk = !text.toLowerCase().includes("error") && !text.includes("INVALID_PARAMS");
@@ -96,7 +96,8 @@ const def: CaseDefinition = {
     await assertResultContains(ctx, "high");
     await assertResultContains(ctx, "alpha");
     await assertResultContains(ctx, "beta");
-    await assertResultContains(ctx, "\"enabled\":true");
+    // get_text 返回 JSON-escaped 文本（`"` → `\"`），匹配子串即可
+    await assertResultContains(ctx, "enabled\\\":true");
   },
 };
 

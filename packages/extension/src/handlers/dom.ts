@@ -1531,11 +1531,13 @@ async function runDateRangeDriverCDP(opts: {
     });
   }
 
-  // helper: 读取某个 panel 的 YM + arrow bbox
+  // helper: 读取某个 panel 的 YM + 月箭头 + 年箭头 bbox
   async function readPanelState(hdrIndex: 0 | 1): Promise<{
     year: number; month: number;
     arrLeft: { cx: number; cy: number } | null;
     arrRight: { cx: number; cy: number } | null;
+    dArrLeft: { cx: number; cy: number } | null;
+    dArrRight: { cx: number; cy: number } | null;
   } | { err: string }> {
     return pageQuery(
       (idx) => {
@@ -1561,17 +1563,20 @@ async function runDateRangeDriverCDP(opts: {
         if (month === null) return { err: `no month in "${raw}"` };
         const aL = p.querySelector(".arrow-left") as HTMLElement | null;
         const aR = p.querySelector(".arrow-right") as HTMLElement | null;
+        const daL = p.querySelector(".d-arrow-left") as HTMLElement | null;
+        const daR = p.querySelector(".d-arrow-right") as HTMLElement | null;
         const toC = (el: HTMLElement | null) => {
           if (!el) return null;
           const r = el.getBoundingClientRect();
           return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
         };
-        return { year, month, arrLeft: toC(aL), arrRight: toC(aR) };
+        return { year, month, arrLeft: toC(aL), arrRight: toC(aR), dArrLeft: toC(daL), dArrRight: toC(daR) };
       },
       [hdrIndex],
     );
   }
 
+  // 优先走年箭头（.d-arrow-left/right）减少跨多年时的 click 次数和 driver 耗时。
   async function navigateMonth(
     hdrIndex: 0 | 1,
     target: { year: number; month: number },
@@ -1579,11 +1584,21 @@ async function runDateRangeDriverCDP(opts: {
     for (let safety = 60; safety > 0; safety--) {
       const info = await readPanelState(hdrIndex);
       if ("err" in info) throw vtxError(VtxErrorCode.COMMIT_FAILED, `read header ${hdrIndex}: ${info.err}`);
-      const delta = (info.year - target.year) * 12 + (info.month - target.month);
-      if (delta === 0) return;
-      const btn = delta > 0 ? info.arrLeft : info.arrRight;
-      if (!btn) throw vtxError(VtxErrorCode.COMMIT_FAILED, `arrow button missing (delta=${delta})`);
-      await clickBBox(btn.cx, btn.cy);
+      const yearDelta = info.year - target.year;
+      const monthDelta = yearDelta * 12 + (info.month - target.month);
+      if (monthDelta === 0) return;
+      // 相差 >= 1 整年时走 d-arrow
+      if (Math.abs(yearDelta) >= 1) {
+        const yBtn = yearDelta > 0 ? info.dArrLeft : info.dArrRight;
+        if (yBtn) {
+          await clickBBox(yBtn.cx, yBtn.cy);
+          await sleep(80);
+          continue;
+        }
+      }
+      const mBtn = monthDelta > 0 ? info.arrLeft : info.arrRight;
+      if (!mBtn) throw vtxError(VtxErrorCode.COMMIT_FAILED, `arrow button missing (monthDelta=${monthDelta})`);
+      await clickBBox(mBtn.cx, mBtn.cy);
       await sleep(80);
     }
     throw vtxError(VtxErrorCode.COMMIT_FAILED, `navigate month safety overflow for hdr ${hdrIndex}`);
@@ -1787,6 +1802,20 @@ async function runDateRangeDriverCDP(opts: {
       { selector, extras: { stage: "verify" } },
     );
   }
+
+  // 保底：click body 强制让任何残留 popper 关闭（blur 事件 → Element Plus emit
+  // change → Vue 更新 modelValue），再等一段时间让 reactive flush 完成。
+  // 这步修复了"driver verify 通过但 result 区仍空"的 flaky 场景。
+  await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
+    type: "mouseMoved", x: 5, y: 5,
+  });
+  await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
+    type: "mousePressed", x: 5, y: 5, button: "left", clickCount: 1,
+  });
+  await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
+    type: "mouseReleased", x: 5, y: 5, button: "left", clickCount: 1,
+  });
+  await sleep(400);
 
   return {
     success: true,

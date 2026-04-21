@@ -50,7 +50,7 @@ pnpm -F @bytenew/vortex-bench bench diff        # 和 baseline.json 比
 pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 baseline
 ```
 
-## 覆盖矩阵（baseline：11 case / 8 pass / 3 fail）
+## 覆盖矩阵（baseline：**11 case / 11 pass / 0 fail** 🎉）
 
 | case | widget | 状态 | 信号 |
 |------|--------|------|------|
@@ -58,9 +58,9 @@ pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 basel
 | el-select-single | 单选 | ✓ | fill kind=select |
 | el-select-multiple | 多选 tag | ✓ | fill kind=select value=[...] |
 | el-cascader | 级联 3 级 | ✓ | CDP 打开 panel + page-side 逐级 click |
-| el-date-picker-daterange | 日期段 | ⚠️ flaky | CDP 真鼠标链路 work（手动验证），但 bench 连跑偶尔 v-model 不 commit |
-| el-date-picker-datetimerange | 日期时间段 | ✗ | day click ok，需实现 time picker 子流程 |
-| el-form-composite | 组合表单 | ✗ | name/level/switch ✓，checkbox-group 未实现 |
+| el-date-picker-daterange | 日期段 | ✓ | CDP 真鼠标 + 年箭头跨年加速 |
+| el-date-picker-datetimerange | 日期时间段 | ✓ | 同上 + time input 预设 + OK 轮询 |
+| el-form-composite | 组合表单 | ✓ | label 匹配（中文"高"），fallback 2 次补 checkbox-group |
 | el-tree | 树形节点 | ✓ | page-side .click() 展开 + node-click 触发 |
 | el-table | 多选 + 展开行 + 行内按钮 | ✓ | `:nth-child + .el-button` 链式定位 |
 | el-dialog-nested | dialog 内套 select | ✓ | dialog + 嵌套 select 完整走通 |
