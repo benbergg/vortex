@@ -36,13 +36,13 @@ describe("MCP ping version fingerprint (@since 0.4.0)", () => {
     expect(h2).not.toBe(h1);
   });
 
-  it("includes diagnostics tool and core v0.4 tools in toolset", () => {
+  it("includes diagnostics tool and core v0.5 tools in toolset", () => {
     const names = getAllToolDefs().map((d) => d.name);
     expect(names).toContain("vortex_ping");
-    expect(names).toContain("vortex_dom_commit");
-    expect(names).toContain("vortex_dom_wait_settled");
-    expect(names).toContain("vortex_page_wait_for_xhr_idle");
-    expect(names).toContain("vortex_dom_batch");
+    expect(names).toContain("vortex_fill");
+    expect(names).toContain("vortex_wait_idle");
+    expect(names).toContain("vortex_navigate");
+    expect(names).toContain("vortex_batch");
   });
 
   it("vortex_ping description advertises version fingerprint", () => {

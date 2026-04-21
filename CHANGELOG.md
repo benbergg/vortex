@@ -4,6 +4,130 @@
 
 ---
 
+## [0.5.0] - 2026-04-20
+
+### 💥 BREAKING CHANGES
+
+- **工具面收敛 74 → 35**。所有老 `vortex_*` 工具名被删除或改名，必须迁移代码。见下方迁移表。
+- **元素定位改用 `target` 参数**。所有动作工具的 `selector` / `index` / `snapshotId` / `frameId` 参数被 `target` 字符串取代：`target: "@eN"` / `"@fNeM"` / CSS selector。
+- **observe 默认输出改为 compact Markdown 文本**。`detail=full` 可回到 v0.4 JSON 结构。
+
+### ✨ Features
+
+- **`@eN` / `@fNeM` ref 格式**：observe 给每元素分配 ref（agent-browser 风格），跨 frame 用 `@fNeM` 前缀；MCP 层自动解析。
+- **跨 frame 透明路由**：动作工具不再需要 `frameId` 参数，ref 前缀携带。全页工具（get_text/html/evaluate/screenshot）新增 `frameRef: "@fN"` 逃生舱。
+- **stale ref 错误提示**：`STALE_SNAPSHOT` 错误附带"请重新调用 observe"提示。
+- **tools/list payload 从 27.5KB 压到 14.5KB（-47%）**，observe 默认输出从 ~80KB（200 元素）降到 ~5KB（-94%）。
+
+### 🔧 Internal
+
+- MCP 层新增 `lib/ref-parser.ts`、`lib/observe-render.ts`、`lib/dispatch.ts`
+- server.ts 里的 MCP 名 → extension action 映射集中到 `dispatchNewTool`
+- vortex-bench 新增真实场景 fixture 套件（Element Plus / Ant Design / shadcn / Vuetify），jsdom 单测 + v0.4 基线对照断言
+
+### 📋 迁移表（Old → New）
+
+**Tab**
+
+| v0.4 | v0.5 |
+|------|------|
+| `vortex_tab_activate({tabId})` | 合并入 `vortex_tab_create({tabId, active:true})` |
+| `vortex_tab_get_info` | 用 `vortex_tab_list` 或 `vortex_page_info` |
+
+**Page / Navigation**
+
+| v0.4 | v0.5 |
+|------|------|
+| `vortex_page_reload` | `vortex_navigate({reload:true})` |
+| `vortex_page_back` | `vortex_history({direction:"back"})` |
+| `vortex_page_forward` | `vortex_history({direction:"forward"})` |
+| `vortex_page_wait` | `vortex_wait` |
+| `vortex_page_wait_for_network_idle` | `vortex_wait_idle({kind:"network"})` |
+| `vortex_page_wait_for_xhr_idle` | `vortex_wait_idle({kind:"xhr"})` |
+
+**DOM**
+
+| v0.4 | v0.5 |
+|------|------|
+| `vortex_dom_click({index, snapshotId})` | `vortex_click({target:"@eN"})` |
+| `vortex_dom_type` | `vortex_type` |
+| `vortex_dom_fill` | `vortex_fill` |
+| `vortex_dom_commit({kind:"cascader", value})` | `vortex_fill({kind:"cascader", target, value})` |
+| `vortex_dom_select` | `vortex_select` |
+| `vortex_dom_hover` | `vortex_hover` |
+| `vortex_dom_batch` | `vortex_batch` |
+| `vortex_dom_query / query_all` | 删除（用 `vortex_observe` 或 `vortex_evaluate`） |
+| `vortex_dom_scroll / get_attribute / get_scroll_info` | 删除（用 `vortex_evaluate`） |
+| `vortex_dom_wait_for_mutation / wait_settled` | `vortex_wait_idle({kind:"dom"})` |
+| `vortex_dom_watch_mutations / unwatch_mutations` | `vortex_events({op:"subscribe", types:["dom.mutated"]})` |
+
+**Content**
+
+| v0.4 | v0.5 |
+|------|------|
+| `vortex_content_get_text` | `vortex_get_text` |
+| `vortex_content_get_html` | `vortex_get_html` |
+| `vortex_content_get_accessibility_tree` | 删除（`vortex_observe` 覆盖） |
+| `vortex_content_get_element_text` | `vortex_get_text({target:"@eN"})` |
+| `vortex_content_get_computed_style` | 删除（用 `vortex_evaluate`） |
+
+**JavaScript**
+
+| v0.4 | v0.5 |
+|------|------|
+| `vortex_js_evaluate` | `vortex_evaluate` |
+| `vortex_js_evaluate_async` | `vortex_evaluate({async:true})` |
+| `vortex_js_call_function` | 删除（用 `vortex_evaluate`） |
+
+**Keyboard / Mouse / Capture**
+
+| v0.4 | v0.5 |
+|------|------|
+| `vortex_keyboard_press` | `vortex_press` |
+| `vortex_keyboard_shortcut` | 删除（用 `vortex_press` 多次调用） |
+| `vortex_mouse_double_click` | `vortex_mouse_click({clickCount:2})` |
+| `vortex_capture_element({selector})` | `vortex_screenshot({target:"@eN"})` |
+| `vortex_capture_gif_*` | 删除 |
+
+**Console / Network**
+
+| v0.4 | v0.5 |
+|------|------|
+| `vortex_console_get_logs` | `vortex_console({op:"get", level?})` |
+| `vortex_console_get_errors` | `vortex_console({op:"get", level:"error"})` |
+| `vortex_console_clear` | `vortex_console({op:"clear"})` |
+| `vortex_network_get_logs` | `vortex_network({op:"get"})` |
+| `vortex_network_get_errors` | `vortex_network({op:"get", filter:{statusMin:400}})` |
+| `vortex_network_filter` | `vortex_network({op:"get", filter})` |
+| `vortex_network_clear` | `vortex_network({op:"clear"})` |
+| `vortex_network_get_response_body` | `vortex_network_response_body` |
+
+**Storage**
+
+| v0.4 | v0.5 |
+|------|------|
+| `vortex_storage_get_cookies` | `vortex_storage_get({scope:"cookie"})` |
+| `vortex_storage_set_cookie` | `vortex_storage_set({scope:"cookie", ...})` |
+| `vortex_storage_delete_cookie` | `vortex_storage_set({scope:"cookie", op:"delete", ...})` |
+| `vortex_storage_get_local_storage` | `vortex_storage_get({scope:"local"})` |
+| `vortex_storage_set_local_storage` | `vortex_storage_set({scope:"local", ...})` |
+| `vortex_storage_get_session_storage` | `vortex_storage_get({scope:"session"})` |
+| `vortex_storage_set_session_storage` | `vortex_storage_set({scope:"session", ...})` |
+| `vortex_storage_export_session` | `vortex_storage_session({op:"export", domain})` |
+| `vortex_storage_import_session` | `vortex_storage_session({op:"import", data})` |
+
+**File / Frames / Events**
+
+| v0.4 | v0.5 |
+|------|------|
+| `vortex_file_get_downloads` | `vortex_file_list_downloads` |
+| `vortex_frames_find` | 删除（用 `vortex_observe`） |
+| `vortex_events_subscribe` | `vortex_events({op:"subscribe", ...})` |
+| `vortex_events_unsubscribe` | `vortex_events({op:"unsubscribe", ...})` |
+| `vortex_events_drain` | `vortex_events({op:"drain"})` |
+
+---
+
 ## [Unreleased] (towards 0.4.0)
 
 ### Added

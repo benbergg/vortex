@@ -1,6 +1,6 @@
 {
   "name": "@bytenew/vortex-bench",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "private": true,
   "type": "module",
   "bin": {
