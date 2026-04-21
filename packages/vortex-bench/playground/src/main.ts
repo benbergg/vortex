@@ -15,6 +15,11 @@ import ElTree from "./pages/ElTree.vue";
 import ElTable from "./pages/ElTable.vue";
 import ElDialogNested from "./pages/ElDialogNested.vue";
 import ElUpload from "./pages/ElUpload.vue";
+import ElRadioGroup from "./pages/ElRadioGroup.vue";
+import ElTimePicker from "./pages/ElTimePicker.vue";
+import ElMessageBoxPage from "./pages/ElMessageBox.vue";
+import ElDrawer from "./pages/ElDrawer.vue";
+import ElInputNumber from "./pages/ElInputNumber.vue";
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -31,6 +36,11 @@ const router = createRouter({
     { path: "/el-table", component: ElTable },
     { path: "/el-dialog-nested", component: ElDialogNested },
     { path: "/el-upload", component: ElUpload },
+    { path: "/el-radio-group", component: ElRadioGroup },
+    { path: "/el-time-picker", component: ElTimePicker },
+    { path: "/el-message-box", component: ElMessageBoxPage },
+    { path: "/el-drawer", component: ElDrawer },
+    { path: "/el-input-number", component: ElInputNumber },
   ],
 });
 

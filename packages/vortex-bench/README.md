@@ -50,7 +50,7 @@ pnpm -F @bytenew/vortex-bench bench diff        # 和 baseline.json 比
 pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 baseline
 ```
 
-## 覆盖矩阵（baseline：**11 case / 11 pass / 0 fail** 🎉）
+## 覆盖矩阵（baseline：**16 case / 15 pass / 1 fail**）
 
 | case | widget | 状态 | 信号 |
 |------|--------|------|------|
@@ -60,11 +60,16 @@ pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 basel
 | el-cascader | 级联 3 级 | ✓ | CDP 打开 panel + page-side 逐级 click |
 | el-date-picker-daterange | 日期段 | ✓ | CDP 真鼠标 + 年箭头跨年加速 |
 | el-date-picker-datetimerange | 日期时间段 | ✓ | 同上 + time input 预设 + OK 轮询 |
-| el-form-composite | 组合表单 | ✓ | label 匹配（中文"高"），driver 直接吃 string[] checkbox |
-| el-tree | 树形节点 | ✓ | observe 现在收 `[role=treeitem]`，accessible name 取 .el-tree-node__content |
+| el-form-composite | 组合表单 | ✓ | label 匹配，checkbox-group driver |
+| el-tree | 树形节点 | ✓ | observe 收 `[role=treeitem]` |
 | el-table | 多选 + 展开行 + 行内按钮 | ✓ | `:nth-child + .el-button` 链式定位 |
 | el-dialog-nested | dialog 内套 select | ✓ | dialog + 嵌套 select 完整走通 |
 | el-upload | 文件上传 | ✓ | `vortex_file_upload` |
+| **el-radio-group** | radio 选项 | ✓ | observe 收 `label:has(input[type=radio])` 替代隐藏 input |
+| **el-time-picker** | 单独 time | ✗ | typed value 没 commit，需 spinner 子流程（同 datetimerange time picker P0）|
+| **el-message-box** | 命令式弹窗 | ✓ | 弹窗 teleport 到 body，observe 抓"确定"按钮 |
+| **el-drawer** | 抽屉 + 内嵌 input | ✓ | drawer 滑出后内部 input 走 vortex_type |
+| **el-input-number** | 数字输入 + step | ✓ | type + Tab 触发 blur commit |
 
 ## v0.6.0 → (latest) 修复记录
 

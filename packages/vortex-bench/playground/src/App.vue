@@ -19,6 +19,11 @@ import { RouterLink, RouterView } from "vue-router";
         <li><RouterLink to="/el-table">el-table</RouterLink></li>
         <li><RouterLink to="/el-dialog-nested">el-dialog + select</RouterLink></li>
         <li><RouterLink to="/el-upload">el-upload</RouterLink></li>
+        <li><RouterLink to="/el-radio-group">el-radio-group</RouterLink></li>
+        <li><RouterLink to="/el-time-picker">el-time-picker</RouterLink></li>
+        <li><RouterLink to="/el-message-box">el-message-box</RouterLink></li>
+        <li><RouterLink to="/el-drawer">el-drawer</RouterLink></li>
+        <li><RouterLink to="/el-input-number">el-input-number</RouterLink></li>
       </ul>
     </aside>
     <main class="content">

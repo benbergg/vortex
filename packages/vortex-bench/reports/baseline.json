@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-21T13:26:35.096Z",
+  "generatedAt": "2026-04-21T13:48:10.630Z",
   "playgroundUrl": "http://localhost:5173",
   "cases": [
     {
@@ -8,7 +8,7 @@
       "callCount": 5,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 2968
+      "durationMs": 1385
     },
     {
       "case": "el-date-picker-daterange",
@@ -16,7 +16,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 20568
+      "durationMs": 19954
     },
     {
       "case": "el-date-picker-datetimerange",
@@ -24,7 +24,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 22699
+      "durationMs": 27043
     },
     {
       "case": "el-dialog-nested",
@@ -32,7 +32,15 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1560
+      "durationMs": 1684
+    },
+    {
+      "case": "el-drawer",
+      "passed": true,
+      "callCount": 8,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1622
     },
     {
       "case": "el-dropdown",
@@ -40,7 +48,7 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1238
+      "durationMs": 1669
     },
     {
       "case": "el-form-composite",
@@ -48,7 +56,31 @@
       "callCount": 13,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1219
+      "durationMs": 1304
+    },
+    {
+      "case": "el-input-number",
+      "passed": true,
+      "callCount": 8,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1225
+    },
+    {
+      "case": "el-message-box",
+      "passed": true,
+      "callCount": 8,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1398
+    },
+    {
+      "case": "el-radio-group",
+      "passed": true,
+      "callCount": 6,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 980
     },
     {
       "case": "el-select-multiple",
@@ -56,7 +88,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1035
+      "durationMs": 1106
     },
     {
       "case": "el-select-single",
@@ -64,7 +96,7 @@
       "callCount": 5,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 916
+      "durationMs": 936
     },
     {
       "case": "el-table",
@@ -72,7 +104,16 @@
       "callCount": 8,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1234
+      "durationMs": 1327
+    },
+    {
+      "case": "el-time-picker",
+      "passed": false,
+      "callCount": 14,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 4983,
+      "failureReason": "result 区应包含 \"time=14:30:45\"，实际: \"time=21:47:55\""
     },
     {
       "case": "el-tree",
@@ -80,7 +121,7 @@
       "callCount": 13,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 2451
+      "durationMs": 2499
     },
     {
       "case": "el-upload",
@@ -88,7 +129,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1122
+      "durationMs": 1149
     }
   ]
 }

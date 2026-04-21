@@ -1,0 +1,26 @@
+// el-drawer：抽屉滑出后在内部 input 输入。
+import type { CaseDefinition } from "../src/types.js";
+import { assertResultContains } from "./_helpers.js";
+
+const def: CaseDefinition = {
+  name: "el-drawer",
+  playgroundPath: "/#/el-drawer",
+  async run(ctx) {
+    // 1. 点触发按钮
+    await ctx.call("vortex_click", {
+      target: "[data-testid=\"target-drawer-trigger\"] button",
+    });
+    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1500 });
+
+    // 2. 在抽屉内输入（vortex_type 触发 Vue v-model）
+    await ctx.call("vortex_type", {
+      target: "[data-testid=\"drawer-input\"] input",
+      text: "test-content",
+    });
+
+    await assertResultContains(ctx, "drawerOpen=true");
+    await assertResultContains(ctx, "inside=test-content");
+  },
+};
+
+export default def;
