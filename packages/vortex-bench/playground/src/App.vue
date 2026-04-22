@@ -24,6 +24,10 @@ import { RouterLink, RouterView } from "vue-router";
         <li><RouterLink to="/el-message-box">el-message-box</RouterLink></li>
         <li><RouterLink to="/el-drawer">el-drawer</RouterLink></li>
         <li><RouterLink to="/el-input-number">el-input-number</RouterLink></li>
+        <li><RouterLink to="/el-autocomplete">el-autocomplete</RouterLink></li>
+        <li><RouterLink to="/el-tabs">el-tabs</RouterLink></li>
+        <li><RouterLink to="/el-pagination">el-pagination</RouterLink></li>
+        <li><RouterLink to="/el-tree-select">el-tree-select</RouterLink></li>
       </ul>
     </aside>
     <main class="content">

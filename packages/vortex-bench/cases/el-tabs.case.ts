@@ -1,0 +1,36 @@
+// el-tabs：切 Tab 后操作 Tab 内部 widget（input）。
+import type { CaseDefinition } from "../src/types.js";
+import { assertResultContains, extractText } from "./_helpers.js";
+
+function findRef(snapshot: string, name: string): string | null {
+  const re = new RegExp(`(@[ef]?\\d+(?:e\\d+)?)\\s+\\[[^\\]]+\\]\\s+"([^"]*?)"`, "g");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(snapshot)) !== null) {
+    if (m[2].trim() === name) return m[1];
+  }
+  return null;
+}
+
+const def: CaseDefinition = {
+  name: "el-tabs",
+  playgroundPath: "/#/el-tabs",
+  async run(ctx) {
+    // 找 "Tab 2" tab ref（role=tab 已在 observe INTERACTIVE_SELECTORS）
+    const snap = extractText(await ctx.call("vortex_observe", {}));
+    const tabRef = findRef(snap, "Tab 2");
+    ctx.assert(tabRef !== null, `observe 应给出"Tab 2" ref: ${snap.slice(0, 300)}`);
+    await ctx.call("vortex_click", { target: tabRef });
+    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1000 });
+
+    // 在 Tab 2 的 input 输入
+    await ctx.call("vortex_type", {
+      target: "[data-testid=\"tab2-input\"] input",
+      text: "hello",
+    });
+
+    await assertResultContains(ctx, "active=tab2");
+    await assertResultContains(ctx, "tab2Input=hello");
+  },
+};
+
+export default def;

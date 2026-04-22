@@ -50,7 +50,7 @@ pnpm -F @bytenew/vortex-bench bench diff        # 和 baseline.json 比
 pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 baseline
 ```
 
-## 覆盖矩阵（baseline：**16 case / 16 pass / 0 fail** 🎉）
+## 覆盖矩阵（baseline：**20 case / 20 pass / 0 fail** 🎉）
 
 | case | widget | 状态 | 信号 |
 |------|--------|------|------|
@@ -70,6 +70,10 @@ pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 basel
 | **el-message-box** | 命令式弹窗 | ✓ | 弹窗 teleport 到 body，observe 抓"确定"按钮 |
 | **el-drawer** | 抽屉 + 内嵌 input | ✓ | drawer 滑出后内部 input 走 vortex_type |
 | **el-input-number** | 数字输入 + step | ✓ | type + Tab 触发 blur commit |
+| **el-autocomplete** | 异步建议 | ✓ | type + wait_idle 等 debounce popper + observe click |
+| **el-tabs** | 标签页 + 内嵌 widget | ✓ | `[role=tab]` observe 直接命中 |
+| **el-pagination** | 页码 + size | ✓ | aria-label="page N" 作 accessibleName |
+| **el-tree-select** | tree 作 select 选项 | ✓ | trigger click 开 + treeitem observe 逐级展开 |
 
 ## v0.6.0 → (latest) 修复记录
 

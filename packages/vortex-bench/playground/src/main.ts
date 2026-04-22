@@ -20,6 +20,10 @@ import ElTimePicker from "./pages/ElTimePicker.vue";
 import ElMessageBoxPage from "./pages/ElMessageBox.vue";
 import ElDrawer from "./pages/ElDrawer.vue";
 import ElInputNumber from "./pages/ElInputNumber.vue";
+import ElAutocomplete from "./pages/ElAutocomplete.vue";
+import ElTabs from "./pages/ElTabs.vue";
+import ElPagination from "./pages/ElPagination.vue";
+import ElTreeSelect from "./pages/ElTreeSelect.vue";
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -41,6 +45,10 @@ const router = createRouter({
     { path: "/el-message-box", component: ElMessageBoxPage },
     { path: "/el-drawer", component: ElDrawer },
     { path: "/el-input-number", component: ElInputNumber },
+    { path: "/el-autocomplete", component: ElAutocomplete },
+    { path: "/el-tabs", component: ElTabs },
+    { path: "/el-pagination", component: ElPagination },
+    { path: "/el-tree-select", component: ElTreeSelect },
   ],
 });
 
