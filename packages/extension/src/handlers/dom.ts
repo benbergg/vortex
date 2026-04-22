@@ -2113,7 +2113,9 @@ async function runTimePickerDriverCDP(opts: {
           }
         }
         if (!hit) return { err: `item "${want}" not in column ${idx}` };
-        hit.scrollIntoView({ block: "center" });
+        // behavior:instant 避免平滑动画期间 bbox 漂移（Element Plus spinner 会在后续
+        // click 时再次 scrollTop，造成"点偏一格"的 flaky）
+        hit.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
         const r = hit.getBoundingClientRect();
         return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
       },
@@ -2124,10 +2126,26 @@ async function runTimePickerDriverCDP(opts: {
         selector, extras: { stage: "spinner-click", column: colIdx, want: wantText },
       });
     }
-    // 等 scroll 动画落定
+    // 等 scroll 完全停（300ms 覆盖 Element Plus 内部 scrollTop 兜底），再查一次 bbox 取最新坐标
+    await sleep(300);
+    const freshBBox = await pageQuery(
+      (idx, want) => {
+        const cols = document.querySelectorAll(".el-time-panel .el-time-spinner__wrapper");
+        const col = cols[idx as number];
+        if (!col) return null;
+        for (const it of Array.from(col.querySelectorAll("li"))) {
+          if ((it.textContent || "").trim() === want) {
+            const r = (it as HTMLElement).getBoundingClientRect();
+            return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+          }
+        }
+        return null;
+      },
+      [colIdx, wantText],
+    );
+    const bb = freshBBox ?? info;
+    await clickBBox(bb.cx, bb.cy);
     await sleep(120);
-    await clickBBox(info.cx, info.cy);
-    await sleep(80);
   }
 
   // step 4: click OK / 确定
