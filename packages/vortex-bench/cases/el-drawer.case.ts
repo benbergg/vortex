@@ -12,7 +12,10 @@ const def: CaseDefinition = {
     });
     await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1500 });
 
-    // 2. 在抽屉内输入（vortex_type 触发 Vue v-model）
+    // 2. 在抽屉内输入（先 click focus，避免 drawer transition 期间 type 打偏）
+    await ctx.call("vortex_click", {
+      target: "[data-testid=\"drawer-input\"] input",
+    });
     await ctx.call("vortex_type", {
       target: "[data-testid=\"drawer-input\"] input",
       text: "test-content",

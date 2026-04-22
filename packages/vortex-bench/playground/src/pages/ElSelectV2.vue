@@ -18,6 +18,7 @@ const options = Array.from({ length: 1000 }, (_, i) => ({
       v-model="value"
       :options="options"
       placeholder="请选择"
+      filterable
       style="width: 240px"
     />
   </div>
