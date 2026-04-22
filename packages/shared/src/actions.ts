@@ -97,6 +97,7 @@ export const MouseActions = {
   CLICK: "mouse.click",
   DOUBLE_CLICK: "mouse.doubleClick",
   MOVE: "mouse.move",
+  DRAG: "mouse.drag",
 } as const;
 
 export const FramesActions = {

@@ -505,6 +505,26 @@ function mouseTools(): ToolDef[] {
         required: ["x", "y"],
       },
     },
+    {
+      name: "vortex_mouse_drag",
+      action: "mouse.drag",
+      description:
+        "Drag from (fromX,fromY) to (toX,toY) via CDP real mouse: move → press → N-step moves → release. steps default 10, ~10ms between steps.",
+      schema: {
+        type: "object",
+        properties: {
+          fromX: { type: "number" },
+          fromY: { type: "number" },
+          toX: { type: "number" },
+          toY: { type: "number" },
+          steps: { type: "number", default: 10, description: "Interpolation steps for smoother drag" },
+          coordSpace: { type: "string", enum: ["frame", "viewport"] },
+          ...optionalTabId,
+          ...optionalFrameId,
+        },
+        required: ["fromX", "fromY", "toX", "toY"],
+      },
+    },
   ];
 }
 

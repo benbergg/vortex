@@ -265,7 +265,16 @@ export function registerDomHandlers(
                 extras: { blocker: desc },
               };
             }
-            // 通过所有检查，执行 click
+            // 通过所有检查，执行 click；对可 focus 元素（input/textarea/button/select）
+            // 先 focus 再 click，保证后续 vortex_press 键盘事件能落在 active element 上
+            // （JS .click() 不像真实鼠标那样顺带 focus，修掉这个行为差异）
+            if (typeof (el as HTMLElement).focus === "function") {
+              try {
+                (el as HTMLElement).focus();
+              } catch {
+                // swallow: focus 不是所有元素都支持
+              }
+            }
             el.click();
             return {
               result: {
