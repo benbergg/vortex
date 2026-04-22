@@ -28,6 +28,10 @@ import { RouterLink, RouterView } from "vue-router";
         <li><RouterLink to="/el-tabs">el-tabs</RouterLink></li>
         <li><RouterLink to="/el-pagination">el-pagination</RouterLink></li>
         <li><RouterLink to="/el-tree-select">el-tree-select</RouterLink></li>
+        <li><RouterLink to="/el-slider">el-slider</RouterLink></li>
+        <li><RouterLink to="/el-transfer">el-transfer</RouterLink></li>
+        <li><RouterLink to="/el-color-picker">el-color-picker</RouterLink></li>
+        <li><RouterLink to="/el-select-v2">el-select-v2</RouterLink></li>
       </ul>
     </aside>
     <main class="content">

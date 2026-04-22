@@ -50,7 +50,7 @@ pnpm -F @bytenew/vortex-bench bench diff        # 和 baseline.json 比
 pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 baseline
 ```
 
-## 覆盖矩阵（baseline：**20 case / 20 pass / 0 fail** 🎉）
+## 覆盖矩阵（baseline：**24 case / 24 pass / 0 fail** 🎉）
 
 | case | widget | 状态 | 信号 |
 |------|--------|------|------|
@@ -74,6 +74,10 @@ pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 basel
 | **el-tabs** | 标签页 + 内嵌 widget | ✓ | `[role=tab]` observe 直接命中 |
 | **el-pagination** | 页码 + size | ✓ | aria-label="page N" 作 accessibleName |
 | **el-tree-select** | tree 作 select 选项 | ✓ | trigger click 开 + treeitem observe 逐级展开 |
+| **el-slider** | 滑块 + show-input | ✓ | nativeInputValueSetter 设 input-number 值（vortex_press 键盘事件 untrusted 不生效）|
+| **el-transfer** | 穿梭框 | ✓ | observe 收 label-wrapped checkbox，点"向右"按钮 |
+| **el-color-picker** | 颜色 panel | ✓ | trigger click 开 panel → hex input type → 确定 |
+| **el-select-v2** | 虚拟滚动 select（1000 项）| ✓ | fill kind=select 直接命中前几条（虚拟滚动跨屏定位待独立 case）|
 
 ## v0.6.0 → (latest) 修复记录
 

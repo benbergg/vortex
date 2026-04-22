@@ -24,6 +24,10 @@ import ElAutocomplete from "./pages/ElAutocomplete.vue";
 import ElTabs from "./pages/ElTabs.vue";
 import ElPagination from "./pages/ElPagination.vue";
 import ElTreeSelect from "./pages/ElTreeSelect.vue";
+import ElSlider from "./pages/ElSlider.vue";
+import ElTransfer from "./pages/ElTransfer.vue";
+import ElColorPicker from "./pages/ElColorPicker.vue";
+import ElSelectV2 from "./pages/ElSelectV2.vue";
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -49,6 +53,10 @@ const router = createRouter({
     { path: "/el-tabs", component: ElTabs },
     { path: "/el-pagination", component: ElPagination },
     { path: "/el-tree-select", component: ElTreeSelect },
+    { path: "/el-slider", component: ElSlider },
+    { path: "/el-transfer", component: ElTransfer },
+    { path: "/el-color-picker", component: ElColorPicker },
+    { path: "/el-select-v2", component: ElSelectV2 },
   ],
 });
 

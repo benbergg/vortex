@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-22T01:33:05.981Z",
+  "generatedAt": "2026-04-22T01:45:11.696Z",
   "playgroundUrl": "http://localhost:5173",
   "cases": [
     {
@@ -8,7 +8,7 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1891
+      "durationMs": 1901
     },
     {
       "case": "el-cascader",
@@ -16,7 +16,15 @@
       "callCount": 5,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 3652
+      "durationMs": 3767
+    },
+    {
+      "case": "el-color-picker",
+      "passed": true,
+      "callCount": 13,
+      "fallbackToEvaluate": 1,
+      "observeMissedPopperItems": 0,
+      "durationMs": 2276
     },
     {
       "case": "el-date-picker-daterange",
@@ -24,7 +32,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 8504
+      "durationMs": 16883
     },
     {
       "case": "el-date-picker-datetimerange",
@@ -32,7 +40,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 24910
+      "durationMs": 18164
     },
     {
       "case": "el-dialog-nested",
@@ -40,7 +48,7 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1679
+      "durationMs": 1398
     },
     {
       "case": "el-drawer",
@@ -48,7 +56,7 @@
       "callCount": 8,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1471
+      "durationMs": 1575
     },
     {
       "case": "el-dropdown",
@@ -56,7 +64,7 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1304
+      "durationMs": 1294
     },
     {
       "case": "el-form-composite",
@@ -64,7 +72,7 @@
       "callCount": 13,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1252
+      "durationMs": 1456
     },
     {
       "case": "el-input-number",
@@ -72,7 +80,7 @@
       "callCount": 8,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1201
+      "durationMs": 1234
     },
     {
       "case": "el-message-box",
@@ -80,7 +88,7 @@
       "callCount": 8,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1459
+      "durationMs": 1502
     },
     {
       "case": "el-pagination",
@@ -88,7 +96,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 942
+      "durationMs": 1017
     },
     {
       "case": "el-radio-group",
@@ -96,7 +104,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 958
+      "durationMs": 946
     },
     {
       "case": "el-select-multiple",
@@ -104,7 +112,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1093
+      "durationMs": 1055
     },
     {
       "case": "el-select-single",
@@ -112,7 +120,23 @@
       "callCount": 5,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 983
+      "durationMs": 988
+    },
+    {
+      "case": "el-select-v2",
+      "passed": true,
+      "callCount": 5,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1156
+    },
+    {
+      "case": "el-slider",
+      "passed": true,
+      "callCount": 7,
+      "fallbackToEvaluate": 1,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1642
     },
     {
       "case": "el-table",
@@ -120,7 +144,7 @@
       "callCount": 8,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1310
+      "durationMs": 1693
     },
     {
       "case": "el-tabs",
@@ -128,7 +152,7 @@
       "callCount": 9,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1278
+      "durationMs": 1554
     },
     {
       "case": "el-time-picker",
@@ -136,7 +160,15 @@
       "callCount": 5,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 7592
+      "durationMs": 7287
+    },
+    {
+      "case": "el-transfer",
+      "passed": true,
+      "callCount": 9,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 2125
     },
     {
       "case": "el-tree",
@@ -144,7 +176,7 @@
       "callCount": 13,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 2619
+      "durationMs": 2928
     },
     {
       "case": "el-tree-select",
@@ -152,7 +184,7 @@
       "callCount": 15,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 3180
+      "durationMs": 5314
     },
     {
       "case": "el-upload",
@@ -160,7 +192,7 @@
       "callCount": 6,
       "fallbackToEvaluate": 0,
       "observeMissedPopperItems": 0,
-      "durationMs": 1199
+      "durationMs": 1825
     }
   ]
 }
