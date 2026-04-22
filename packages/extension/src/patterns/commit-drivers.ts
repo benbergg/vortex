@@ -13,6 +13,7 @@ export type CommitKind =
   | "datetimerange"
   | "cascader"
   | "select"
+  | "time"
   /** @since 0.4.0 (O-10) */
   | "checkbox-group";
 
@@ -60,6 +61,13 @@ export const COMMIT_DRIVERS: CommitDriverSpec[] = [
     closestSelector: ".el-cascader",
     summary:
       "Element Plus <el-cascader>: CDP real-mouse click the trigger to open panel (el-cascader root ignores untrusted click), then walks the label path level-by-level. value: string[] (label path, e.g. ['华东','上海','浦东']).",
+  },
+  {
+    id: "element-plus-time",
+    kind: "time",
+    closestSelector: "input.el-input__inner",
+    summary:
+      "Element Plus <el-time-picker> (spinner panel): CDP click input to open .el-time-panel, scroll + click matching HH/MM/SS in 3 spinner columns, click OK. value: 'HH:MM:SS' string.",
   },
 ];
 

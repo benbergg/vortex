@@ -50,7 +50,7 @@ pnpm -F @bytenew/vortex-bench bench diff        # 和 baseline.json 比
 pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 baseline
 ```
 
-## 覆盖矩阵（baseline：**16 case / 15 pass / 1 fail**）
+## 覆盖矩阵（baseline：**16 case / 16 pass / 0 fail** 🎉）
 
 | case | widget | 状态 | 信号 |
 |------|--------|------|------|
@@ -66,7 +66,7 @@ pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 basel
 | el-dialog-nested | dialog 内套 select | ✓ | dialog + 嵌套 select 完整走通 |
 | el-upload | 文件上传 | ✓ | `vortex_file_upload` |
 | **el-radio-group** | radio 选项 | ✓ | observe 收 `label:has(input[type=radio])` 替代隐藏 input |
-| **el-time-picker** | 单独 time | ✗ | typed value 没 commit，需 spinner 子流程（同 datetimerange time picker P0）|
+| **el-time-picker** | 单独 time | ✓ | 新 `element-plus-time` driver：CDP 打开 panel → 三列 spinner 滚动 + click → 确定 |
 | **el-message-box** | 命令式弹窗 | ✓ | 弹窗 teleport 到 body，observe 抓"确定"按钮 |
 | **el-drawer** | 抽屉 + 内嵌 input | ✓ | drawer 滑出后内部 input 走 vortex_type |
 | **el-input-number** | 数字输入 + step | ✓ | type + Tab 触发 blur commit |
