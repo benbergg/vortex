@@ -169,8 +169,8 @@ describe("dispatchNewTool", () => {
     expect(result).toBeNull();
   });
 
-  it("工具总数应为 35", async () => {
+  it("工具总数应为 36", async () => {
     const { getAllToolDefs } = await import("../src/tools/schemas.js");
-    expect(getAllToolDefs().length).toBe(35);
+    expect(getAllToolDefs().length).toBe(36);
   });
 });

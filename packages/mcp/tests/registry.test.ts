@@ -15,9 +15,9 @@ describe("getToolDefs", () => {
     expect(a).toEqual(b);
   });
 
-  it("includes all required vortex_* prefixed tools (v0.5 set of 35)", () => {
+  it("includes all required vortex_* prefixed tools (v0.5 set of 36)", () => {
     const names = getToolDefs().map((d) => d.name);
-    // v0.5.0 合并后的完整 35 工具名单（按 schemas.ts 定义顺序）
+    // v0.5.0 合并 + vortex_mouse_drag 后的完整 36 工具名单（按 schemas.ts 定义顺序）
     const expected = [
       "vortex_ping",
       "vortex_events",
@@ -43,6 +43,7 @@ describe("getToolDefs", () => {
       "vortex_evaluate",
       "vortex_mouse_click",
       "vortex_mouse_move",
+      "vortex_mouse_drag",
       "vortex_screenshot",
       "vortex_console",
       "vortex_network",
@@ -93,8 +94,8 @@ describe("getToolDefs", () => {
     expect(tabList?.returnsImage).toBeUndefined();
   });
 
-  it("has exactly 35 tools (v0.5 consolidated set)", () => {
-    expect(getToolDefs().length).toBe(35);
+  it("has exactly 36 tools (v0.5 consolidated set + vortex_mouse_drag)", () => {
+    expect(getToolDefs().length).toBe(36);
   });
 
   it("batch tool is included for batch DOM operations", () => {
