@@ -13,6 +13,8 @@ export interface CaseMetrics {
   observeMissedPopperItems: number;
   durationMs: number;
   failureReason?: string;
+  /** v0.6 新增：case 自定义数值指标（如 P50/P90 延迟、token baseline 等） */
+  customMetrics?: Record<string, number>;
 }
 
 export interface CaseContext {
@@ -24,6 +26,8 @@ export interface CaseContext {
   recordObserveMiss(missed: number): void;
   /** 断言失败即 throw，runCase 捕获置为 failed */
   assert(cond: unknown, message: string): void;
+  /** v0.6 新增：写入 customMetrics 字段（被框架收集到 CaseMetrics） */
+  recordMetric(key: string, value: number): void;
 }
 
 export interface CaseDefinition {

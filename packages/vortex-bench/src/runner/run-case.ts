@@ -27,6 +27,7 @@ export async function runCase(def: CaseDefinition, opts: RunCaseOptions): Promis
   let callCount = 0;
   let fallback = 0;
   let missed = 0;
+  const customMetrics: Record<string, number> = {};
 
   async function callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     callCount++;
@@ -59,6 +60,9 @@ export async function runCase(def: CaseDefinition, opts: RunCaseOptions): Promis
     assert(cond, message) {
       if (!cond) throw new AssertionError(message);
     },
+    recordMetric(key, value) {
+      customMetrics[key] = value;
+    },
   };
 
   const started = Date.now();
@@ -73,10 +77,10 @@ export async function runCase(def: CaseDefinition, opts: RunCaseOptions): Promis
 
     await def.run(ctx);
 
-    return buildMetrics(def, true, undefined, callCount, fallback, missed, Date.now() - started);
+    return buildMetrics(def, true, undefined, callCount, fallback, missed, Date.now() - started, customMetrics);
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    return buildMetrics(def, false, reason, callCount, fallback, missed, Date.now() - started);
+    return buildMetrics(def, false, reason, callCount, fallback, missed, Date.now() - started, customMetrics);
   } finally {
     await closeMcpConnection(mcp);
     void trace; void mcp as unknown as McpConnection; // 保留引用抑制 unused 警告
@@ -91,6 +95,7 @@ function buildMetrics(
   fallback: number,
   missed: number,
   durationMs: number,
+  customMetrics: Record<string, number>,
 ): CaseMetrics {
   const m: CaseMetrics = {
     case: def.name,
@@ -101,6 +106,7 @@ function buildMetrics(
     durationMs,
   };
   if (reason !== undefined) m.failureReason = reason;
+  if (Object.keys(customMetrics).length > 0) m.customMetrics = { ...customMetrics };
   return m;
 }
 
