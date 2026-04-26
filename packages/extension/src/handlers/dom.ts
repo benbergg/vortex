@@ -4,7 +4,7 @@ import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 import { getIframeOffset } from "../lib/iframe-offset.js";
 import { resolveTarget, resolveTargetOptional } from "../lib/resolve-target.js";
-import { pageQuery as nativePageQuery } from "../adapter/native.js";
+import { pageQuery as nativePageQuery, mapPageError } from "../adapter/native.js";
 import { clickBBox as cdpClickBBox } from "../adapter/cdp.js";
 import {
   FILL_REJECT_PATTERNS,
@@ -23,9 +23,10 @@ export function registerDomHandlers(
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string) => {
           try {
             const el = document.querySelector(sel);
             if (!el) return { result: null };
@@ -46,11 +47,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -59,9 +58,10 @@ export function registerDomHandlers(
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string) => {
           try {
             const elements = Array.from(document.querySelectorAll(sel)).slice(0, 100);
             return {
@@ -83,11 +83,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -321,9 +319,15 @@ export function registerDomHandlers(
       if (text == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: text");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: async (sel: string, txt: string, delayMs: number) => {
+      const res = await nativePageQuery<{
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      } | undefined>(
+        tid,
+        frameId,
+        async (sel: string, txt: string, delayMs: number) => {
           try {
             // === 探测（与 CLICK 同步；见 CLICK 普通路径）===
             const els = document.querySelectorAll(sel);
@@ -377,24 +381,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, text, delay ?? 0],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as {
-        result?: unknown;
-        error?: string;
-        errorCode?: string;
-        extras?: Record<string, unknown>;
-      };
-      if (res?.error) {
-        const code: VtxErrorCode =
-          res.errorCode && res.errorCode in VtxErrorCode
-            ? (res.errorCode as VtxErrorCode)
-            : res.error.startsWith("Element not found:")
-              ? VtxErrorCode.ELEMENT_NOT_FOUND
-              : VtxErrorCode.JS_EXECUTION_ERROR;
-        throw vtxError(code, res.error, { selector, extras: res.extras });
-      }
+        [selector, text, delay ?? 0],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -406,9 +395,15 @@ export function registerDomHandlers(
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (
+      const res = await nativePageQuery<{
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      } | undefined>(
+        tid,
+        frameId,
+        (
           sel: string,
           val: string,
           rejectPatterns: {
@@ -492,24 +487,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, value, FILL_REJECT_PATTERNS, fallbackToNative],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as {
-        result?: unknown;
-        error?: string;
-        errorCode?: string;
-        extras?: Record<string, unknown>;
-      };
-      if (res?.error) {
-        const code: VtxErrorCode =
-          res.errorCode && res.errorCode in VtxErrorCode
-            ? (res.errorCode as VtxErrorCode)
-            : res.error.startsWith("Element not found:")
-              ? VtxErrorCode.ELEMENT_NOT_FOUND
-              : VtxErrorCode.JS_EXECUTION_ERROR;
-        throw vtxError(code, res.error, { selector, extras: res.extras });
-      }
+        [selector, value, FILL_REJECT_PATTERNS, fallbackToNative],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -520,9 +500,15 @@ export function registerDomHandlers(
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string, val: string) => {
+      const res = await nativePageQuery<{
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      } | undefined>(
+        tid,
+        frameId,
+        (sel: string, val: string) => {
           try {
             // === 探测（与 CLICK 同步）===
             const els = document.querySelectorAll(sel);
@@ -566,24 +552,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, value],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as {
-        result?: unknown;
-        error?: string;
-        errorCode?: string;
-        extras?: Record<string, unknown>;
-      };
-      if (res?.error) {
-        const code: VtxErrorCode =
-          res.errorCode && res.errorCode in VtxErrorCode
-            ? (res.errorCode as VtxErrorCode)
-            : res.error.startsWith("Element not found:")
-              ? VtxErrorCode.ELEMENT_NOT_FOUND
-              : VtxErrorCode.JS_EXECUTION_ERROR;
-        throw vtxError(code, res.error, { selector, extras: res.extras });
-      }
+        [selector, value],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -602,9 +573,10 @@ export function registerDomHandlers(
       }
       const tid = await getActiveTabId(__t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (
           sel: string | undefined,
           cont: string | undefined,
           pos: string | undefined,
@@ -661,11 +633,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector ?? null, container ?? null, position ?? null, x ?? null, y ?? null],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector ?? null, container ?? null, position ?? null, x ?? null, y ?? null],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -674,9 +644,15 @@ export function registerDomHandlers(
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string) => {
+      const res = await nativePageQuery<{
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      } | undefined>(
+        tid,
+        frameId,
+        (sel: string) => {
           try {
             // === 探测（与 CLICK 同步；HOVER 不检查 disabled，disabled 元素仍可收 hover 事件）===
             const els = document.querySelectorAll(sel);
@@ -706,24 +682,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as {
-        result?: unknown;
-        error?: string;
-        errorCode?: string;
-        extras?: Record<string, unknown>;
-      };
-      if (res?.error) {
-        const code: VtxErrorCode =
-          res.errorCode && res.errorCode in VtxErrorCode
-            ? (res.errorCode as VtxErrorCode)
-            : res.error.startsWith("Element not found:")
-              ? VtxErrorCode.ELEMENT_NOT_FOUND
-              : VtxErrorCode.JS_EXECUTION_ERROR;
-        throw vtxError(code, res.error, { selector, extras: res.extras });
-      }
+        [selector],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -734,9 +695,10 @@ export function registerDomHandlers(
       if (!attribute) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: attribute");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string, attr: string) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string, attr: string) => {
           try {
             const el = document.querySelector(sel);
             if (!el) return { error: `Element not found: ${sel}` };
@@ -745,11 +707,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, attribute],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector, attribute],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -758,9 +718,10 @@ export function registerDomHandlers(
       const selector = __t?.selector;
       const tid = await getActiveTabId(__t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string | undefined) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string | undefined) => {
           try {
             if (sel) {
               const el = document.querySelector(sel);
@@ -790,11 +751,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector ?? null],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector ?? null],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -804,9 +763,10 @@ export function registerDomHandlers(
       const timeout = (args.timeout as number | undefined) ?? 10000;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string, timeoutMs: number) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string, timeoutMs: number) => {
           return new Promise<{ result?: unknown; error?: string }>((resolve) => {
             try {
               const el = document.querySelector(sel);
@@ -836,11 +796,9 @@ export function registerDomHandlers(
             }
           });
         },
-        args: [selector, timeout],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector, timeout],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -854,9 +812,10 @@ export function registerDomHandlers(
         __t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId,
       );
       const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string | null, quiet: number, to: number) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string | null, quiet: number, to: number) => {
           return new Promise<{ result?: unknown; error?: string }>((resolve) => {
             try {
               const root = sel ? document.querySelector(sel) : document.body;
@@ -910,10 +869,8 @@ export function registerDomHandlers(
             }
           });
         },
-        args: [selector ?? null, quietMs, timeout],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
+        [selector ?? null, quietMs, timeout],
+      );
       if (res?.error) {
         const isTimeout = res.error.startsWith("DOM did not settle");
         const isNotFound =
