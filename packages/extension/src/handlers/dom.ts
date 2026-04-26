@@ -2,10 +2,9 @@ import { DomActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
-import { getIframeOffset } from "../lib/iframe-offset.js";
 import { resolveTarget, resolveTargetOptional } from "../lib/resolve-target.js";
 import { pageQuery as nativePageQuery, mapPageError } from "../adapter/native.js";
-import { clickBBox as cdpClickBBox } from "../adapter/cdp.js";
+import { clickBBox as cdpClickBBox, cdpClickElement } from "../adapter/cdp.js";
 import {
   runCascaderDriverCDP,
   runDateRangeDriverCDP,
@@ -102,111 +101,7 @@ export function registerDomHandlers(
       const useRealMouse = args.useRealMouse as boolean | undefined;
 
       if (useRealMouse) {
-        // 取元素中心坐标（含完整探测，与普通 CLICK 路径同步）
-        const rectResults = await chrome.scripting.executeScript({
-          target: buildExecuteTarget(tid, frameId),
-          func: (sel: string) => {
-            try {
-              // === 探测 ===
-              const els = document.querySelectorAll(sel);
-              if (els.length === 0) {
-                return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
-              }
-              if (els.length > 1) {
-                return {
-                  errorCode: "SELECTOR_AMBIGUOUS",
-                  error: `Selector "${sel}" matched ${els.length} elements`,
-                  extras: { matchCount: els.length },
-                };
-              }
-              const el = els[0] as HTMLElement;
-              if ((el as HTMLInputElement).disabled === true) {
-                return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
-              }
-              const rect0 = el.getBoundingClientRect();
-              if (rect0.width === 0 || rect0.height === 0) {
-                return {
-                  errorCode: "ELEMENT_DETACHED",
-                  error: `Element ${sel} has zero dimensions (detached or hidden)`,
-                };
-              }
-              // useRealMouse 会 scrollIntoView，所以不做 offscreen 检查
-              el.scrollIntoView({ block: "center", inline: "center" });
-              const rect = el.getBoundingClientRect();
-              const cxInner = rect.left + rect.width / 2;
-              const cyInner = rect.top + rect.height / 2;
-              // occlusion 检查
-              const topEl = document.elementFromPoint(cxInner, cyInner);
-              if (topEl && topEl !== el && !el.contains(topEl) && !topEl.contains(el)) {
-                const classStr =
-                  typeof topEl.className === "string" && topEl.className
-                    ? "." + topEl.className.split(" ").filter(Boolean).join(".")
-                    : "";
-                const desc =
-                  topEl.tagName.toLowerCase() +
-                  (topEl.id ? "#" + topEl.id : "") +
-                  classStr;
-                return {
-                  errorCode: "ELEMENT_OCCLUDED",
-                  error: `Element ${sel} is covered by <${desc}>`,
-                  extras: { blocker: desc },
-                };
-              }
-              return {
-                result: {
-                  x: cxInner,
-                  y: cyInner,
-                  tag: el.tagName.toLowerCase(),
-                  text: el.innerText?.slice(0, 200),
-                },
-              };
-            } catch (err) {
-              return { error: err instanceof Error ? err.message : String(err) };
-            }
-          },
-          args: [selector],
-          world: "MAIN",
-        });
-        const rectRes = rectResults[0]?.result as {
-          result?: { x: number; y: number; tag: string; text?: string };
-          error?: string;
-          errorCode?: string;
-          extras?: Record<string, unknown>;
-        };
-        if (rectRes?.error) {
-          const code: VtxErrorCode =
-            rectRes.errorCode && rectRes.errorCode in VtxErrorCode
-              ? (rectRes.errorCode as VtxErrorCode)
-              : rectRes.error.startsWith("Element not found:")
-                ? VtxErrorCode.ELEMENT_NOT_FOUND
-                : VtxErrorCode.JS_EXECUTION_ERROR;
-          throw vtxError(code, rectRes.error, { selector, extras: rectRes.extras });
-        }
-        const { x: cx, y: cy, tag, text } = rectRes.result!;
-
-        // iframe 坐标偏移
-        const { x: offsetX, y: offsetY } = await getIframeOffset(tid, frameId);
-        const x = cx + offsetX;
-        const y = cy + offsetY;
-
-        // CDP 真实鼠标事件
-        await debuggerMgr.attach(tid);
-        await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-          type: "mouseMoved", x, y,
-        });
-        await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-          type: "mousePressed", x, y, button: "left", clickCount: 1,
-        });
-        await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-          type: "mouseReleased", x, y, button: "left", clickCount: 1,
-        });
-
-        return {
-          success: true,
-          element: { tag, text },
-          x, y,
-          mode: "realMouse",
-        };
+        return await cdpClickElement(debuggerMgr, tid, frameId, selector);
       }
 
       // 普通 element.click() 路径（含失败探测）
