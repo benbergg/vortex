@@ -5,6 +5,7 @@ import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 import { getIframeOffset } from "../lib/iframe-offset.js";
 import { resolveTarget, resolveTargetOptional } from "../lib/resolve-target.js";
 import { pageQuery as nativePageQuery } from "../adapter/native.js";
+import { clickBBox as cdpClickBBox } from "../adapter/cdp.js";
 import {
   FILL_REJECT_PATTERNS,
   findDriver,
@@ -1491,24 +1492,11 @@ async function runDateRangeDriverCDP(opts: {
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-  // 本地 alias：复用统一 pageQuery，绑定 tid+frameId。
+  // 本地 alias：复用统一 pageQuery / clickBBox，绑定 tid+frameId+debuggerMgr。
   const pageQuery = <T>(fn: (...args: unknown[]) => T, args: unknown[] = []) =>
     nativePageQuery<T>(tid, frameId, fn, args);
-
-  // CDP 真鼠标 click at page-coords
-  async function clickBBox(cx: number, cy: number): Promise<void> {
-    const { x: ox, y: oy } = await getIframeOffset(tid, frameId);
-    const x = cx + ox;
-    const y = cy + oy;
-    await debuggerMgr.attach(tid);
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mousePressed", x, y, button: "left", clickCount: 1,
-    });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mouseReleased", x, y, button: "left", clickCount: 1,
-    });
-  }
+  const clickBBox = (cx: number, cy: number) =>
+    cdpClickBBox(debuggerMgr, tid, frameId, cx, cy);
 
   // step 1: resolve root + start input bbox
   const openInfo = await pageQuery(
@@ -1871,23 +1859,11 @@ async function runCascaderDriverCDP(opts: {
   }
   const path = value.map((v) => String(v));
 
-  // 本地 alias：复用统一 pageQuery，绑定 tid+frameId。
+  // 本地 alias：复用统一 pageQuery / clickBBox，绑定 tid+frameId+debuggerMgr。
   const pageQuery = <T>(fn: (...args: unknown[]) => T, args: unknown[] = []) =>
     nativePageQuery<T>(tid, frameId, fn, args);
-
-  async function clickBBox(cx: number, cy: number): Promise<void> {
-    const { x: ox, y: oy } = await getIframeOffset(tid, frameId);
-    const x = cx + ox;
-    const y = cy + oy;
-    await debuggerMgr.attach(tid);
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mousePressed", x, y, button: "left", clickCount: 1,
-    });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mouseReleased", x, y, button: "left", clickCount: 1,
-    });
-  }
+  const clickBBox = (cx: number, cy: number) =>
+    cdpClickBBox(debuggerMgr, tid, frameId, cx, cy);
 
   // step 1: locate cascader root + get bbox
   const rootInfo = await pageQuery(
@@ -2019,23 +1995,11 @@ async function runTimePickerDriverCDP(opts: {
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-  // 本地 alias：复用统一 pageQuery，绑定 tid+frameId。
+  // 本地 alias：复用统一 pageQuery / clickBBox，绑定 tid+frameId+debuggerMgr。
   const pageQuery = <T>(fn: (...args: unknown[]) => T, args: unknown[] = []) =>
     nativePageQuery<T>(tid, frameId, fn, args);
-
-  async function clickBBox(cx: number, cy: number): Promise<void> {
-    const { x: ox, y: oy } = await getIframeOffset(tid, frameId);
-    const x = cx + ox;
-    const y = cy + oy;
-    await debuggerMgr.attach(tid);
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mousePressed", x, y, button: "left", clickCount: 1,
-    });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mouseReleased", x, y, button: "left", clickCount: 1,
-    });
-  }
+  const clickBBox = (cx: number, cy: number) =>
+    cdpClickBBox(debuggerMgr, tid, frameId, cx, cy);
 
   // step 1: locate input + open panel
   const openInfo = await pageQuery(
