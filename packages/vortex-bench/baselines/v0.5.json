@@ -1,0 +1,233 @@
+{
+  "generatedAt": "2026-04-26T00:19:19.427Z",
+  "playgroundUrl": "http://localhost:5173",
+  "cases": [
+    {
+      "case": "el-autocomplete",
+      "passed": false,
+      "callCount": 14,
+      "fallbackToEvaluate": 1,
+      "observeMissedPopperItems": 1,
+      "durationMs": 9004,
+      "failureReason": "result 区应包含 \"value=banana\"，实际: \"value=ban\""
+    },
+    {
+      "case": "el-cascader",
+      "passed": false,
+      "callCount": 13,
+      "fallbackToEvaluate": 4,
+      "observeMissedPopperItems": 0,
+      "durationMs": 22027,
+      "failureReason": "vortex_fill kind=cascader 直接失败: Error [COMMIT_FAILED]: Cascader panel did not open within timeout"
+    },
+    {
+      "case": "el-color-picker",
+      "passed": true,
+      "callCount": 13,
+      "fallbackToEvaluate": 1,
+      "observeMissedPopperItems": 0,
+      "durationMs": 5191
+    },
+    {
+      "case": "el-date-picker-daterange",
+      "passed": false,
+      "callCount": 4,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 16071,
+      "failureReason": "vortex_fill kind=daterange 失败: Error [COMMIT_FAILED]: Picker did not open within timeout"
+    },
+    {
+      "case": "el-date-picker-datetimerange",
+      "passed": true,
+      "callCount": 6,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 30796
+    },
+    {
+      "case": "el-dialog-nested",
+      "passed": true,
+      "callCount": 9,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1247
+    },
+    {
+      "case": "el-drawer",
+      "passed": true,
+      "callCount": 9,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1359
+    },
+    {
+      "case": "el-dropdown",
+      "passed": true,
+      "callCount": 9,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1109
+    },
+    {
+      "case": "el-form-composite",
+      "passed": true,
+      "callCount": 13,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1034
+    },
+    {
+      "case": "el-input-number",
+      "passed": true,
+      "callCount": 8,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1111
+    },
+    {
+      "case": "el-message-box",
+      "passed": true,
+      "callCount": 8,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1307
+    },
+    {
+      "case": "el-pagination",
+      "passed": true,
+      "callCount": 6,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 812
+    },
+    {
+      "case": "el-radio-group",
+      "passed": true,
+      "callCount": 6,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 758
+    },
+    {
+      "case": "el-select-multiple",
+      "passed": true,
+      "callCount": 6,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 994
+    },
+    {
+      "case": "el-select-single",
+      "passed": true,
+      "callCount": 5,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 876
+    },
+    {
+      "case": "el-select-v2",
+      "passed": true,
+      "callCount": 5,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 863
+    },
+    {
+      "case": "el-select-v2-virtual",
+      "passed": true,
+      "callCount": 10,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1468
+    },
+    {
+      "case": "el-slider",
+      "passed": true,
+      "callCount": 11,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1487
+    },
+    {
+      "case": "el-slider-drag",
+      "passed": true,
+      "callCount": 7,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 10946
+    },
+    {
+      "case": "el-table",
+      "passed": true,
+      "callCount": 8,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1146
+    },
+    {
+      "case": "el-tabs",
+      "passed": true,
+      "callCount": 9,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1124
+    },
+    {
+      "case": "el-time-picker",
+      "passed": true,
+      "callCount": 5,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 5868
+    },
+    {
+      "case": "el-transfer",
+      "passed": true,
+      "callCount": 9,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1150
+    },
+    {
+      "case": "el-tree",
+      "passed": true,
+      "callCount": 13,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1718
+    },
+    {
+      "case": "el-tree-select",
+      "passed": true,
+      "callCount": 15,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 2422
+    },
+    {
+      "case": "el-upload",
+      "passed": true,
+      "callCount": 6,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 1044
+    },
+    {
+      "case": "latency-p50",
+      "passed": true,
+      "callCount": 208,
+      "fallbackToEvaluate": 0,
+      "observeMissedPopperItems": 0,
+      "durationMs": 393127,
+      "customMetrics": {
+        "nativeP50_ms": 5,
+        "nativeP90_ms": 6,
+        "cdpP50_ms": 3289,
+        "cdpP90_ms": 4839,
+        "sampleCount": 100,
+        "totalTokenBaseline": 0
+      }
+    }
+  ]
+}
