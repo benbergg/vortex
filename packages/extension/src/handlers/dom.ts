@@ -4,6 +4,7 @@ import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 import { getIframeOffset } from "../lib/iframe-offset.js";
 import { resolveTarget, resolveTargetOptional } from "../lib/resolve-target.js";
+import { pageQuery as nativePageQuery } from "../adapter/native.js";
 import {
   FILL_REJECT_PATTERNS,
   findDriver,
@@ -1490,19 +1491,9 @@ async function runDateRangeDriverCDP(opts: {
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-  // page-side 查询 helper：传入 top-level func 字面量
-  async function pageQuery<T>(
-    fn: (...args: unknown[]) => T,
-    args: unknown[] = [],
-  ): Promise<T> {
-    const r = await chrome.scripting.executeScript({
-      target: buildExecuteTarget(tid, frameId),
-      func: fn,
-      args,
-      world: "MAIN",
-    });
-    return r[0]?.result as T;
-  }
+  // 本地 alias：复用统一 pageQuery，绑定 tid+frameId。
+  const pageQuery = <T>(fn: (...args: unknown[]) => T, args: unknown[] = []) =>
+    nativePageQuery<T>(tid, frameId, fn, args);
 
   // CDP 真鼠标 click at page-coords
   async function clickBBox(cx: number, cy: number): Promise<void> {
@@ -1880,18 +1871,9 @@ async function runCascaderDriverCDP(opts: {
   }
   const path = value.map((v) => String(v));
 
-  async function pageQuery<T>(
-    fn: (...args: unknown[]) => T,
-    args: unknown[] = [],
-  ): Promise<T> {
-    const r = await chrome.scripting.executeScript({
-      target: buildExecuteTarget(tid, frameId),
-      func: fn,
-      args,
-      world: "MAIN",
-    });
-    return r[0]?.result as T;
-  }
+  // 本地 alias：复用统一 pageQuery，绑定 tid+frameId。
+  const pageQuery = <T>(fn: (...args: unknown[]) => T, args: unknown[] = []) =>
+    nativePageQuery<T>(tid, frameId, fn, args);
 
   async function clickBBox(cx: number, cy: number): Promise<void> {
     const { x: ox, y: oy } = await getIframeOffset(tid, frameId);
@@ -2037,18 +2019,9 @@ async function runTimePickerDriverCDP(opts: {
 
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
-  async function pageQuery<T>(
-    fn: (...args: unknown[]) => T,
-    args: unknown[] = [],
-  ): Promise<T> {
-    const r = await chrome.scripting.executeScript({
-      target: buildExecuteTarget(tid, frameId),
-      func: fn,
-      args,
-      world: "MAIN",
-    });
-    return r[0]?.result as T;
-  }
+  // 本地 alias：复用统一 pageQuery，绑定 tid+frameId。
+  const pageQuery = <T>(fn: (...args: unknown[]) => T, args: unknown[] = []) =>
+    nativePageQuery<T>(tid, frameId, fn, args);
 
   async function clickBBox(cx: number, cy: number): Promise<void> {
     const { x: ox, y: oy } = await getIframeOffset(tid, frameId);
