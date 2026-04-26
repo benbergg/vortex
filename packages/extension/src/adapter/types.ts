@@ -17,12 +17,11 @@ export interface NativeAdapter {
 
 /** chrome.debugger.* 包装。CDP-only 能力（trusted event / 真鼠标 click）。 */
 export interface CdpAdapter {
-  /** 真鼠标 click at viewport-coords (cx, cy)；内部含 iframe 偏移 + dispatchMouseEvent×3。 */
+  /** 真鼠标 click at page-coords (x, y)；调用方自行加 iframe offset。dispatchMouseEvent×3。 */
   clickBBox(
     tabId: number,
-    frameId: number | undefined,
-    cx: number,
-    cy: number,
+    x: number,
+    y: number,
   ): Promise<void>;
   /** click 元素中心点（含探测 + scrollIntoView + occlusion + clickBBox）。供 CLICK useRealMouse 分支用。 */
   cdpClickElement(

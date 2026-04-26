@@ -8,6 +8,7 @@
 
 import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { DebuggerManager } from "../../lib/debugger-manager.js";
+import { getIframeOffset } from "../../lib/iframe-offset.js";
 import { pageQuery as nativePageQuery } from "../native.js";
 import { clickBBox as cdpClickBBox } from "../cdp.js";
 
@@ -46,8 +47,10 @@ export async function runDateRangeDriverCDP(opts: {
   // 本地 alias：复用统一 pageQuery / clickBBox，绑定 tid+frameId+debuggerMgr。
   const pageQuery = <T>(fn: (...args: unknown[]) => T, args: unknown[] = []) =>
     nativePageQuery<T>(tid, frameId, fn, args);
-  const clickBBox = (cx: number, cy: number) =>
-    cdpClickBBox(debuggerMgr, tid, frameId, cx, cy);
+  const clickBBox = async (cx: number, cy: number) => {
+    const { x: ox, y: oy } = await getIframeOffset(tid, frameId);
+    await cdpClickBBox(debuggerMgr, tid, cx + ox, cy + oy);
+  };
 
   // step 1: resolve root + start input bbox
   const openInfo = await pageQuery(

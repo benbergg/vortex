@@ -8,22 +8,21 @@ import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { pageQuery as nativePageQuery } from "./native.js";
 
 /**
- * CDP 真鼠标 click at viewport-coords (cx, cy)。
+ * CDP 真鼠标 click at page-coords (x, y)。
  * 抽取自 dom.ts 3 处重复（runDateRangeDriverCDP / runCascaderDriverCDP / runTimePickerDriverCDP）。
  * CLICK handler useRealMouse 分支 inline 版本将在 T1.9（cdpClickElement 抽取）一并合并复用。
+ *
+ * 注：调用方负责把 viewport-coords + iframe offset 加为 page-coords 后传入。
+ * 这样设计避免本函数内部隐式调用 getIframeOffset，cdpClickElement 可以提前算 1 次复用。
  *
  * debuggerMgr 显式参数（cdp.ts 内不持有状态，见 §0.2 约束 #1）。
  */
 export async function clickBBox(
   debuggerMgr: DebuggerManager,
   tabId: number,
-  frameId: number | undefined,
-  cx: number,
-  cy: number,
+  x: number,
+  y: number,
 ): Promise<void> {
-  const { x: ox, y: oy } = await getIframeOffset(tabId, frameId);
-  const x = cx + ox;
-  const y = cy + oy;
   await debuggerMgr.attach(tabId);
   await debuggerMgr.sendCommand(tabId, "Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
   await debuggerMgr.sendCommand(tabId, "Input.dispatchMouseEvent", {
@@ -136,16 +135,19 @@ export async function cdpClickElement(
   }
 
   const { x: cx, y: cy, tag, text } = rectRes.result!;
-  // CDP 真鼠标三连击（含 iframe offset，复用 clickBBox）
-  await clickBBox(debuggerMgr, tabId, frameId, cx, cy);
+  // 提前算 1 次 iframe offset，给 dispatch + return 共用（避免两次 round-trip + race）
+  const { x: ox, y: oy } = await getIframeOffset(tabId, frameId);
+  const px = cx + ox;
+  const py = cy + oy;
+  // CDP 真鼠标三连击（已 page-coords，clickBBox 内部不再算 offset）
+  await clickBBox(debuggerMgr, tabId, px, py);
 
   // 返回的 x/y 是 page-coords（含 iframe offset），与原 dom.ts L189-190 一致
-  const { x: ox, y: oy } = await getIframeOffset(tabId, frameId);
   return {
     success: true as const,
     element: { tag, text },
-    x: cx + ox,
-    y: cy + oy,
+    x: px,
+    y: py,
     mode: "realMouse" as const,
   };
 }
