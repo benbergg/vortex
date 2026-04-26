@@ -3,4 +3,4 @@
 
 export { runDateRangeDriverCDP } from "./daterange.js";
 export { runCascaderDriverCDP } from "./cascader.js";
-// runTimePickerDriverCDP 在 T1.7c 加入
+export { runTimePickerDriverCDP } from "./time-picker.js";
