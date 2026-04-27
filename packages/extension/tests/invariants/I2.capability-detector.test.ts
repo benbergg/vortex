@@ -1,7 +1,7 @@
 // I2: CapabilityDetector 在 chrome.debugger 不可用时返回 canUseCDP=false。
 // 实现见 ../../src/adapter/detector.ts（T1.8 task 完成）。
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { capabilityDetector } from "../../src/adapter/detector";
 
 declare global {
@@ -44,5 +44,71 @@ describe("I2: CapabilityDetector fallback to native when CDP unavailable", () =>
 
   it("needsTrustedEvent 对普通 click 返回 false", () => {
     expect(capabilityDetector.needsTrustedEvent("click", { tagName: "button" })).toBe(false);
+  });
+
+  // 覆盖 commit 2d0062b（P1 fix）：timeout 后 attach 仍成功必须 detach 清理，避免 debugger 残留泄漏
+  describe("timeout-late-attach race（commit 2d0062b 回归保护）", () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("timeout 后 attach 才成功 callback 时 canUseCDP 返 false 且 detach 调用一次", async () => {
+      const attachCallbacks: Array<() => void> = [];
+      const detachMock = vi.fn((_t: unknown, cb?: () => void) => cb?.());
+      globalThis.chrome = {
+        debugger: {
+          attach: vi.fn((_target: unknown, _ver: unknown, cb: () => void) => {
+            // 不立即触发 callback，而是放入队列等待手动激活（模拟 attach 慢于 timeout）
+            attachCallbacks.push(cb);
+          }),
+          detach: detachMock,
+        },
+        runtime: { lastError: undefined },
+      };
+
+      // 启动探测；不 await，先让 timer 推进
+      const promise = capabilityDetector.canUseCDP(1);
+
+      // 推进时间触发 timeout（1000ms budget）
+      await vi.advanceTimersByTimeAsync(1500);
+
+      // 此时 promise 应已 resolve(false)（timer 提前触发）
+      const result = await promise;
+      expect(result).toBe(false);
+
+      // 模拟 attach 在 timeout 之后才成功 callback（lastError 缺省即"成功"）
+      expect(attachCallbacks.length).toBe(1);
+      attachCallbacks[0]();
+
+      // 关键断言：detach 被调用一次清理（修复 commit 2d0062b 之前会泄漏 attached）
+      expect(detachMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("timeout 后 attach 失败 callback 时不调 detach（无泄漏可清）", async () => {
+      const attachCallbacks: Array<() => void> = [];
+      const detachMock = vi.fn((_t: unknown, cb?: () => void) => cb?.());
+      globalThis.chrome = {
+        debugger: {
+          attach: vi.fn((_target: unknown, _ver: unknown, cb: () => void) => {
+            attachCallbacks.push(cb);
+          }),
+          detach: detachMock,
+        },
+        runtime: { lastError: undefined },
+      };
+
+      const promise = capabilityDetector.canUseCDP(1);
+      await vi.advanceTimersByTimeAsync(1500);
+      expect(await promise).toBe(false);
+
+      // attach 在 timeout 后才 callback，但带 lastError → 实际未 attached，无需 detach
+      (globalThis.chrome.runtime ??= {}).lastError = { message: "tab closed" };
+      attachCallbacks[0]();
+
+      expect(detachMock).not.toHaveBeenCalled();
+    });
   });
 });
