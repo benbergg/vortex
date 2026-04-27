@@ -2,10 +2,9 @@
 // 不被 L2/L3/L4 import（depcruise 强制；见 .dependency-cruiser.cjs）。
 // PR #1 各 task 逐步迁入：clickBBox / cdpClickElement / 3 个 CDP driver。
 
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import { getIframeOffset } from "../lib/iframe-offset.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
-import { pageQuery as nativePageQuery } from "./native.js";
+import { pageQuery as nativePageQuery, mapPageError } from "./native.js";
 
 /**
  * CDP 真鼠标 click at page-coords (x, y)。
@@ -124,15 +123,7 @@ export async function cdpClickElement(
     [selector],
   );
 
-  if (rectRes?.error) {
-    const code: VtxErrorCode =
-      rectRes.errorCode && rectRes.errorCode in VtxErrorCode
-        ? (rectRes.errorCode as VtxErrorCode)
-        : rectRes.error.startsWith("Element not found:")
-          ? VtxErrorCode.ELEMENT_NOT_FOUND
-          : VtxErrorCode.JS_EXECUTION_ERROR;
-    throw vtxError(code, rectRes.error, { selector, extras: rectRes.extras });
-  }
+  if (rectRes?.error) mapPageError(rectRes, selector);
 
   const { x: cx, y: cy, tag, text } = rectRes.result!;
   // 提前算 1 次 iframe offset，给 dispatch + return 共用（避免两次 round-trip + race）
