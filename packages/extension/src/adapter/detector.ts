@@ -1,6 +1,7 @@
 // L1 Capability Detector：探测当前环境能力，决定走 native / cdp 路径。
+// TODO: capabilityDetector 当前仅供 I2 测试 + L2 调用预留，生产 handler wire 在 PR #2 完成（spec §1.8）
 
-import type { CapabilityDetector } from "./types";
+import type { CapabilityDetector } from "./types.js";
 
 const DRAG_REQUIRES_CDP = true; // drag 操作 untrusted event 不可用，强制 CDP
 
