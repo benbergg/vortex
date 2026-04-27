@@ -17,6 +17,7 @@ import {
   COMMIT_DRIVERS,
   type CommitKind,
 } from "../patterns/index.js";
+import { waitActionable } from "../action/auto-wait.js";
 
 export function registerDomHandlers(
   router: ActionRouter,
@@ -100,6 +101,9 @@ export function registerDomHandlers(
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       const useRealMouse = args.useRealMouse as boolean | undefined;
+
+      // L2 integration: actionability + auto-wait pre-check
+      await waitActionable(tid, frameId, selector, { timeout: (args.timeout as number | undefined) ?? 5000 });
 
       if (useRealMouse) {
         return await cdpClickElement(debuggerMgr, tid, frameId, selector);
@@ -220,6 +224,10 @@ export function registerDomHandlers(
       if (text == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: text");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+
+      // L2 integration: actionability + auto-wait pre-check (editable required)
+      await waitActionable(tid, frameId, selector, { timeout: (args.timeout as number | undefined) ?? 5000, needsEditable: true });
+
       const res = await nativePageQuery<{
         result?: unknown;
         error?: string;
@@ -296,6 +304,9 @@ export function registerDomHandlers(
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+
+      // L2 integration: actionability + auto-wait pre-check (editable required)
+      await waitActionable(tid, frameId, selector, { timeout: (args.timeout as number | undefined) ?? 5000, needsEditable: true });
 
       // === framework-aware rejection via page-side bundle (@since 0.4.0, migrated T2.7a) ===
       if (!fallbackToNative) {
@@ -391,6 +402,10 @@ export function registerDomHandlers(
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+
+      // L2 integration: actionability + auto-wait pre-check
+      await waitActionable(tid, frameId, selector, { timeout: (args.timeout as number | undefined) ?? 5000 });
+
       const res = await nativePageQuery<{
         result?: unknown;
         error?: string;
