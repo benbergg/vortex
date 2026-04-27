@@ -10,6 +10,9 @@ dist/
 .serena/
 .context/
 
+# 计划文档（按全局规范，写到知识库 12-Projects/，不入仓库）
+docs/plans/
+
 # opencode 插件 + playwright-mcp 缓存
 packages/mcp/opencode.json
 packages/mcp/.playwright-mcp/
