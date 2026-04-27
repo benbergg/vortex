@@ -2,8 +2,14 @@ import { DomActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
-import { getIframeOffset } from "../lib/iframe-offset.js";
 import { resolveTarget, resolveTargetOptional } from "../lib/resolve-target.js";
+import { pageQuery as nativePageQuery, mapPageError } from "../adapter/native.js";
+import { clickBBox as cdpClickBBox, cdpClickElement } from "../adapter/cdp.js";
+import {
+  runCascaderDriverCDP,
+  runDateRangeDriverCDP,
+  runTimePickerDriverCDP,
+} from "../adapter/cdp-drivers/index.js";
 import {
   FILL_REJECT_PATTERNS,
   findDriver,
@@ -21,9 +27,10 @@ export function registerDomHandlers(
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string) => {
           try {
             const el = document.querySelector(sel);
             if (!el) return { result: null };
@@ -44,11 +51,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -57,9 +62,10 @@ export function registerDomHandlers(
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string) => {
           try {
             const elements = Array.from(document.querySelectorAll(sel)).slice(0, 100);
             return {
@@ -81,11 +87,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -97,111 +101,7 @@ export function registerDomHandlers(
       const useRealMouse = args.useRealMouse as boolean | undefined;
 
       if (useRealMouse) {
-        // 取元素中心坐标（含完整探测，与普通 CLICK 路径同步）
-        const rectResults = await chrome.scripting.executeScript({
-          target: buildExecuteTarget(tid, frameId),
-          func: (sel: string) => {
-            try {
-              // === 探测 ===
-              const els = document.querySelectorAll(sel);
-              if (els.length === 0) {
-                return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
-              }
-              if (els.length > 1) {
-                return {
-                  errorCode: "SELECTOR_AMBIGUOUS",
-                  error: `Selector "${sel}" matched ${els.length} elements`,
-                  extras: { matchCount: els.length },
-                };
-              }
-              const el = els[0] as HTMLElement;
-              if ((el as HTMLInputElement).disabled === true) {
-                return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
-              }
-              const rect0 = el.getBoundingClientRect();
-              if (rect0.width === 0 || rect0.height === 0) {
-                return {
-                  errorCode: "ELEMENT_DETACHED",
-                  error: `Element ${sel} has zero dimensions (detached or hidden)`,
-                };
-              }
-              // useRealMouse 会 scrollIntoView，所以不做 offscreen 检查
-              el.scrollIntoView({ block: "center", inline: "center" });
-              const rect = el.getBoundingClientRect();
-              const cxInner = rect.left + rect.width / 2;
-              const cyInner = rect.top + rect.height / 2;
-              // occlusion 检查
-              const topEl = document.elementFromPoint(cxInner, cyInner);
-              if (topEl && topEl !== el && !el.contains(topEl) && !topEl.contains(el)) {
-                const classStr =
-                  typeof topEl.className === "string" && topEl.className
-                    ? "." + topEl.className.split(" ").filter(Boolean).join(".")
-                    : "";
-                const desc =
-                  topEl.tagName.toLowerCase() +
-                  (topEl.id ? "#" + topEl.id : "") +
-                  classStr;
-                return {
-                  errorCode: "ELEMENT_OCCLUDED",
-                  error: `Element ${sel} is covered by <${desc}>`,
-                  extras: { blocker: desc },
-                };
-              }
-              return {
-                result: {
-                  x: cxInner,
-                  y: cyInner,
-                  tag: el.tagName.toLowerCase(),
-                  text: el.innerText?.slice(0, 200),
-                },
-              };
-            } catch (err) {
-              return { error: err instanceof Error ? err.message : String(err) };
-            }
-          },
-          args: [selector],
-          world: "MAIN",
-        });
-        const rectRes = rectResults[0]?.result as {
-          result?: { x: number; y: number; tag: string; text?: string };
-          error?: string;
-          errorCode?: string;
-          extras?: Record<string, unknown>;
-        };
-        if (rectRes?.error) {
-          const code: VtxErrorCode =
-            rectRes.errorCode && rectRes.errorCode in VtxErrorCode
-              ? (rectRes.errorCode as VtxErrorCode)
-              : rectRes.error.startsWith("Element not found:")
-                ? VtxErrorCode.ELEMENT_NOT_FOUND
-                : VtxErrorCode.JS_EXECUTION_ERROR;
-          throw vtxError(code, rectRes.error, { selector, extras: rectRes.extras });
-        }
-        const { x: cx, y: cy, tag, text } = rectRes.result!;
-
-        // iframe 坐标偏移
-        const { x: offsetX, y: offsetY } = await getIframeOffset(tid, frameId);
-        const x = cx + offsetX;
-        const y = cy + offsetY;
-
-        // CDP 真实鼠标事件
-        await debuggerMgr.attach(tid);
-        await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-          type: "mouseMoved", x, y,
-        });
-        await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-          type: "mousePressed", x, y, button: "left", clickCount: 1,
-        });
-        await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-          type: "mouseReleased", x, y, button: "left", clickCount: 1,
-        });
-
-        return {
-          success: true,
-          element: { tag, text },
-          x, y,
-          mode: "realMouse",
-        };
+        return await cdpClickElement(debuggerMgr, tid, frameId, selector);
       }
 
       // 普通 element.click() 路径（含失败探测）
@@ -319,9 +219,15 @@ export function registerDomHandlers(
       if (text == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: text");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: async (sel: string, txt: string, delayMs: number) => {
+      const res = await nativePageQuery<{
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      } | undefined>(
+        tid,
+        frameId,
+        async (sel: string, txt: string, delayMs: number) => {
           try {
             // === 探测（与 CLICK 同步；见 CLICK 普通路径）===
             const els = document.querySelectorAll(sel);
@@ -375,24 +281,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, text, delay ?? 0],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as {
-        result?: unknown;
-        error?: string;
-        errorCode?: string;
-        extras?: Record<string, unknown>;
-      };
-      if (res?.error) {
-        const code: VtxErrorCode =
-          res.errorCode && res.errorCode in VtxErrorCode
-            ? (res.errorCode as VtxErrorCode)
-            : res.error.startsWith("Element not found:")
-              ? VtxErrorCode.ELEMENT_NOT_FOUND
-              : VtxErrorCode.JS_EXECUTION_ERROR;
-        throw vtxError(code, res.error, { selector, extras: res.extras });
-      }
+        [selector, text, delay ?? 0],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -404,9 +295,15 @@ export function registerDomHandlers(
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (
+      const res = await nativePageQuery<{
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      } | undefined>(
+        tid,
+        frameId,
+        (
           sel: string,
           val: string,
           rejectPatterns: {
@@ -490,24 +387,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, value, FILL_REJECT_PATTERNS, fallbackToNative],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as {
-        result?: unknown;
-        error?: string;
-        errorCode?: string;
-        extras?: Record<string, unknown>;
-      };
-      if (res?.error) {
-        const code: VtxErrorCode =
-          res.errorCode && res.errorCode in VtxErrorCode
-            ? (res.errorCode as VtxErrorCode)
-            : res.error.startsWith("Element not found:")
-              ? VtxErrorCode.ELEMENT_NOT_FOUND
-              : VtxErrorCode.JS_EXECUTION_ERROR;
-        throw vtxError(code, res.error, { selector, extras: res.extras });
-      }
+        [selector, value, FILL_REJECT_PATTERNS, fallbackToNative],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -518,9 +400,15 @@ export function registerDomHandlers(
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string, val: string) => {
+      const res = await nativePageQuery<{
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      } | undefined>(
+        tid,
+        frameId,
+        (sel: string, val: string) => {
           try {
             // === 探测（与 CLICK 同步）===
             const els = document.querySelectorAll(sel);
@@ -564,24 +452,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, value],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as {
-        result?: unknown;
-        error?: string;
-        errorCode?: string;
-        extras?: Record<string, unknown>;
-      };
-      if (res?.error) {
-        const code: VtxErrorCode =
-          res.errorCode && res.errorCode in VtxErrorCode
-            ? (res.errorCode as VtxErrorCode)
-            : res.error.startsWith("Element not found:")
-              ? VtxErrorCode.ELEMENT_NOT_FOUND
-              : VtxErrorCode.JS_EXECUTION_ERROR;
-        throw vtxError(code, res.error, { selector, extras: res.extras });
-      }
+        [selector, value],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -600,9 +473,10 @@ export function registerDomHandlers(
       }
       const tid = await getActiveTabId(__t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (
           sel: string | undefined,
           cont: string | undefined,
           pos: string | undefined,
@@ -659,11 +533,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector ?? null, container ?? null, position ?? null, x ?? null, y ?? null],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector ?? null, container ?? null, position ?? null, x ?? null, y ?? null],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -672,9 +544,15 @@ export function registerDomHandlers(
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string) => {
+      const res = await nativePageQuery<{
+        result?: unknown;
+        error?: string;
+        errorCode?: string;
+        extras?: Record<string, unknown>;
+      } | undefined>(
+        tid,
+        frameId,
+        (sel: string) => {
           try {
             // === 探测（与 CLICK 同步；HOVER 不检查 disabled，disabled 元素仍可收 hover 事件）===
             const els = document.querySelectorAll(sel);
@@ -704,24 +582,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as {
-        result?: unknown;
-        error?: string;
-        errorCode?: string;
-        extras?: Record<string, unknown>;
-      };
-      if (res?.error) {
-        const code: VtxErrorCode =
-          res.errorCode && res.errorCode in VtxErrorCode
-            ? (res.errorCode as VtxErrorCode)
-            : res.error.startsWith("Element not found:")
-              ? VtxErrorCode.ELEMENT_NOT_FOUND
-              : VtxErrorCode.JS_EXECUTION_ERROR;
-        throw vtxError(code, res.error, { selector, extras: res.extras });
-      }
+        [selector],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -732,9 +595,10 @@ export function registerDomHandlers(
       if (!attribute) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: attribute");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string, attr: string) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string, attr: string) => {
           try {
             const el = document.querySelector(sel);
             if (!el) return { error: `Element not found: ${sel}` };
@@ -743,11 +607,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector, attribute],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector, attribute],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -756,9 +618,10 @@ export function registerDomHandlers(
       const selector = __t?.selector;
       const tid = await getActiveTabId(__t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string | undefined) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string | undefined) => {
           try {
             if (sel) {
               const el = document.querySelector(sel);
@@ -788,11 +651,9 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [selector ?? null],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector ?? null],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -802,9 +663,10 @@ export function registerDomHandlers(
       const timeout = (args.timeout as number | undefined) ?? 10000;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string, timeoutMs: number) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string, timeoutMs: number) => {
           return new Promise<{ result?: unknown; error?: string }>((resolve) => {
             try {
               const el = document.querySelector(sel);
@@ -834,11 +696,9 @@ export function registerDomHandlers(
             }
           });
         },
-        args: [selector, timeout],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
-      if (res?.error) throw vtxError((res.error.startsWith("Element not found:") || res.error.startsWith("Container not found:")) ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, res.error, selector ? { selector } : undefined);
+        [selector, timeout],
+      );
+      if (res?.error) mapPageError(res, selector);
       return res?.result;
     },
 
@@ -852,9 +712,10 @@ export function registerDomHandlers(
         __t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId,
       );
       const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (sel: string | null, quiet: number, to: number) => {
+      const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
+        tid,
+        frameId,
+        (sel: string | null, quiet: number, to: number) => {
           return new Promise<{ result?: unknown; error?: string }>((resolve) => {
             try {
               const root = sel ? document.querySelector(sel) : document.body;
@@ -908,10 +769,8 @@ export function registerDomHandlers(
             }
           });
         },
-        args: [selector ?? null, quietMs, timeout],
-        world: "MAIN",
-      });
-      const res = results[0]?.result as { result?: unknown; error?: string };
+        [selector ?? null, quietMs, timeout],
+      );
       if (res?.error) {
         const isTimeout = res.error.startsWith("DOM did not settle");
         const isNotFound =
@@ -1450,784 +1309,4 @@ export function registerDomHandlers(
       return res?.result;
     },
   });
-}
-
-// ---- daterange / datetimerange CDP 真鼠标驱动 ----
-// 原因：Element Plus 的 date picker 某些 handler 检查 event.isTrusted。
-// scripting.executeScript + dispatchMouseEvent 得到的是 untrusted 事件，
-// UI 看着有动作（day cell 能选中）但 v-model 不更新。只有 CDP
-// Input.dispatchMouseEvent 产生的 isTrusted=true 事件能完整驱动。
-
-function parseYMDLocal(s: string): { year: number; month: number; day: number } | null {
-  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (!m) return null;
-  return { year: +m[1], month: +m[2], day: +m[3] };
-}
-
-async function runDateRangeDriverCDP(opts: {
-  tid: number;
-  frameId: number | undefined;
-  selector: string;
-  closestSelector: string;
-  isDateTime: boolean;
-  value: { start?: string; end?: string };
-  timeout: number;
-  debuggerMgr: DebuggerManager;
-}): Promise<unknown> {
-  const { tid, frameId, selector, closestSelector, isDateTime, value, timeout, debuggerMgr } = opts;
-
-  if (!value?.start || !value?.end) {
-    throw vtxError(VtxErrorCode.INVALID_PARAMS, `value must be { start, end }, got ${JSON.stringify(value)}`);
-  }
-  const ts = parseYMDLocal(value.start);
-  const te = parseYMDLocal(value.end);
-  if (!ts || !te) {
-    throw vtxError(
-      VtxErrorCode.INVALID_PARAMS,
-      `value.start/end must start with YYYY-MM-DD, got ${value.start} / ${value.end}`,
-    );
-  }
-
-  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-  // page-side 查询 helper：传入 top-level func 字面量
-  async function pageQuery<T>(
-    fn: (...args: unknown[]) => T,
-    args: unknown[] = [],
-  ): Promise<T> {
-    const r = await chrome.scripting.executeScript({
-      target: buildExecuteTarget(tid, frameId),
-      func: fn,
-      args,
-      world: "MAIN",
-    });
-    return r[0]?.result as T;
-  }
-
-  // CDP 真鼠标 click at page-coords
-  async function clickBBox(cx: number, cy: number): Promise<void> {
-    const { x: ox, y: oy } = await getIframeOffset(tid, frameId);
-    const x = cx + ox;
-    const y = cy + oy;
-    await debuggerMgr.attach(tid);
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mousePressed", x, y, button: "left", clickCount: 1,
-    });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mouseReleased", x, y, button: "left", clickCount: 1,
-    });
-  }
-
-  // step 1: resolve root + start input bbox
-  const openInfo = await pageQuery(
-    (sel, closestSel) => {
-      const els = document.querySelectorAll(sel as string);
-      if (els.length === 0) return { err: `Element not found: ${sel}` };
-      if (els.length > 1) return { err: `Selector "${sel}" matched ${els.length} elements` };
-      const target = els[0] as HTMLElement;
-      const root = (target.closest(closestSel as string) ??
-        target.querySelector(closestSel as string)) as HTMLElement | null;
-      if (!root) return { err: `Target does not match driver closestSelector "${closestSel}"` };
-      const sIn = root.querySelector("input.el-range-input") as HTMLElement | null;
-      if (!sIn) return { err: "Range inputs not found under .el-date-editor" };
-      sIn.scrollIntoView({ block: "center", inline: "center" });
-      const r = sIn.getBoundingClientRect();
-      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
-    },
-    [selector, closestSelector],
-  );
-  if ("err" in openInfo) {
-    throw vtxError(VtxErrorCode.COMMIT_FAILED, openInfo.err, { selector });
-  }
-  await clickBBox(openInfo.cx, openInfo.cy);
-
-  // step 2: wait picker visible
-  const deadline = Date.now() + timeout;
-  let panelReady = false;
-  while (Date.now() < deadline) {
-    const ok = await pageQuery(() => {
-      const p = document.querySelector(".el-date-range-picker");
-      if (!p) return false;
-      const r = p.getBoundingClientRect();
-      // Vue transition 完成后 height 才撑开（enter-to），100 为稳态阈值
-      return r.width > 100 && r.height > 100;
-    });
-    if (ok) { panelReady = true; break; }
-    await sleep(50);
-  }
-  if (!panelReady) {
-    throw vtxError(VtxErrorCode.COMMIT_FAILED, "Picker did not open within timeout", {
-      selector, extras: { stage: "open-picker" },
-    });
-  }
-
-  // helper: 读取某个 panel 的 YM + 月箭头 + 年箭头 bbox
-  async function readPanelState(hdrIndex: 0 | 1): Promise<{
-    year: number; month: number;
-    arrLeft: { cx: number; cy: number } | null;
-    arrRight: { cx: number; cy: number } | null;
-    dArrLeft: { cx: number; cy: number } | null;
-    dArrRight: { cx: number; cy: number } | null;
-  } | { err: string }> {
-    return pageQuery(
-      (idx) => {
-        const p = document.querySelector(".el-date-range-picker");
-        if (!p) return { err: "no panel" };
-        const hdrs = p.querySelectorAll(".el-date-range-picker__header");
-        const hdr = hdrs[idx as number];
-        if (!hdr) return { err: `no header[${idx}]` };
-        const raw = ((hdr as HTMLElement).innerText || hdr.textContent || "").toLowerCase();
-        const y = raw.match(/\b(\d{4})\b/);
-        if (!y) return { err: `no year in "${raw}"` };
-        const year = +y[1];
-        let month: number | null = null;
-        const numAfter = raw.match(/\d{4}\D+(\d{1,2})/);
-        if (numAfter && +numAfter[1] >= 1 && +numAfter[1] <= 12) {
-          month = +numAfter[1];
-        } else {
-          const EN = ["january","february","march","april","may","june","july","august","september","october","november","december"];
-          for (let i = 0; i < 12; i++) {
-            if (new RegExp(`\\b${EN[i]}\\b`).test(raw)) { month = i + 1; break; }
-          }
-        }
-        if (month === null) return { err: `no month in "${raw}"` };
-        const aL = p.querySelector(".arrow-left") as HTMLElement | null;
-        const aR = p.querySelector(".arrow-right") as HTMLElement | null;
-        const daL = p.querySelector(".d-arrow-left") as HTMLElement | null;
-        const daR = p.querySelector(".d-arrow-right") as HTMLElement | null;
-        const toC = (el: HTMLElement | null) => {
-          if (!el) return null;
-          const r = el.getBoundingClientRect();
-          return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
-        };
-        return { year, month, arrLeft: toC(aL), arrRight: toC(aR), dArrLeft: toC(daL), dArrRight: toC(daR) };
-      },
-      [hdrIndex],
-    );
-  }
-
-  // 优先走年箭头（.d-arrow-left/right）减少跨多年时的 click 次数和 driver 耗时。
-  async function navigateMonth(
-    hdrIndex: 0 | 1,
-    target: { year: number; month: number },
-  ): Promise<void> {
-    for (let safety = 60; safety > 0; safety--) {
-      const info = await readPanelState(hdrIndex);
-      if ("err" in info) throw vtxError(VtxErrorCode.COMMIT_FAILED, `read header ${hdrIndex}: ${info.err}`);
-      const yearDelta = info.year - target.year;
-      const monthDelta = yearDelta * 12 + (info.month - target.month);
-      if (monthDelta === 0) return;
-      // 相差 >= 1 整年时走 d-arrow
-      if (Math.abs(yearDelta) >= 1) {
-        const yBtn = yearDelta > 0 ? info.dArrLeft : info.dArrRight;
-        if (yBtn) {
-          await clickBBox(yBtn.cx, yBtn.cy);
-          await sleep(80);
-          continue;
-        }
-      }
-      const mBtn = monthDelta > 0 ? info.arrLeft : info.arrRight;
-      if (!mBtn) throw vtxError(VtxErrorCode.COMMIT_FAILED, `arrow button missing (monthDelta=${monthDelta})`);
-      await clickBBox(mBtn.cx, mBtn.cy);
-      await sleep(80);
-    }
-    throw vtxError(VtxErrorCode.COMMIT_FAILED, `navigate month safety overflow for hdr ${hdrIndex}`);
-  }
-
-  // helper: 点某侧 panel 的某天
-  async function clickDayCell(side: "left" | "right", day: number): Promise<void> {
-    const info = await pageQuery(
-      (s, d) => {
-        const content = document.querySelector(`.el-date-range-picker__content.is-${s}`);
-        if (!content) return { err: `no ${s} content` };
-        const tds = content.querySelectorAll("td");
-        for (const td of Array.from(tds)) {
-          const cls = (td as HTMLElement).className;
-          if (cls.includes("disabled") || cls.includes("prev-month") || cls.includes("next-month")) continue;
-          const cell = ((td as HTMLElement).querySelector(".cell") as HTMLElement) ?? (td as HTMLElement);
-          if ((cell.innerText || "").trim() === String(d)) {
-            const r = (td as HTMLElement).getBoundingClientRect();
-            return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
-          }
-        }
-        return { err: `day ${d} not found in ${s} panel` };
-      },
-      [side, day],
-    );
-    if ("err" in info) throw vtxError(VtxErrorCode.COMMIT_FAILED, info.err);
-    await clickBBox(info.cx, info.cy);
-  }
-
-  // step 3: navigate left to start month
-  await navigateMonth(0, { year: ts.year, month: ts.month });
-  // step 4: click start day
-  await clickDayCell("left", ts.day);
-  await sleep(80);
-
-  const sameMonth = ts.year === te.year && ts.month === te.month;
-  if (sameMonth) {
-    // start/end 同月份：不翻 right（Element Plus 强制 right > left，
-    // 翻 right 回到 start 月会反向把 left 推到更早月，污染 start click 的 panel）
-    await clickDayCell("left", te.day);
-  } else {
-    // step 5: navigate right to end month
-    await navigateMonth(1, { year: te.year, month: te.month });
-    // step 6: click end day
-    await clickDayCell("right", te.day);
-  }
-  await sleep(80);
-
-  // step 6.5: datetime 场景，day click 后还需显式 set Time inputs 才会 enable OK。
-  // 从 value.start/end 解析 "HH:MM:SS" 部分，用 nativeInputValueSetter + dispatch input
-  // 让 Element Plus 识别为用户键入。
-  if (isDateTime) {
-    const startTimeStr = (value.start.split(" ")[1] ?? "00:00:00").trim() || "00:00:00";
-    const endTimeStr = (value.end.split(" ")[1] ?? "00:00:00").trim() || "00:00:00";
-    const setRes = await pageQuery(
-      (startTime, endTime) => {
-        const p = document.querySelector(".el-date-range-picker");
-        if (!p) return { err: "no panel for time set" };
-        const inputs = Array.from(p.querySelectorAll("input.el-input__inner")) as HTMLInputElement[];
-        const sT = inputs.find((i) =>
-          ["Start Time", "开始时间"].includes(i.placeholder),
-        );
-        const eT = inputs.find((i) =>
-          ["End Time", "结束时间"].includes(i.placeholder),
-        );
-        if (!sT || !eT) {
-          return {
-            err: `time inputs not found, placeholders: ${inputs.map((i) => i.placeholder).join("|")}`,
-          };
-        }
-        const proto = HTMLInputElement.prototype as unknown as { value: unknown };
-        const descriptor = Object.getOwnPropertyDescriptor(proto, "value");
-        const setter = descriptor?.set as ((v: string) => void) | undefined;
-        if (!setter) return { err: "no native value setter" };
-        const set = (el: HTMLInputElement, v: string) => {
-          setter.call(el, v);
-          el.dispatchEvent(new Event("input", { bubbles: true }));
-          el.dispatchEvent(new Event("change", { bubbles: true }));
-        };
-        set(sT, startTime as string);
-        set(eT, endTime as string);
-        return { ok: true };
-      },
-      [startTimeStr, endTimeStr],
-    );
-    if (setRes && "err" in setRes) {
-      throw vtxError(VtxErrorCode.COMMIT_FAILED, `set time inputs: ${setRes.err}`, {
-        selector, extras: { stage: "set-time" },
-      });
-    }
-    await sleep(100);
-  }
-
-  // step 7: datetime 场景点"确定"
-  if (isDateTime) {
-    // 轮询等 OK button enable（两个 day click 后 Element Plus 需要 nextTick 才更新 disabled 状态）
-    const okDeadline = Date.now() + 2000;
-    let okInfo:
-      | { cx: number; cy: number; disabled: boolean }
-      | { err: string }
-      | null = null;
-    while (Date.now() < okDeadline) {
-      okInfo = await pageQuery(() => {
-        const p = document.querySelector(".el-date-range-picker");
-        if (!p || !p.classList.contains("has-time")) return null;
-        const btns = Array.from(p.querySelectorAll("button")) as HTMLElement[];
-        const hit = btns.find((b) => {
-          const t = (b.innerText || "").trim();
-          return t === "确定" || t === "OK";
-        });
-        if (!hit) return { err: "no confirm button" };
-        const r = hit.getBoundingClientRect();
-        const btn = hit as HTMLButtonElement;
-        const disabled =
-          btn.disabled ||
-          btn.classList.contains("is-disabled") ||
-          btn.hasAttribute("disabled");
-        return { cx: r.left + r.width / 2, cy: r.top + r.height / 2, disabled };
-      });
-      if (okInfo && "disabled" in okInfo && !okInfo.disabled) break;
-      await sleep(100);
-    }
-    if (okInfo && "err" in okInfo) {
-      throw vtxError(VtxErrorCode.COMMIT_FAILED, okInfo.err, {
-        selector, extras: { stage: "confirm" },
-      });
-    }
-    if (okInfo && "disabled" in okInfo) {
-      if (okInfo.disabled) {
-        throw vtxError(
-          VtxErrorCode.COMMIT_FAILED,
-          "OK/确定 button still disabled after selecting start+end days (time inputs may need explicit set)",
-          { selector, extras: { stage: "confirm" } },
-        );
-      }
-      await clickBBox(okInfo.cx, okInfo.cy);
-      await sleep(200);
-    }
-  }
-
-  // step 8a: 等 picker close (height 归 0 或 element 消失)，Element Plus 在 close 时 emit
-  // 对外 change event 让 v-model commit。verify 前必须等这一步。
-  const closeDeadline = Date.now() + 2000;
-  while (Date.now() < closeDeadline) {
-    const closed = await pageQuery(() => {
-      const p = document.querySelector(".el-date-range-picker");
-      if (!p) return true;
-      return p.getBoundingClientRect().height === 0;
-    });
-    if (closed) break;
-    await sleep(50);
-  }
-  await sleep(150); // 额外一个 Vue tick，让 v-model commit 稳
-
-  // step 8b: verify input values
-  const verifyDeadline = Date.now() + 2000;
-  let verified:
-    | { sVal: string; eVal: string; ok: boolean; expectStart: string; expectEnd: string }
-    | null = null;
-  while (Date.now() < verifyDeadline) {
-    const info = await pageQuery(
-      (sel, closestSel, tsJson, teJson) => {
-        const els = document.querySelectorAll(sel as string);
-        const target = els[0] as HTMLElement | undefined;
-        if (!target) return { err: "target gone" };
-        const root = (target.closest(closestSel as string) ??
-          target.querySelector(closestSel as string)) as HTMLElement | null;
-        if (!root) return { err: "root gone" };
-        const ins = root.querySelectorAll("input.el-range-input");
-        const sIn = ins[0] as HTMLInputElement | undefined;
-        const eIn = ins[1] as HTMLInputElement | undefined;
-        if (!sIn || !eIn) return { err: "inputs gone" };
-        const tsv = JSON.parse(tsJson as string);
-        const tev = JSON.parse(teJson as string);
-        const pad = (n: number) => String(n).padStart(2, "0");
-        const expectStart = `${tsv.year}-${pad(tsv.month)}-${pad(tsv.day)}`;
-        const expectEnd = `${tev.year}-${pad(tev.month)}-${pad(tev.day)}`;
-        return {
-          sVal: sIn.value,
-          eVal: eIn.value,
-          ok: sIn.value.startsWith(expectStart) && eIn.value.startsWith(expectEnd),
-          expectStart, expectEnd,
-        };
-      },
-      [selector, closestSelector, JSON.stringify(ts), JSON.stringify(te)],
-    );
-    if ("err" in info) {
-      throw vtxError(VtxErrorCode.COMMIT_FAILED, info.err);
-    }
-    if (info.ok) {
-      verified = info;
-      break;
-    }
-    verified = info; // 最近一次状态，便于 else 报错
-    await sleep(100);
-  }
-  if (!verified || !verified.ok) {
-    throw vtxError(
-      VtxErrorCode.COMMIT_FAILED,
-      `Inputs did not commit: got "${verified?.sVal}" / "${verified?.eVal}", expected to start with "${verified?.expectStart}" / "${verified?.expectEnd}"`,
-      { selector, extras: { stage: "verify" } },
-    );
-  }
-
-  // 保底：click body 强制让任何残留 popper 关闭（blur 事件 → Element Plus emit
-  // change → Vue 更新 modelValue），再等一段时间让 reactive flush 完成。
-  // 这步修复了"driver verify 通过但 result 区仍空"的 flaky 场景。
-  await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-    type: "mouseMoved", x: 5, y: 5,
-  });
-  await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-    type: "mousePressed", x: 5, y: 5, button: "left", clickCount: 1,
-  });
-  await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-    type: "mouseReleased", x: 5, y: 5, button: "left", clickCount: 1,
-  });
-  await sleep(400);
-
-  return {
-    success: true,
-    driver: isDateTime ? "element-plus-datetimerange" : "element-plus-daterange",
-    startValue: verified.sVal,
-    endValue: verified.eVal,
-    transport: "cdp-real-mouse",
-  };
-}
-
-// ---- cascader CDP 真鼠标驱动 ----
-// 触发区（.el-cascader）对 untrusted click 不响应，但面板内 .el-cascader-node__label
-// 用 page-side .click() 可以逐级展开。混合：worker CDP 开 panel + page JS 走 path。
-
-async function runCascaderDriverCDP(opts: {
-  tid: number;
-  frameId: number | undefined;
-  selector: string;
-  closestSelector: string;
-  value: unknown[];
-  timeout: number;
-  debuggerMgr: DebuggerManager;
-}): Promise<unknown> {
-  const { tid, frameId, selector, closestSelector, value, timeout, debuggerMgr } = opts;
-
-  if (!Array.isArray(value) || value.length === 0) {
-    throw vtxError(
-      VtxErrorCode.INVALID_PARAMS,
-      `value must be a non-empty label path array, got ${JSON.stringify(value)}`,
-    );
-  }
-  const path = value.map((v) => String(v));
-
-  async function pageQuery<T>(
-    fn: (...args: unknown[]) => T,
-    args: unknown[] = [],
-  ): Promise<T> {
-    const r = await chrome.scripting.executeScript({
-      target: buildExecuteTarget(tid, frameId),
-      func: fn,
-      args,
-      world: "MAIN",
-    });
-    return r[0]?.result as T;
-  }
-
-  async function clickBBox(cx: number, cy: number): Promise<void> {
-    const { x: ox, y: oy } = await getIframeOffset(tid, frameId);
-    const x = cx + ox;
-    const y = cy + oy;
-    await debuggerMgr.attach(tid);
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mousePressed", x, y, button: "left", clickCount: 1,
-    });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mouseReleased", x, y, button: "left", clickCount: 1,
-    });
-  }
-
-  // step 1: locate cascader root + get bbox
-  const rootInfo = await pageQuery(
-    (sel, cs) => {
-      const els = document.querySelectorAll(sel as string);
-      if (els.length === 0) return { err: `Element not found: ${sel}` };
-      if (els.length > 1) return { err: `Selector "${sel}" matched ${els.length} elements` };
-      const target = els[0] as HTMLElement;
-      const root = (target.closest(cs as string) ??
-        target.querySelector(cs as string)) as HTMLElement | null;
-      if (!root) return { err: `Target does not match closestSelector "${cs}"` };
-      root.scrollIntoView({ block: "center", inline: "center" });
-      const r = root.getBoundingClientRect();
-      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
-    },
-    [selector, closestSelector],
-  );
-  if ("err" in rootInfo) {
-    throw vtxError(VtxErrorCode.COMMIT_FAILED, rootInfo.err, { selector });
-  }
-
-  // step 2: CDP click to open panel
-  await clickBBox(rootInfo.cx, rootInfo.cy);
-
-  // step 3: wait panel visible
-  const deadline = Date.now() + timeout;
-  let panelReady = false;
-  while (Date.now() < deadline) {
-    const ok = await pageQuery(() => {
-      const p = document.querySelector(".el-cascader-panel");
-      if (!p) return false;
-      const r = p.getBoundingClientRect();
-      return r.width > 50 && r.height > 50;
-    });
-    if (ok) { panelReady = true; break; }
-    await new Promise<void>((r) => setTimeout(r, 50));
-  }
-  if (!panelReady) {
-    throw vtxError(VtxErrorCode.COMMIT_FAILED, "Cascader panel did not open within timeout", {
-      selector, extras: { stage: "open-panel" },
-    });
-  }
-
-  // step 4: walk label path, click each level.
-  // page-side 一次 executeScript 跑完所有 level，避免多次往返。
-  const walkRes = await pageQuery(
-    (labelsArg) => {
-      const labels = labelsArg as string[];
-      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-      return (async () => {
-        const clicked: string[] = [];
-        for (let i = 0; i < labels.length; i++) {
-          const want = labels[i];
-          // wait menu[i] to appear (展开过渡可能慢)
-          let menu: Element | null = null;
-          for (let attempt = 0; attempt < 20; attempt++) {
-            const menus = document.querySelectorAll(".el-cascader-menu");
-            if (menus[i]) { menu = menus[i]; break; }
-            await sleep(50);
-          }
-          if (!menu) return { err: `cascader menu level ${i} did not appear`, clicked };
-          // find label
-          let hit: HTMLElement | null = null;
-          for (const nl of Array.from(menu.querySelectorAll(".el-cascader-node__label"))) {
-            if ((nl.textContent || "").trim() === want) {
-              hit = nl as HTMLElement;
-              break;
-            }
-          }
-          if (!hit) {
-            const avail = Array.from(menu.querySelectorAll(".el-cascader-node__label"))
-              .map((e) => (e.textContent || "").trim());
-            return { err: `label "${want}" not found at level ${i}. Available: ${avail.join(",")}`, clicked };
-          }
-          hit.click();
-          clicked.push(want);
-          // 最后一级点完后 panel 会自己关闭 (single-select cascader)；
-          // 非最后级需等 next menu 展开
-          if (i < labels.length - 1) {
-            await sleep(80);
-          }
-        }
-        return { ok: true, clicked };
-      })();
-    },
-    [path],
-  );
-  if ("err" in walkRes) {
-    throw vtxError(VtxErrorCode.COMMIT_FAILED, walkRes.err, {
-      selector, extras: { stage: "walk-path", clicked: walkRes.clicked },
-    });
-  }
-
-  // step 5: wait panel close + 小 sleep 让 v-model commit
-  await new Promise<void>((r) => setTimeout(r, 200));
-
-  return {
-    success: true,
-    driver: "element-plus-cascader",
-    path,
-    transport: "cdp-real-mouse+page-click",
-  };
-}
-
-// ---- el-time-picker spinner driver ----
-// 1) CDP click input 打开 .el-time-panel
-// 2) 三列 spinner 各自 scrollIntoView 目标 li → CDP click
-// 3) CDP click "OK"，等 panel close，verify input.value
-
-async function runTimePickerDriverCDP(opts: {
-  tid: number;
-  frameId: number | undefined;
-  selector: string;
-  closestSelector: string;
-  value: string;
-  timeout: number;
-  debuggerMgr: DebuggerManager;
-}): Promise<unknown> {
-  const { tid, frameId, selector, closestSelector, value, timeout, debuggerMgr } = opts;
-
-  const m = value.match(/^(\d{1,2}):(\d{1,2}):(\d{1,2})$/);
-  if (!m) {
-    throw vtxError(
-      VtxErrorCode.INVALID_PARAMS,
-      `value must be HH:MM:SS, got ${JSON.stringify(value)}`,
-    );
-  }
-  const targetParts = [m[1], m[2], m[3]].map((s) => s.padStart(2, "0"));
-
-  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-  async function pageQuery<T>(
-    fn: (...args: unknown[]) => T,
-    args: unknown[] = [],
-  ): Promise<T> {
-    const r = await chrome.scripting.executeScript({
-      target: buildExecuteTarget(tid, frameId),
-      func: fn,
-      args,
-      world: "MAIN",
-    });
-    return r[0]?.result as T;
-  }
-
-  async function clickBBox(cx: number, cy: number): Promise<void> {
-    const { x: ox, y: oy } = await getIframeOffset(tid, frameId);
-    const x = cx + ox;
-    const y = cy + oy;
-    await debuggerMgr.attach(tid);
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mousePressed", x, y, button: "left", clickCount: 1,
-    });
-    await debuggerMgr.sendCommand(tid, "Input.dispatchMouseEvent", {
-      type: "mouseReleased", x, y, button: "left", clickCount: 1,
-    });
-  }
-
-  // step 1: locate input + open panel
-  const openInfo = await pageQuery(
-    (sel, cs) => {
-      const els = document.querySelectorAll(sel as string);
-      if (els.length === 0) return { err: `Element not found: ${sel}` };
-      if (els.length > 1) return { err: `Selector "${sel}" matched ${els.length} elements` };
-      const target = els[0] as HTMLElement;
-      const root = (target.closest(cs as string) ??
-        target.querySelector(cs as string)) as HTMLElement | null;
-      if (!root) return { err: `Target does not match closestSelector "${cs}"` };
-      root.scrollIntoView({ block: "center", inline: "center" });
-      const r = root.getBoundingClientRect();
-      return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
-    },
-    [selector, closestSelector],
-  );
-  if ("err" in openInfo) {
-    throw vtxError(VtxErrorCode.COMMIT_FAILED, openInfo.err, { selector });
-  }
-  await clickBBox(openInfo.cx, openInfo.cy);
-
-  // step 2: wait .el-time-panel 可见
-  const deadline = Date.now() + timeout;
-  let panelReady = false;
-  while (Date.now() < deadline) {
-    const ok = await pageQuery(() => {
-      const p = document.querySelector(".el-time-panel");
-      if (!p) return false;
-      const r = p.getBoundingClientRect();
-      return r.width > 50 && r.height > 50;
-    });
-    if (ok) { panelReady = true; break; }
-    await sleep(50);
-  }
-  if (!panelReady) {
-    throw vtxError(VtxErrorCode.COMMIT_FAILED, "Time panel did not open within timeout", {
-      selector, extras: { stage: "open-panel" },
-    });
-  }
-
-  // step 3: 三列 spinner 各 click 目标 item
-  for (let colIdx = 0; colIdx < 3; colIdx++) {
-    const wantText = targetParts[colIdx];
-    // 先 scrollIntoView 让 item 在 viewport 里再拿 bbox
-    const info = await pageQuery(
-      (idx, want) => {
-        const cols = document.querySelectorAll(".el-time-panel .el-time-spinner__wrapper");
-        const col = cols[idx as number];
-        if (!col) return { err: `column ${idx} missing` };
-        const items = col.querySelectorAll("li");
-        let hit: HTMLElement | null = null;
-        for (const it of Array.from(items)) {
-          if ((it.textContent || "").trim() === want) {
-            hit = it as HTMLElement;
-            break;
-          }
-        }
-        if (!hit) return { err: `item "${want}" not in column ${idx}` };
-        // behavior:instant 避免平滑动画期间 bbox 漂移（Element Plus spinner 会在后续
-        // click 时再次 scrollTop，造成"点偏一格"的 flaky）
-        hit.scrollIntoView({ block: "center", behavior: "instant" as ScrollBehavior });
-        const r = hit.getBoundingClientRect();
-        return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
-      },
-      [colIdx, wantText],
-    );
-    if ("err" in info) {
-      throw vtxError(VtxErrorCode.COMMIT_FAILED, info.err, {
-        selector, extras: { stage: "spinner-click", column: colIdx, want: wantText },
-      });
-    }
-    // 等 scroll 完全停（300ms 覆盖 Element Plus 内部 scrollTop 兜底），再查一次 bbox 取最新坐标
-    await sleep(300);
-    const freshBBox = await pageQuery(
-      (idx, want) => {
-        const cols = document.querySelectorAll(".el-time-panel .el-time-spinner__wrapper");
-        const col = cols[idx as number];
-        if (!col) return null;
-        for (const it of Array.from(col.querySelectorAll("li"))) {
-          if ((it.textContent || "").trim() === want) {
-            const r = (it as HTMLElement).getBoundingClientRect();
-            return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
-          }
-        }
-        return null;
-      },
-      [colIdx, wantText],
-    );
-    const bb = freshBBox ?? info;
-    await clickBBox(bb.cx, bb.cy);
-    await sleep(120);
-  }
-
-  // step 4: click OK / 确定
-  const okInfo = await pageQuery(() => {
-    const panel = document.querySelector(".el-time-panel");
-    if (!panel) return { err: "panel gone" };
-    const btns = Array.from(panel.querySelectorAll("button")) as HTMLElement[];
-    const hit = btns.find((b) => {
-      const t = (b.innerText || "").trim();
-      return t === "确定" || t === "OK" || t === "Confirm";
-    });
-    if (!hit) {
-      const labels = btns.map((b) => (b.innerText || "").trim());
-      return { err: `confirm button not found among [${labels.join(",")}]` };
-    }
-    const r = hit.getBoundingClientRect();
-    return { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
-  });
-  if ("err" in okInfo) {
-    throw vtxError(VtxErrorCode.COMMIT_FAILED, okInfo.err, {
-      selector, extras: { stage: "confirm" },
-    });
-  }
-  await clickBBox(okInfo.cx, okInfo.cy);
-  await sleep(150);
-
-  // step 5: wait panel close + verify input.value
-  const closeDeadline = Date.now() + 2000;
-  while (Date.now() < closeDeadline) {
-    const closed = await pageQuery(() => {
-      const p = document.querySelector(".el-time-panel");
-      return !p || p.getBoundingClientRect().height === 0;
-    });
-    if (closed) break;
-    await sleep(50);
-  }
-  await sleep(150);
-
-  // step 6: verify input value 是否含目标 HH:MM:SS
-  const expect = targetParts.join(":");
-  const verifyDeadline = Date.now() + 1500;
-  let lastVal = "";
-  while (Date.now() < verifyDeadline) {
-    const v = await pageQuery(
-      (sel, cs) => {
-        const els = document.querySelectorAll(sel as string);
-        const target = els[0] as HTMLElement | undefined;
-        if (!target) return null;
-        const root = (target.closest(cs as string) ??
-          target.querySelector(cs as string)) as HTMLInputElement | null;
-        return root?.value ?? null;
-      },
-      [selector, closestSelector],
-    );
-    if (v && v.includes(expect)) {
-      lastVal = v;
-      break;
-    }
-    if (v != null) lastVal = v;
-    await sleep(100);
-  }
-  if (!lastVal.includes(expect)) {
-    throw vtxError(
-      VtxErrorCode.COMMIT_FAILED,
-      `Time input did not commit: got "${lastVal}", expected "${expect}"`,
-      { selector, extras: { stage: "verify" } },
-    );
-  }
-
-  return {
-    success: true,
-    driver: "element-plus-time",
-    value: lastVal,
-    transport: "cdp-real-mouse",
-  };
 }
