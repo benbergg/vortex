@@ -132,6 +132,40 @@ export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
     hint: "vortex_dom_commit driver failed mid-flow. Inspect context.extras.stage (open-picker / navigate-month / click-day / confirm / verify) to see which step broke. Page state may have changed between calls, or the framework version is not matched by any driver.",
     recoverable: true,
   },
+
+  // -- L2 Action layer --
+  NOT_ATTACHED: {
+    hint: "Element detached from DOM. Call vortex_observe to re-locate the element, then retry with the new ref.",
+    recoverable: true,
+  },
+  NOT_VISIBLE: {
+    hint: "Element not visible (display:none / visibility:hidden / 0x0 box). Call vortex_wait with mode:'element' state:'visible', or check if the parent container is hidden.",
+    recoverable: true,
+  },
+  NOT_STABLE: {
+    hint: "Element position is unstable (animating). Call vortex_wait with mode:'idle' to let the animation settle, then retry.",
+    recoverable: true,
+  },
+  OBSCURED: {
+    hint: "Element hit-test failed; covered by another element (e.g. modal/loading overlay). Inspect via vortex_screenshot, dismiss the overlay (context.extras.blocker may identify it), then retry.",
+    recoverable: true,
+  },
+  DISABLED: {
+    hint: "Element is disabled (disabled attr / aria-disabled / fieldset[disabled]). Complete prerequisite interactions to unlock it before retrying.",
+    recoverable: true,
+  },
+  NOT_EDITABLE: {
+    hint: "Target is not editable (readonly or non-input element). Use vortex_extract or vortex_get_text to read instead, or pick a different selector.",
+    recoverable: false,
+  },
+  ACTION_FAILED_ALL_PATHS: {
+    hint: "All fallback paths exhausted (dispatchEvent → CDP → ...). context.extras.attemptedPaths lists what was tried. Inspect via vortex_screenshot; consider coordinate-based click via vortex_evaluate, or check if the element is inside a closed shadow root.",
+    recoverable: false,
+  },
+  DRAG_REQUIRES_CDP: {
+    hint: "Drag operation requires CDP, but CDP is unavailable (DevTools may be open, or chrome.debugger attach was denied). Close DevTools and retry, or rewrite the flow using vortex_evaluate primitives.",
+    recoverable: false,
+  },
 };
 
 /**

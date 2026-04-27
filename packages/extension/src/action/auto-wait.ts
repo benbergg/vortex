@@ -3,10 +3,6 @@
 //
 // Default timeout 5000ms; each reason has its own retry interval (per spec §2 table).
 // On timeout exhaustion, throws vtxError(TIMEOUT) with extras.lastReason carrying the last failure code.
-//
-// FIXME(T2.7): mapToVtxCode currently returns JS_EXECUTION_ERROR for all reasons; T2.7 will add
-// precise codes (NOT_ATTACHED / NOT_VISIBLE / NOT_STABLE / OBSCURED / DISABLED / NOT_EDITABLE)
-// to VtxErrorCode and we'll restore precise mapping then.
 
 import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import {
@@ -88,8 +84,14 @@ export async function waitActionable(
   );
 }
 
-/** ActionabilityFailure → VtxErrorCode mapping. T2.7 will restore precise codes. */
-function mapToVtxCode(_reason: ActionabilityFailure): VtxErrorCode {
-  // FIXME(T2.7): replace with precise mapping after T2.7 adds the 6 L2 error codes.
-  return VtxErrorCode.JS_EXECUTION_ERROR;
+/** Maps ActionabilityFailure to VtxErrorCode (precise mapping; T2.7 added the 6 L2 codes). */
+function mapToVtxCode(reason: ActionabilityFailure): VtxErrorCode {
+  switch (reason) {
+    case "NOT_ATTACHED": return VtxErrorCode.NOT_ATTACHED;
+    case "NOT_VISIBLE":  return VtxErrorCode.NOT_VISIBLE;
+    case "NOT_STABLE":   return VtxErrorCode.NOT_STABLE;
+    case "OBSCURED":     return VtxErrorCode.OBSCURED;
+    case "DISABLED":     return VtxErrorCode.DISABLED;
+    case "NOT_EDITABLE": return VtxErrorCode.NOT_EDITABLE;
+  }
 }

@@ -42,6 +42,24 @@ export const VtxErrorCode = {
   /** vortex_dom_commit 的 driver 在流程中途失败（picker 打不开、日期格找不到、校验不一致等）。
    *  context.extras 会带 stage 字段标识失败阶段。*/
   COMMIT_FAILED: "COMMIT_FAILED",
+
+  // -- L2 Action layer (added in PR #2) --
+  /** Actionability: element detached from DOM */
+  NOT_ATTACHED: "NOT_ATTACHED",
+  /** Actionability: display:none / visibility:hidden / opacity:0 / 0x0 */
+  NOT_VISIBLE: "NOT_VISIBLE",
+  /** Actionability: double-RAF sample shows unstable position (animating) */
+  NOT_STABLE: "NOT_STABLE",
+  /** Actionability: hit-test hit a different element (covered) */
+  OBSCURED: "OBSCURED",
+  /** Actionability: disabled / aria-disabled / fieldset[disabled] */
+  DISABLED: "DISABLED",
+  /** Actionability: fill/type target is readonly or non-input */
+  NOT_EDITABLE: "NOT_EDITABLE",
+  /** Fallback chain exhausted all paths */
+  ACTION_FAILED_ALL_PATHS: "ACTION_FAILED_ALL_PATHS",
+  /** Drag operation but CDP unavailable */
+  DRAG_REQUIRES_CDP: "DRAG_REQUIRES_CDP",
 } as const;
 
 export type VtxErrorCode = (typeof VtxErrorCode)[keyof typeof VtxErrorCode];

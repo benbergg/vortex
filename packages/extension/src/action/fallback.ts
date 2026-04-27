@@ -3,11 +3,9 @@
 //
 // Each action has a sequence of paths; each layer's failure is judged via micro-verify (T2.6).
 // In T2.5 we use inline checks (e.g. el.value === val) until T2.6 lands. All paths failing throws
-// ACTION_FAILED_ALL_PATHS (FIXME T2.7).
+// ACTION_FAILED_ALL_PATHS.
 //
 // Drag is CDP-only: if CDP unavailable, throws DRAG_REQUIRES_CDP without fallback.
-//
-// FIXME(T2.7): replace JS_EXECUTION_ERROR placeholders with ACTION_FAILED_ALL_PATHS / DRAG_REQUIRES_CDP.
 
 import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import { pageQuery as nativePageQuery } from "../adapter/native.js";
@@ -58,7 +56,7 @@ export async function clickWithFallback(
   }
 
   throw vtxError(
-    VtxErrorCode.JS_EXECUTION_ERROR, // FIXME(T2.7): ACTION_FAILED_ALL_PATHS
+    VtxErrorCode.ACTION_FAILED_ALL_PATHS,
     `Click failed all paths`,
     { selector: ctx.selector, extras: { attemptedPaths: attempted } },
   );
@@ -126,7 +124,7 @@ export async function fillWithFallback(
   }
 
   throw vtxError(
-    VtxErrorCode.JS_EXECUTION_ERROR, // FIXME(T2.7): ACTION_FAILED_ALL_PATHS
+    VtxErrorCode.ACTION_FAILED_ALL_PATHS,
     `Fill failed all paths`,
     { selector: ctx.selector, extras: { attemptedPaths: attempted } },
   );
@@ -183,7 +181,7 @@ export async function dragWithFallback(
 ): Promise<{ path: ActionPath }> {
   if (!(await capabilityDetector.canUseCDP(ctx.tabId))) {
     throw vtxError(
-      VtxErrorCode.JS_EXECUTION_ERROR, // FIXME(T2.7): DRAG_REQUIRES_CDP
+      VtxErrorCode.DRAG_REQUIRES_CDP,
       "Drag requires CDP but CDP unavailable",
       { selector: ctx.selector },
     );
