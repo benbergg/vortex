@@ -117,10 +117,10 @@ export type ActionabilityResult =
         requestAnimationFrame(() => {
           const r2 = el.getBoundingClientRect();
           const stable =
-            Math.abs(r1.x - r2.x) < 1 &&
-            Math.abs(r1.y - r2.y) < 1 &&
-            Math.abs(r1.width - r2.width) < 1 &&
-            Math.abs(r1.height - r2.height) < 1;
+            r1.x === r2.x &&
+            r1.y === r2.y &&
+            r1.width === r2.width &&
+            r1.height === r2.height;
           resolve(stable);
         });
       });
