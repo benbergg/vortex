@@ -1,7 +1,7 @@
-// I9: waitActionable times out and returns the last failure reason when element
+// I9: waitActionable times out and throws with the last failure reason when element
 // remains non-actionable for the full timeout duration.
 // Per spec §2: default timeout 5000ms (vortex L2), reason-aware retry strategy.
-// Implementation: ../../src/action/auto-wait.ts (T2.4 will implement).
+// Implementation: ../../src/action/auto-wait.ts (T2.4).
 // FIXME: remove .skip at T2.9 after auto-wait is implemented.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -35,18 +35,18 @@ describe.skip("I9: waitActionable times out when element stays non-actionable", 
     vi.useRealTimers();
   });
 
-  it("resolves with ok=false and last failure reason after timeout", async () => {
+  it("rejects with TIMEOUT error and lastReason after timeout", async () => {
     const timeout = 200;
-    // Start waiting; advance time past timeout to trigger resolution.
+    // Start waiting; advance time past timeout to trigger rejection.
     const waitPromise = waitActionable(1, undefined, "#btn", { timeout });
     await vi.advanceTimersByTimeAsync(timeout + 50);
-    const res = await waitPromise;
 
-    expect(res.ok).toBe(false);
     // Element is disabled, so last failure reason should be DISABLED.
-    expect(res.reason).toBe("DISABLED");
-    // Auto-wait should have made multiple attempts before timing out.
-    expect(typeof res.attempts).toBe("number");
-    expect(res.attempts).toBeGreaterThan(0);
+    await expect(waitPromise).rejects.toMatchObject({
+      code: "TIMEOUT",
+      context: expect.objectContaining({
+        extras: expect.objectContaining({ lastReason: "DISABLED" }),
+      }),
+    });
   });
 });
