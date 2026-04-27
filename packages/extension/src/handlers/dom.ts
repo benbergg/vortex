@@ -4,6 +4,7 @@ import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
 import { resolveTarget, resolveTargetOptional } from "../lib/resolve-target.js";
 import { pageQuery as nativePageQuery, mapPageError } from "../adapter/native.js";
+import { loadPageSideModule } from "../adapter/page-side-loader.js";
 import { clickBBox as cdpClickBBox, cdpClickElement } from "../adapter/cdp.js";
 import {
   runCascaderDriverCDP,
@@ -295,6 +296,27 @@ export function registerDomHandlers(
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+
+      // === framework-aware rejection via page-side bundle (@since 0.4.0, migrated T2.7a) ===
+      if (!fallbackToNative) {
+        await loadPageSideModule(tid, frameId, "fill-reject");
+        const rejectResult = await nativePageQuery<
+          | { rejected: false }
+          | { rejected: true; errorCode: string; error: string; extras: Record<string, unknown> }
+          | undefined
+        >(
+          tid,
+          frameId,
+          (sel: string, patterns: unknown) =>
+            (window as any).__vortexFillReject.checkRejectPattern(sel, patterns),
+          [selector, FILL_REJECT_PATTERNS],
+        );
+        if (rejectResult?.rejected) {
+          const r = rejectResult as { rejected: true; errorCode: string; error: string; extras: Record<string, unknown> };
+          mapPageError(r, selector);
+        }
+      }
+
       const res = await nativePageQuery<{
         result?: unknown;
         error?: string;
@@ -303,19 +325,9 @@ export function registerDomHandlers(
       } | undefined>(
         tid,
         frameId,
-        (
-          sel: string,
-          val: string,
-          rejectPatterns: {
-            id: string;
-            closestSelector: string;
-            reason: string;
-            suggestedTool: string;
-          }[],
-          allowFallback: boolean,
-        ) => {
+        (sel: string, val: string) => {
           try {
-            // === 探测（与 CLICK 同步）===
+            // === element probes (in sync with CLICK) ===
             const els = document.querySelectorAll(sel);
             if (els.length === 0) {
               return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
@@ -349,28 +361,7 @@ export function registerDomHandlers(
                 error: `Element ${sel} is outside the viewport`,
               };
             }
-            // === framework-aware 拒绝（@since 0.4.0）===
-            if (!allowFallback) {
-              for (const p of rejectPatterns) {
-                let hit = false;
-                try { hit = !!el.closest(p.closestSelector); } catch { /* 无效选择器跳过 */ }
-                if (hit) {
-                  return {
-                    errorCode: "UNSUPPORTED_TARGET",
-                    error:
-                      `dom_fill rejected on framework-controlled target (${p.id}): ${p.reason} ` +
-                      `Retry with ${p.suggestedTool}. Example: ${p.fixExample}`,
-                    extras: {
-                      pattern: p.id,
-                      suggestedTool: p.suggestedTool,
-                      fixExample: p.fixExample,
-                      selector: sel,
-                    },
-                  };
-                }
-              }
-            }
-            // === fill 操作 ===
+            // === fill operation ===
             const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
               window.HTMLInputElement.prototype,
               "value",
@@ -387,7 +378,7 @@ export function registerDomHandlers(
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        [selector, value, FILL_REJECT_PATTERNS, fallbackToNative],
+        [selector, value],
       );
       if (res?.error) mapPageError(res, selector);
       return res?.result;
@@ -848,457 +839,34 @@ export function registerDomHandlers(
         });
       }
 
-      const results = await chrome.scripting.executeScript({
-        target: buildExecuteTarget(tid, frameId),
-        func: (
-          sel: string,
-          driverId: string,
-          closestSelector: string,
-          val: unknown,
-          timeoutMs: number,
-        ) => {
-          // ---- 页面侧完整流程：返回 { result?, error?, errorCode?, stage? } ----
-          const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-          async function waitFor<T>(
-            probe: () => T | null | undefined,
-            to: number,
-            intervalMs = 50,
-          ): Promise<T | null> {
-            const deadline = Date.now() + to;
-            while (Date.now() < deadline) {
-              const r = probe();
-              if (r) return r;
-              await sleep(intervalMs);
-            }
-            return null;
-          }
+      // Load page-side bundle for drivers that have been migrated out of inline func.
+      if (driver.kind === "checkbox-group") {
+        await loadPageSideModule(tid, frameId, "commit-checkbox-group");
+      } else if (driver.kind === "select") {
+        await loadPageSideModule(tid, frameId, "commit-select");
+      }
 
-          function parseYMD(s: string): { year: number; month: number; day: number } | null {
-            // 接受 "YYYY-MM-DD" 或 "YYYY-MM-DD HH:MM:SS"
-            const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-            if (!m) return null;
-            return { year: +m[1], month: +m[2], day: +m[3] };
-          }
-
-          function readHeaderYM(hdr: Element | null | undefined): { year: number; month: number } | null {
-            if (!hdr) return null;
-            const raw = (hdr as HTMLElement).innerText || hdr.textContent || "";
-            const t = raw.toLowerCase();
-            // 先抓 4 位 year
-            const yMatch = t.match(/\b(\d{4})\b/);
-            if (!yMatch) return null;
-            const year = +yMatch[1];
-            // 中文 "2026 年 4 月" 或 "2026年4月"：year 后的数字月
-            const numAfter = t.match(/\d{4}\D+(\d{1,2})/);
-            if (numAfter && +numAfter[1] >= 1 && +numAfter[1] <= 12) {
-              return { year, month: +numAfter[1] };
-            }
-            // 英文全月名（Element Plus 默认英文 locale 输出 "2026 April"）
-            const EN_MONTHS = [
-              "january", "february", "march", "april", "may", "june",
-              "july", "august", "september", "october", "november", "december",
-            ];
-            for (let i = 0; i < EN_MONTHS.length; i++) {
-              if (new RegExp(`\\b${EN_MONTHS[i]}\\b`).test(t)) {
-                return { year, month: i + 1 };
-              }
-            }
-            return null;
-          }
-
-          function monthDelta(a: { year: number; month: number }, b: { year: number; month: number }): number {
-            return (a.year - b.year) * 12 + (a.month - b.month);
-          }
-
-          function findDayCell(content: Element | null, day: number): HTMLElement | null {
-            if (!content) return null;
-            const tds = content.querySelectorAll("td");
-            for (const td of Array.from(tds)) {
-              const cls = td.className;
-              if (cls.includes("disabled") || cls.includes("prev-month") || cls.includes("next-month")) continue;
-              const cell = (td.querySelector(".cell") as HTMLElement | null) ?? (td as HTMLElement);
-              if ((cell.innerText || "").trim() === String(day)) return td as HTMLElement;
-            }
-            return null;
-          }
-
-          function dispatchMouseClick(el: HTMLElement): void {
-            const rect = el.getBoundingClientRect();
-            const opts = {
-              bubbles: true,
-              cancelable: true,
-              view: window,
-              clientX: rect.left + rect.width / 2,
-              clientY: rect.top + rect.height / 2,
-            };
-            el.dispatchEvent(new MouseEvent("mousedown", opts));
-            el.dispatchEvent(new MouseEvent("mouseup", opts));
-            el.dispatchEvent(new MouseEvent("click", opts));
-          }
-
-          try {
-            const els = document.querySelectorAll(sel);
-            if (els.length === 0) return { error: `Element not found: ${sel}`, errorCode: "ELEMENT_NOT_FOUND" };
-            if (els.length > 1)
-              return {
-                error: `Selector "${sel}" matched ${els.length} elements`,
-                errorCode: "SELECTOR_AMBIGUOUS",
-                extras: { matchCount: els.length },
-              };
-            const target = els[0] as HTMLElement;
-            // 允许 target 自身/祖先，或 target 子孙匹配 closestSelector。
-            // 这样 agent 可以把 [data-testid=wrapper] 作为 target，不必精确指到 driver 根节点。
-            const root = (target.closest(closestSelector) ??
-              target.querySelector(closestSelector)) as HTMLElement | null;
-            if (!root)
-              return {
-                error: `Target does not match driver closestSelector "${closestSelector}" (neither ancestor nor descendant)`,
-                errorCode: "UNSUPPORTED_TARGET",
-                extras: { driverId },
-              };
-
-            // -------- Element Plus datetime/date range driver --------
-            if (driverId === "element-plus-datetimerange" || driverId === "element-plus-daterange") {
-              const isDateTime = driverId === "element-plus-datetimerange";
-              const v = val as { start?: string; end?: string };
-              if (!v?.start || !v?.end)
-                return {
-                  error: `value must be { start, end }, got ${JSON.stringify(v)}`,
-                  errorCode: "INVALID_PARAMS",
-                };
-              const ts = parseYMD(v.start);
-              const te = parseYMD(v.end);
-              if (!ts || !te)
-                return {
-                  error: `value.start/end must start with YYYY-MM-DD, got ${v.start} / ${v.end}`,
-                  errorCode: "INVALID_PARAMS",
-                };
-
-              const startInput = root.querySelector(
-                'input.el-range-input[placeholder*="开始"], input.el-range-input[placeholder*="Start"]',
-              ) as HTMLInputElement | null;
-              const endInput = root.querySelector(
-                'input.el-range-input[placeholder*="结束"], input.el-range-input[placeholder*="End"]',
-              ) as HTMLInputElement | null;
-              const allRangeInputs = root.querySelectorAll("input.el-range-input");
-              const sIn = startInput ?? (allRangeInputs[0] as HTMLInputElement | undefined);
-              const eIn = endInput ?? (allRangeInputs[1] as HTMLInputElement | undefined);
-              if (!sIn || !eIn)
-                return {
-                  error: "Range inputs not found under .el-date-editor",
-                  errorCode: "COMMIT_FAILED",
-                  stage: "resolve-inputs",
-                };
-
-              // 1. 打开 picker（click 起始输入）
-              sIn.scrollIntoView({ block: "center", inline: "center" });
-              sIn.focus();
-              dispatchMouseClick(sIn);
-
-              // 2. 等 picker 出现
-              return (async () => {
-                const panel = await waitFor(
-                  () => document.querySelector(".el-date-range-picker") as HTMLElement | null,
-                  timeoutMs,
-                );
-                if (!panel)
-                  return {
-                    error: "Picker did not open within timeout",
-                    errorCode: "COMMIT_FAILED",
-                    stage: "open-picker",
-                  };
-
-                const hdrs = () => panel.querySelectorAll(".el-date-range-picker__header");
-
-                // 3. 导航左面板到 start 月
-                let safety = 60;
-                while (safety-- > 0) {
-                  const cur = readHeaderYM(hdrs()[0]);
-                  if (!cur) break;
-                  const d = monthDelta(cur, ts);
-                  if (d === 0) break;
-                  const btn = panel.querySelector(d > 0 ? ".arrow-left" : ".arrow-right") as HTMLElement | null;
-                  if (!btn) break;
-                  dispatchMouseClick(btn);
-                  await sleep(30);
-                }
-
-                // 4. 点击 start 日
-                const leftContent = panel.querySelector(".el-date-range-picker__content.is-left");
-                const startCell = findDayCell(leftContent, ts.day);
-                if (!startCell)
-                  return {
-                    error: `Start day cell ${ts.year}-${ts.month}-${ts.day} not found`,
-                    errorCode: "COMMIT_FAILED",
-                    stage: "click-start",
-                  };
-                dispatchMouseClick(startCell);
-                await sleep(30);
-
-                // 5. 导航右面板到 end 月（右 header 往目标移动；点 arrow-right 使两面板前进）
-                safety = 60;
-                while (safety-- > 0) {
-                  const cur = readHeaderYM(hdrs()[1]);
-                  if (!cur) break;
-                  const d = monthDelta(cur, te);
-                  if (d === 0) break;
-                  const btn = panel.querySelector(d > 0 ? ".arrow-left" : ".arrow-right") as HTMLElement | null;
-                  if (!btn) break;
-                  dispatchMouseClick(btn);
-                  await sleep(30);
-                }
-
-                // 6. 点击 end 日（优先右面板，若右面板显示的还是 start 月则在左面板里找）
-                let rightContent = panel.querySelector(".el-date-range-picker__content.is-right");
-                let endCell = findDayCell(rightContent, te.day);
-                if (!endCell) {
-                  const leftNow = panel.querySelector(".el-date-range-picker__content.is-left");
-                  endCell = findDayCell(leftNow, te.day);
-                }
-                if (!endCell)
-                  return {
-                    error: `End day cell ${te.year}-${te.month}-${te.day} not found`,
-                    errorCode: "COMMIT_FAILED",
-                    stage: "click-end",
-                  };
-                dispatchMouseClick(endCell);
-                await sleep(30);
-
-                // 7. has-time 时点底部"确定"
-                if (isDateTime && panel.classList.contains("has-time")) {
-                  const okBtn = Array.from(panel.querySelectorAll("button")).find(
-                    (b) => ((b as HTMLElement).innerText || "").trim() === "确定" || ((b as HTMLElement).innerText || "").trim() === "OK",
-                  ) as HTMLButtonElement | undefined;
-                  if (okBtn) dispatchMouseClick(okBtn);
-                }
-
-                // 8. 等 picker 关闭
-                await waitFor(() => {
-                  const p = document.querySelector(".el-date-range-picker") as HTMLElement | null;
-                  if (!p) return true;
-                  return p.getBoundingClientRect().width === 0 ? true : null;
-                }, 2000);
-
-                // 9. 校验输入值
-                const sVal = sIn.value;
-                const eVal = eIn.value;
-                const expectStart = `${ts.year}-${String(ts.month).padStart(2, "0")}-${String(ts.day).padStart(2, "0")}`;
-                const expectEnd = `${te.year}-${String(te.month).padStart(2, "0")}-${String(te.day).padStart(2, "0")}`;
-                if (!sVal.startsWith(expectStart) || !eVal.startsWith(expectEnd))
-                  return {
-                    error: `Inputs did not commit: got "${sVal}" / "${eVal}", expected to start with "${expectStart}" / "${expectEnd}"`,
-                    errorCode: "COMMIT_FAILED",
-                    stage: "verify",
-                    extras: { startValue: sVal, endValue: eVal },
-                  };
-
-                return {
-                  result: {
-                    success: true,
-                    driver: driverId,
-                    startValue: sVal,
-                    endValue: eVal,
-                  },
-                };
-              })();
-            }
-
-            // -------- Element Plus checkbox-group driver (O-10, @since 0.4.0) --------
-            if (driverId === "element-plus-checkbox-group") {
-              // 接受两种形状：value: string[]（推荐，简洁）或 { values: string[] }（兼容旧）
-              const v = val as { values?: string[] } | string[];
-              const labels: string[] | null = Array.isArray(v)
-                ? (v as string[])
-                : Array.isArray(v?.values)
-                  ? (v.values as string[])
-                  : null;
-              if (!labels) {
-                return {
-                  error: `value must be string[] or { values: string[] }, got ${JSON.stringify(v)}`,
-                  errorCode: "INVALID_PARAMS",
-                };
-              }
-              const target = new Set(labels.map((s) => String(s).trim()));
-
-              return (async () => {
-                // 支持 button 风格（.el-checkbox-button）和 label 风格（.el-checkbox）
-                const btns = Array.from(
-                  root.querySelectorAll(".el-checkbox-button, .el-checkbox"),
-                ) as HTMLElement[];
-                if (btns.length === 0) {
-                  return {
-                    error: "No .el-checkbox-button or .el-checkbox children under .el-checkbox-group",
-                    errorCode: "COMMIT_FAILED",
-                    stage: "resolve-buttons",
-                  };
-                }
-                const unknownTargets = [...target].filter(
-                  (name) => !btns.some((b) => (b.innerText || "").trim() === name),
-                );
-                if (unknownTargets.length > 0) {
-                  const available = btns.map((b) => (b.innerText || "").trim());
-                  return {
-                    error: `Unknown label(s): ${unknownTargets.join(",")}. Available: ${available.join(",")}`,
-                    errorCode: "INVALID_PARAMS",
-                    extras: { unknownTargets, available },
-                  };
-                }
-
-                // 关键：逐个 click + 让 Vue 跑一个 microtask/动画帧再下一个。
-                // 直接 forEach 同步点会被 Element Plus 的 click-group 合并成"只认最后一次"。
-                const dispatchReal = (el: HTMLElement) => {
-                  const input = el.querySelector('input[type="checkbox"]') as HTMLInputElement | null;
-                  // 点 label 比点 input 更稳：label 上有 @click.prevent + Vue 侧更新 v-model
-                  if (input) input.click();
-                  else el.click();
-                };
-                const tick = () => new Promise((r) => setTimeout(r, 40));
-
-                const toggled: string[] = [];
-                for (const b of btns) {
-                  const name = (b.innerText || "").trim();
-                  const isChecked = b.classList.contains("is-checked");
-                  const shouldCheck = target.has(name);
-                  if (isChecked === shouldCheck) continue;
-                  dispatchReal(b);
-                  toggled.push(name);
-                  await tick();
-                }
-
-                // 校验：再读一遍实际 checked 状态，要求与目标一致
-                const checkedNow = btns
-                  .filter((b) => b.classList.contains("is-checked"))
-                  .map((b) => (b.innerText || "").trim())
-                  .sort();
-                const wanted = [...target].sort();
-                const ok =
-                  checkedNow.length === wanted.length &&
-                  checkedNow.every((n, i) => n === wanted[i]);
-                if (!ok) {
-                  return {
-                    error: `Checkbox state did not converge: got [${checkedNow.join(",")}], expected [${wanted.join(",")}]`,
-                    errorCode: "COMMIT_FAILED",
-                    stage: "verify",
-                    extras: { checkedNow, wanted, toggled },
-                  };
-                }
-
-                return {
-                  result: {
-                    success: true,
-                    driver: driverId,
-                    checked: checkedNow,
-                    toggled,
-                  },
-                };
-              })();
-            }
-
-            // -------- Element Plus el-select driver --------
-            if (driverId === "element-plus-select") {
-              const labels = Array.isArray(val)
-                ? (val as unknown[]).map((v) => String(v))
-                : [String(val)];
-              const isMultiple = Array.isArray(val) || root.classList.contains("is-multiple");
-
-              // trigger：el-select 2.x 是 .el-select__wrapper，老版本是 .select-trigger
-              const wrapper =
-                (root.querySelector(".el-select__wrapper") as HTMLElement | null) ??
-                (root.querySelector(".select-trigger") as HTMLElement | null) ??
-                (root as HTMLElement);
-
-              return (async () => {
-                // 1. 点 wrapper 打开 popper
-                wrapper.scrollIntoView({ block: "center", inline: "center" });
-                dispatchMouseClick(wrapper);
-
-                // 2. 等当前 select 的 dropdown 出现并可见
-                //    el-select 的 wrapper 有 aria-controls 指向 popper id
-                const popperId = wrapper.getAttribute("aria-controls");
-                const dropdown = await waitFor(() => {
-                  if (popperId) {
-                    const el = document.getElementById(popperId);
-                    if (el && el.getBoundingClientRect().width > 0) return el as HTMLElement;
-                  }
-                  // fallback：扫所有可见 dropdown，取第一个
-                  const all = document.querySelectorAll(".el-select-dropdown");
-                  for (const d of Array.from(all)) {
-                    if ((d as HTMLElement).getBoundingClientRect().width > 0) return d as HTMLElement;
-                  }
-                  return null;
-                }, timeoutMs);
-                if (!dropdown) {
-                  return {
-                    error: "Select dropdown did not open within timeout",
-                    errorCode: "COMMIT_FAILED",
-                    stage: "open-dropdown",
-                  };
-                }
-
-                // 3. 每个 label 找对应 option click
-                const clicked: string[] = [];
-                const unknown: string[] = [];
-                for (const label of labels) {
-                  const items = Array.from(
-                    dropdown.querySelectorAll(".el-select-dropdown__item"),
-                  ) as HTMLElement[];
-                  const hit = items.find((it) => (it.textContent || "").trim() === label);
-                  if (!hit) {
-                    unknown.push(label);
-                    continue;
-                  }
-                  dispatchMouseClick(hit);
-                  clicked.push(label);
-                  await sleep(40); // 让 Vue 跑一个 tick 再点下一个
-                }
-
-                // 4. multi-select 点 wrapper 关闭 popper；single-select 会自动关
-                if (isMultiple && dropdown.getBoundingClientRect().width > 0) {
-                  dispatchMouseClick(wrapper);
-                  await sleep(40);
-                }
-
-                if (unknown.length > 0) {
-                  const available = Array.from(
-                    dropdown.querySelectorAll(".el-select-dropdown__item"),
-                  ).map((i) => ((i as HTMLElement).textContent || "").trim());
-                  return {
-                    error: `Unknown option label(s): ${unknown.join(", ")}. Available: ${available.join(", ")}`,
-                    errorCode: "INVALID_PARAMS",
-                    extras: { unknown, available },
-                  };
-                }
-
-                return {
-                  result: {
-                    success: true,
-                    driver: driverId,
-                    multiple: isMultiple,
-                    clicked,
-                  },
-                };
-              })();
-            }
-
-            return {
-              error: `Unknown driver id: ${driverId}`,
-              errorCode: "INVALID_PARAMS",
-            };
-          } catch (err) {
-            return { error: err instanceof Error ? err.message : String(err) };
-          }
-        },
-        args: [selector, driver.id, driver.closestSelector, value as never, timeout],
-        world: "MAIN",
-      });
-
-      const res = results[0]?.result as {
+      const res = await nativePageQuery<{
         result?: unknown;
         error?: string;
         errorCode?: string;
         stage?: string;
         extras?: Record<string, unknown>;
-      };
+      } | undefined>(
+        tid,
+        frameId,
+        (sel: string, closestSelector: string, val: unknown, timeoutMs: number, driverId: string) => {
+          if (driverId === "element-plus-checkbox-group") {
+            return (window as any).__vortexCommitCheckboxGroup.run(sel, closestSelector, val, timeoutMs);
+          }
+          if (driverId === "element-plus-select") {
+            return (window as any).__vortexCommitSelect.run(sel, closestSelector, val, timeoutMs);
+          }
+          return { error: `Unknown driver id: ${driverId}`, errorCode: "INVALID_PARAMS" };
+        },
+        [selector, driver.closestSelector, value as never, timeout, driver.id],
+      );
+
       if (res?.error) {
         const known = res.errorCode && res.errorCode in VtxErrorCode;
         const code = known ? (res.errorCode as VtxErrorCode) : VtxErrorCode.JS_EXECUTION_ERROR;

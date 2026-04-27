@@ -5,16 +5,17 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 /**
- * O-10 checkbox-group driver 合约测试。
+ * O-10 checkbox-group driver contract tests.
  *
- * 真正跑 Element Plus DOM 需要完整 jsdom + Vue，成本过高；这里锁定
- * 两条关键不变式：
- *  1. 注册表里有 element-plus-checkbox-group driver
- *  2. dom.ts 里 page-side 实现包含核心保护：逐个 click + Vue tick 间隔 + 最终 verify
+ * Running Element Plus DOM requires full jsdom + Vue which is too expensive;
+ * instead we lock two key invariants:
+ *  1. The registry has element-plus-checkbox-group driver
+ *  2. The page-side bundle contains core protections: sequential click + Vue tick gap + final verify
+ *     (migrated from dom.ts to page-side bundle in T2.7a)
  */
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DOM_SRC = readFileSync(
-  join(__dirname, "..", "src", "handlers", "dom.ts"),
+  join(__dirname, "..", "src", "page-side", "commit-drivers", "checkbox-group.ts"),
   "utf8",
 );
 
