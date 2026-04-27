@@ -70,14 +70,14 @@
 
 - 默认 timeout: 由 `Progress` 传入（Playwright 框架级默认 30000ms；vortex L2 建议 5000ms，可通过 `act({ options: { timeout: N } })` 覆盖）
 - 轮询周期: RAF（约 16ms）；stable 判定在 page-side IIFE 内完成
-- **Playwright 实际重试策略（非 reason-aware）**：固定递进 `waitTime = [0, 20, 100, 100, 500]` ms（第 1 次 0ms，第 2 次 20ms，第 3 次起 100ms，第 5 次起 500ms）。所有失败原因共用同一张时间表。
-- vortex 实施可参考此策略，或做 reason-aware 优化（见下）：
+- **vortex 选用 reason-aware 重试策略**（按失败原因使用不同间隔）：
   - `NOT_ATTACHED` → 立即重试（DOM 可能正在 re-render）
   - `NOT_VISIBLE` → 50ms 间隔（等 CSS transition）
   - `NOT_STABLE` → 1 RAF 间隔（等动画下一帧）
   - `OBSCURED` → 100ms 间隔（等 modal / loading 退出）
   - `DISABLED` → 200ms 间隔（等异步状态更新）
   - `NOT_EDITABLE` → 不重试（语义错误，立即报）
+- 参考：Playwright 实际使用固定递进 `waitTime = [0, 20, 100, 100, 500]` ms，不区分失败原因（详见 §7.5）
 - timeout 用尽 → 报最后一次失败码，含 extras
 
 ## 3. Fallback Chain
@@ -102,6 +102,9 @@
 - **Stable 判定的 RAF 采样**：在 page-side IIFE 内通过 `requestAnimationFrame` 实现（与 Playwright 一致）；jsdom 测试用 fake timer 模拟（host-side 用 `setTimeout(16)` 双次调用作为降级）
 - **Visible 判定**：优先 `element.checkVisibility()` API（Chromium/Firefox），WebKit 退化为手动检查 `visibility` + `getBoundingClientRect()`；不使用 `offsetParent === null` 作为主判据
 - **ReceivesEvents**：需要处理 Shadow DOM 多层 `elementsFromPoint`，简化实现可用 `document.elementFromPoint` 单层，但需在 extras 中注明 shadow DOM 精度限制
+- **Enabled 判定**：vortex 简化为 native disabled（BUTTON/INPUT/SELECT/TEXTAREA/OPTION/OPTGROUP + `hasAttribute('disabled')`）+ aria-disabled（直接属性，不跨 shadow boundary 遍历 ARIA 链）+ fieldset[disabled]（`element.closest('FIELDSET[DISABLED]')`，**不处理** legend 例外）
+- **Editable 判定**：vortex 检查对象为 INPUT / TEXTAREA / contenteditable / SELECT；contenteditable 始终视为可编辑（readonly = false）；SELECT 检查 `hasAttribute('readonly')`；不支持 ARIA readonly roles
+- **Auto-wait 重试策略**：vortex 选用 reason-aware 策略（详见 §2），Playwright 固定递进 `[0, 20, 100, 100, 500]`ms 仅作历史参考（详见 §7.5）
 
 ## 6. 修订记录
 
