@@ -3,7 +3,9 @@
   "version": "0.5.0",
   "type": "module",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && node scripts/build-page-side.mjs",
+    "build:main": "vite build",
+    "build:page-side": "node scripts/build-page-side.mjs",
     "dev": "vite build --watch",
     "clean": "rm -rf dist",
     "test": "vitest run",
