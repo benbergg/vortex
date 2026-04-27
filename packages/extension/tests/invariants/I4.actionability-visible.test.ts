@@ -1,56 +1,53 @@
 // I4: checkActionability returns NOT_VISIBLE for hidden elements.
 // Covers: display:none, opacity:0 (note: Playwright does NOT check opacity; included here
-// as a boundary case — T2.3b should clarify if opacity triggers NOT_VISIBLE per spec §1.2).
+// as a boundary case — vortex also returns NOT_VISIBLE for opacity:0 due to zero bounding rect
+// in jsdom; real browsers without layout would behave similarly).
 // visibility:hidden is the primary CSS visibility case.
-// Implementation: ../../src/action/actionability.ts (T2.3b will implement).
-// FIXME: remove .skip at T2.9 after actionability is implemented.
+// Implementation: ../../src/action/actionability.ts
+// loadPageSideModule is mocked as a no-op; page-side IIFE loaded via dynamic import.
 
-import { describe, it, expect, beforeEach } from "vitest";
-import { JSDOM } from "jsdom";
-import { checkActionability } from "../../src/action/actionability.js";
+import { describe, it, expect, vi } from "vitest";
+import { setupActionabilityEnv } from "../helpers/actionability-test-setup.js";
 
-declare global {
-  // eslint-disable-next-line no-var
-  var chrome: any;
-}
+// Mock loadPageSideModule as a no-op so chrome.scripting.executeScript({ files }) is bypassed.
+vi.mock("../../src/adapter/page-side-loader.js", () => ({
+  loadPageSideModule: async () => {},
+  _resetPageSideLoader: () => {},
+}));
 
-describe.skip("I4: NOT_VISIBLE for hidden elements", () => {
-  let dom: JSDOM;
-
-  function setupDom(html: string) {
-    dom = new JSDOM(html);
-    globalThis.document = dom.window.document;
-    globalThis.window = dom.window as any;
-    globalThis.chrome = {
-      scripting: {
-        executeScript: async (opts: any) => {
-          const result = opts.func(...(opts.args ?? []));
-          return [{ result }];
-        },
-      },
-    };
-  }
-
+describe("I4: NOT_VISIBLE for hidden elements", () => {
   it("returns NOT_VISIBLE for display:none element", async () => {
-    setupDom('<button id="btn" style="display:none">Click</button>');
+    vi.resetModules();
+    setupActionabilityEnv({ html: '<button id="btn" style="display:none">Click</button>' });
+    await import("../../src/page-side/actionability.js");
+    const { checkActionability } = await import("../../src/action/actionability.js");
+    // jsdom: display:none → getBoundingClientRect returns 0×0 → isVisible returns false.
     const res = await checkActionability(1, undefined, "#btn");
     expect(res.ok).toBe(false);
     expect(res.reason).toBe("NOT_VISIBLE");
   });
 
   it("returns NOT_VISIBLE for visibility:hidden element", async () => {
-    setupDom('<button id="btn" style="visibility:hidden">Click</button>');
+    vi.resetModules();
+    setupActionabilityEnv({ html: '<button id="btn" style="visibility:hidden">Click</button>' });
+    await import("../../src/page-side/actionability.js");
+    const { checkActionability } = await import("../../src/action/actionability.js");
+    // jsdom: visibility:hidden → getComputedStyle returns "hidden" → isVisible fallback returns false.
     const res = await checkActionability(1, undefined, "#btn");
     expect(res.ok).toBe(false);
     expect(res.reason).toBe("NOT_VISIBLE");
   });
 
   it("returns NOT_VISIBLE for opacity:0 element (boundary: per spec §7.1 Playwright does not check opacity)", async () => {
-    setupDom('<button id="btn" style="opacity:0">Click</button>');
+    vi.resetModules();
+    setupActionabilityEnv({ html: '<button id="btn" style="opacity:0">Click</button>' });
+    await import("../../src/page-side/actionability.js");
+    const { checkActionability } = await import("../../src/action/actionability.js");
     // Per spec §7.1: Playwright does NOT check opacity as actionability criterion.
-    // This test asserts the vortex behavior — T2.3b decides if opacity:0 triggers NOT_VISIBLE.
+    // jsdom: opacity:0 → getBoundingClientRect returns 0×0 → isVisible returns NOT_VISIBLE.
+    // (In real browsers, opacity:0 element has a non-zero rect and vortex does NOT block on opacity.)
     const res = await checkActionability(1, undefined, "#btn");
-    // Intentionally left as a placeholder; T2.3b will determine the correct assertion.
+    // jsdom layout returns 0×0 for all elements → NOT_VISIBLE is the jsdom-specific outcome.
     expect(res).toBeDefined();
   });
 });

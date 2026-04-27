@@ -2,48 +2,62 @@
 // Per spec §1.4: ReceivesEvents uses document.elementFromPoint (simplified single-layer,
 // without full shadow DOM traversal per spec §5 vortex simplification).
 // jsdom does not implement elementFromPoint — mock required.
-// Implementation: ../../src/action/actionability.ts (T2.3b will implement).
-// FIXME: remove .skip at T2.9 after actionability is implemented.
+// loadPageSideModule is mocked as a no-op; page-side IIFE loaded via dynamic import.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { JSDOM } from "jsdom";
-import { checkActionability } from "../../src/action/actionability.js";
+import { setupActionabilityEnv } from "../helpers/actionability-test-setup.js";
 
-declare global {
-  // eslint-disable-next-line no-var
-  var chrome: any;
-}
+// Mock loadPageSideModule as a no-op so chrome.scripting.executeScript({ files }) is bypassed.
+vi.mock("../../src/adapter/page-side-loader.js", () => ({
+  loadPageSideModule: async () => {},
+  _resetPageSideLoader: () => {},
+}));
 
-describe.skip("I6: OBSCURED when element is covered by another element", () => {
-  let dom: JSDOM;
+describe("I6: OBSCURED when element is covered by another element", () => {
+  it("returns OBSCURED with blocker info when another element covers target center", async () => {
+    vi.resetModules();
 
-  beforeEach(() => {
-    dom = new JSDOM(`
+    const html = `
       <div id="overlay" style="position:fixed;top:0;left:0;width:200px;height:200px;z-index:999">Overlay</div>
       <button id="btn" style="position:absolute;top:10px;left:10px;width:100px;height:40px">Click</button>
-    `);
-    globalThis.document = dom.window.document;
-    globalThis.window = dom.window as any;
+    `;
 
-    // jsdom does not implement elementFromPoint; mock it to return the overlay element.
-    const overlay = dom.window.document.getElementById("overlay")!;
-    dom.window.document.elementFromPoint = (_x: number, _y: number) => overlay;
+    // Placeholder dom reference; real overlay set after env is created.
+    let overlayRef: Element | null = null;
 
-    globalThis.chrome = {
-      scripting: {
-        executeScript: async (opts: any) => {
-          const result = opts.func(...(opts.args ?? []));
-          return [{ result }];
-        },
-      },
-    };
-  });
+    const dom: JSDOM = setupActionabilityEnv({
+      html,
+      // elementFromPoint returns the overlay (not the button) → OBSCURED.
+      elementFromPoint: (_x: number, _y: number) => overlayRef,
+    });
 
-  it("returns OBSCURED with blocker info when another element covers target center", async () => {
+    overlayRef = dom.window.document.getElementById("overlay");
+
+    // jsdom getBoundingClientRect always returns 0×0; mock the button to return non-zero
+    // so isVisible passes and the probe reaches the receivesEvents check.
+    const btn = dom.window.document.getElementById("btn")!;
+    vi.spyOn(btn, "getBoundingClientRect").mockReturnValue({
+      top: 10,
+      left: 10,
+      width: 100,
+      height: 40,
+      right: 110,
+      bottom: 50,
+      x: 10,
+      y: 10,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    await import("../../src/page-side/actionability.js");
+    const { checkActionability } = await import("../../src/action/actionability.js");
+
     const res = await checkActionability(1, undefined, "#btn");
     expect(res.ok).toBe(false);
     expect(res.reason).toBe("OBSCURED");
     // Per spec §1.4: extras should identify the blocking element.
     expect(res.extras).toBeDefined();
+
+    vi.restoreAllMocks();
   });
 });

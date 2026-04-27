@@ -1,44 +1,47 @@
 // I5: checkActionability returns NOT_STABLE for an animating element.
 // Per spec §1.3: stability is determined by consecutive RAF callbacks comparing
 // getBoundingClientRect() {top, left, width, height} with strict === equality.
-// Implementation: ../../src/action/actionability.ts (T2.3b will implement).
 //
-// FIXME: remove .skip at T2.9 after actionability + auto-wait implemented.
-// NOTE: this test depends on jsdom RAF mock. T2.2.5 research result → determines
-// concrete implementation. jsdom does not run a real layout engine, so RAF-based
-// stability checks need fake timer coordination to simulate animating bounding rects.
+// jsdom RAF mock: requestAnimationFrame is shimmed to setTimeout(0) in the test setup helper,
+// so vi.useFakeTimers() can advance the RAF ticks to simulate the double-sample check.
+// loadPageSideModule is mocked as a no-op; page-side IIFE loaded via dynamic import.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { JSDOM } from "jsdom";
-import { checkActionability } from "../../src/action/actionability.js";
+import { setupActionabilityEnv } from "../helpers/actionability-test-setup.js";
 
-declare global {
-  // eslint-disable-next-line no-var
-  var chrome: any;
-}
+// Mock loadPageSideModule as a no-op so chrome.scripting.executeScript({ files }) is bypassed.
+vi.mock("../../src/adapter/page-side-loader.js", () => ({
+  loadPageSideModule: async () => {},
+  _resetPageSideLoader: () => {},
+}));
 
-describe.skip("I5: NOT_STABLE for animating element", () => {
-  let dom: JSDOM;
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
-  beforeEach(() => {
+describe("I5: NOT_STABLE for animating element", () => {
+  it("returns NOT_STABLE when element bounding rect changes between RAF ticks", async () => {
     vi.useFakeTimers();
-    dom = new JSDOM('<button id="btn">Click</button>');
-    globalThis.document = dom.window.document;
-    globalThis.window = dom.window as any;
+    vi.resetModules();
 
-    // Mock chrome.scripting.executeScript to run func synchronously in jsdom context.
-    globalThis.chrome = {
-      scripting: {
-        executeScript: async (opts: any) => {
-          const result = opts.func(...(opts.args ?? []));
-          return [{ result }];
-        },
-      },
-    };
+    // Set up env with a placeholder elementFromPoint; override below after element reference.
+    const dom: JSDOM = setupActionabilityEnv({
+      html: '<button id="btn">Click</button>',
+    });
 
-    // Simulate moving element: getBoundingClientRect returns different values each call.
-    let callCount = 0;
     const btn = dom.window.document.getElementById("btn")!;
+
+    // Override elementFromPoint to return the button so receivesEvents passes (no OBSCURED).
+    Object.defineProperty(dom.window.document, "elementFromPoint", {
+      value: (_x: number, _y: number) => btn,
+      writable: true,
+      configurable: true,
+    });
+
+    // Simulate animating element: getBoundingClientRect returns different position each call.
+    let callCount = 0;
     vi.spyOn(btn, "getBoundingClientRect").mockImplementation(() => {
       callCount++;
       return {
@@ -53,17 +56,17 @@ describe.skip("I5: NOT_STABLE for animating element", () => {
         toJSON: () => ({}),
       } as DOMRect;
     });
-  });
 
-  afterEach(() => {
-    vi.useRealTimers();
-    vi.restoreAllMocks();
-  });
+    await import("../../src/page-side/actionability.js");
+    const { checkActionability } = await import("../../src/action/actionability.js");
 
-  it("returns NOT_STABLE when element bounding rect changes between RAF ticks", async () => {
-    // checkActionability with a single-shot check should detect instability.
-    // T2.3b will implement the actual RAF polling; this test documents the contract.
-    const res = await checkActionability(1, undefined, "#btn");
+    // Start checkActionability; it will await probeStable which uses double-RAF.
+    // The RAF shim uses setTimeout(0), so we use runAllTimersAsync to drain all pending
+    // timers and microtasks so the nested RAF callbacks fire and probeStable resolves.
+    const [res] = await Promise.all([
+      checkActionability(1, undefined, "#btn"),
+      vi.runAllTimersAsync(),
+    ]);
     expect(res.ok).toBe(false);
     expect(res.reason).toBe("NOT_STABLE");
   });
