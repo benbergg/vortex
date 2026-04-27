@@ -58,4 +58,39 @@ describe("I-bundle: page-side-loader idempotent loading of page-side bundles", (
     await loadPageSideModule(1, undefined, "fill-reject");
     expect(globalThis.chrome.scripting.executeScript).toHaveBeenCalledTimes(2);
   });
+
+  it("concurrent loads of same module call executeScript only once", async () => {
+    // Make executeScript slow so both callers see in-flight state.
+    let resolveExec: () => void;
+    const execDone = new Promise<void>((r) => { resolveExec = r; });
+    globalThis.chrome.scripting.executeScript = vi.fn(async () => {
+      await execDone;
+      return [{ result: undefined }];
+    });
+
+    const p1 = loadPageSideModule(1, undefined, "actionability");
+    const p2 = loadPageSideModule(1, undefined, "actionability");
+    const p3 = loadPageSideModule(1, undefined, "actionability");
+
+    resolveExec!();
+    await Promise.all([p1, p2, p3]);
+
+    expect(globalThis.chrome.scripting.executeScript).toHaveBeenCalledTimes(1);
+  });
+
+  it("failed load is evicted so retries can succeed", async () => {
+    // First call fails
+    globalThis.chrome.scripting.executeScript = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("inject failed"))
+      .mockResolvedValueOnce([{ result: undefined }]);
+
+    await expect(
+      loadPageSideModule(1, undefined, "actionability"),
+    ).rejects.toThrow("inject failed");
+
+    // Retry should re-attempt (cache evicted)
+    await loadPageSideModule(1, undefined, "actionability");
+    expect(globalThis.chrome.scripting.executeScript).toHaveBeenCalledTimes(2);
+  });
 });

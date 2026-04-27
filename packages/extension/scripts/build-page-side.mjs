@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 // Build page-side IIFE bundles via vite programmatic API.
-// Each entry must be built individually because rollup does not support IIFE with multiple inputs.
-// Uses an isolated config (no crx plugin) to avoid code-splitting interference.
-// Output: dist/page-side/<name>.js
+//
+// Design constraints:
+// - IIFE format: required for chrome.scripting.executeScript({ files }) injection
+// - configFile: false → isolates from the crx plugin (which would enable code-splitting
+//   and break IIFE output format)
+// - emptyOutDir: false → does not wipe main bundle outputs (dist/manifest.json / dist/src/* etc.)
+// - outDir: dist/page-side/ → subdir under shared dist/
+// - world: MAIN → bundles attach globals to window.*, consistent with PR #1 pageQuery
+// - Each entry built independently (rollup does not support IIFE with multiple inputs)
 
 import { build } from "vite";
 import { resolve, dirname } from "node:path";
