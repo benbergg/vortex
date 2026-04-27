@@ -1,16 +1,18 @@
 // L1 Adapter 静态依赖检查。
 // 规则：
-//   1. cdp.ts 不被 L2 (action/) / L3 (reasoning/) 直接 import
-//   2. mcp 包不直接 import L1 cdp.ts
+//   1. cdp.ts 仅 adapter/ + handlers/ (legacy dom.ts) + lib/ 可 import，其余目录禁（反向白名单）
+//   2. handlers 不直接 import cdp-drivers 内部（warn）
 // 违反 → CI fail。
+// 注：mcp 包跨 package 物理隔离（无 workspace dep on extension），不需 depcruise 规则 enforce。
 
 module.exports = {
   forbidden: [
     {
       name: "no-cdp-leak",
       severity: "error",
-      comment: "L2/L3/L4 must not import L1 cdp adapter (CDP must stay encapsulated)",
-      from: { path: "^src/(action|reasoning)/" },
+      comment:
+        "CDP adapter is L1 internal. Allowed importers: adapter/ + handlers/ (legacy dom.ts) + lib/. Future L2/L3/L4 (action/reasoning/events/patterns/content/background) must go through facade.",
+      from: { path: "^src/", pathNot: "^src/(adapter|handlers|lib)/" },
       to: { path: "^src/adapter/cdp(\\.ts|/.+)$" },
     },
     {
