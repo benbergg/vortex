@@ -109,20 +109,22 @@ export type ActionabilityResult =
     return { ok: false, blocker: desc };
   }
 
-  // Stable check: double-sample bounding rect with RAF, position+size diff < 1px.
+  // Stable check: sample bounding rect across 1 RAF cycle, strict === comparison
+  // (per L2-spec §7.2 "fixed 1 RAF cycle" + §1.3 "consecutive 2 RAF samples").
+  // r1 captured synchronously, r2 after 1 rAF callback — the gap between the
+  // two samples is exactly one animation frame. No tolerance: any sub-pixel
+  // movement counts as not-stable (spec drops the original "< 1px" tolerance).
   function isStable(el: Element): Promise<boolean> {
     return new Promise((resolve) => {
       const r1 = el.getBoundingClientRect();
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const r2 = el.getBoundingClientRect();
-          const stable =
-            r1.x === r2.x &&
-            r1.y === r2.y &&
-            r1.width === r2.width &&
-            r1.height === r2.height;
-          resolve(stable);
-        });
+        const r2 = el.getBoundingClientRect();
+        const stable =
+          r1.x === r2.x &&
+          r1.y === r2.y &&
+          r1.width === r2.width &&
+          r1.height === r2.height;
+        resolve(stable);
       });
     });
   }
@@ -130,6 +132,14 @@ export type ActionabilityResult =
   // Single-shot probe (no wait; host-side auto-wait orchestrates retries).
   // needsEditable: true for fill/type, false for click.
   // Stable is checked separately by host-side via probeStable (RAF cannot compose with chrome.scripting boundary).
+  //
+  // Check order: Attached → Visible → Enabled → Editable → ReceivesEvents.
+  // Note this differs from L2-spec §1's catalog numbering (1.1-1.6), which is
+  // an ID list not an execution order. Vortex deliberately checks Enabled/
+  // Editable before ReceivesEvents because DISABLED / NOT_EDITABLE produce
+  // more actionable hints for the LLM than OBSCURED — a disabled element
+  // hidden behind a modal should report "wait for prereq to enable" first,
+  // not "dismiss the overlay" (the modal might be the prereq itself).
   async function probe(
     selector: string,
     needsEditable: boolean,
