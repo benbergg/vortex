@@ -60,6 +60,24 @@ export const VtxErrorCode = {
   ACTION_FAILED_ALL_PATHS: "ACTION_FAILED_ALL_PATHS",
   /** Drag operation but CDP unavailable */
   DRAG_REQUIRES_CDP: "DRAG_REQUIRES_CDP",
+
+  // -- L3 Reasoning（8 类，@since 0.6.0 PR #3）--
+  /** a11y tree 不可用（CSP / sandboxed page），无法 getFullAXTree。*/
+  A11Y_UNAVAILABLE: "A11Y_UNAVAILABLE",
+  /** chrome.debugger.attach 失败（缺权限、tab 已关闭等）。*/
+  CDP_NOT_ATTACHED: "CDP_NOT_ATTACHED",
+  /** ref 关联节点 stale，descriptor 三级消解仍然失败。*/
+  STALE_REF: "STALE_REF",
+  /** descriptor strict 模式下多匹配。*/
+  AMBIGUOUS_DESCRIPTOR: "AMBIGUOUS_DESCRIPTOR",
+  /** RefStore 中找不到此 ref。*/
+  REF_NOT_FOUND: "REF_NOT_FOUND",
+  /** snapshot 已过期（> 5 min）。*/
+  SNAPSHOT_EXPIRED: "SNAPSHOT_EXPIRED",
+  /** 跨源 iframe，Accessibility.getFullAXTree 拒绝（CDP 已 attach，但 AX tree 不能跨源查询）。*/
+  CROSS_ORIGIN_IFRAME: "CROSS_ORIGIN_IFRAME",
+  /** closed shadow host，无法穿透。*/
+  CLOSED_SHADOW_DOM: "CLOSED_SHADOW_DOM",
 } as const;
 
 export type VtxErrorCode = (typeof VtxErrorCode)[keyof typeof VtxErrorCode];

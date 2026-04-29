@@ -166,6 +166,40 @@ export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
     hint: "Drag operation requires CDP, but CDP is unavailable (DevTools may be open, or chrome.debugger attach was denied). Close DevTools and retry, or rewrite the flow using vortex_evaluate primitives.",
     recoverable: false,
   },
+
+  // -- L3 Reasoning（@since 0.6.0 PR #3）--
+  A11Y_UNAVAILABLE: {
+    hint: "Accessibility tree unavailable on this page (CSP-restricted or sandboxed). Switch to a regular page or fall back to CSS selectors via vortex_dom_*.",
+    recoverable: false,
+  },
+  CDP_NOT_ATTACHED: {
+    hint: "chrome.debugger could not attach to the tab. Verify manifest has the 'debugger' permission and the tab is not chrome:// or chrome-extension://.",
+    recoverable: false,
+  },
+  STALE_REF: {
+    hint: "Element ref is stale and could not be re-resolved by descriptor. Call vortex_observe again to get fresh refs.",
+    recoverable: true,
+  },
+  AMBIGUOUS_DESCRIPTOR: {
+    hint: "Descriptor matched multiple elements in strict mode. Add a 'near' relation to disambiguate, narrow the name, or set strict:false to take the first match.",
+    recoverable: true,
+  },
+  REF_NOT_FOUND: {
+    hint: "ref does not exist in the current RefStore. Call vortex_observe to mint fresh refs and retry.",
+    recoverable: true,
+  },
+  SNAPSHOT_EXPIRED: {
+    hint: "Snapshot expired (> 5 min). Call vortex_observe to capture a new snapshot and retry.",
+    recoverable: true,
+  },
+  CROSS_ORIGIN_IFRAME: {
+    hint: "Accessibility.getFullAXTree was rejected for a cross-origin frame; the AX tree cannot be queried across origin boundaries. Switch to a same-origin entry point or operate within the iframe via its own tab context.",
+    recoverable: false,
+  },
+  CLOSED_SHADOW_DOM: {
+    hint: "Element lives inside a closed shadow root and cannot be pierced. Ask the component author to use { mode: 'open' } shadow, or expose an ARIA-rich light-DOM proxy.",
+    recoverable: false,
+  },
 };
 
 /**
