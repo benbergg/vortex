@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createHash } from "node:crypto";
-import { getToolDef, getToolDefs } from "../src/tools/registry.js";
+import { getToolDef, getToolDefs, getInternalToolDef } from "../src/tools/registry.js";
 import { getAllToolDefs } from "../src/tools/schemas.js";
 
 vi.mock("../src/client.js", () => ({
@@ -22,8 +22,8 @@ describe("handleCallTool routing logic", () => {
     expect(getToolDef("vortex_")).toBeUndefined();
   });
 
-  it("getToolDef returns correct def for known tools", () => {
-    const ping = getToolDef("vortex_ping");
+  it("getInternalToolDef returns ping (v0.6 ping internalized, kept for diagnostic fingerprint)", () => {
+    const ping = getInternalToolDef("vortex_ping");
     expect(ping).toBeDefined();
     expect(ping!.action).toBe("__mcp_ping__");
   });
@@ -33,28 +33,34 @@ describe("handleCallTool routing logic", () => {
     const { eventStore } = await import("../src/lib/event-store.js");
     vi.mocked(sendRequest).mockResolvedValue({} as any);
 
-    // v0.5: subscribe / unsubscribe / drain 合并到 vortex_events({op})，action 统一 __mcp_events__
-    const events = getToolDef("vortex_events");
+    // v0.6: events 内部化，action 仍 __mcp_events__（通过 getInternalToolDef 调用）
+    const events = getInternalToolDef("vortex_events");
     expect(events?.action).toBe("__mcp_events__");
 
     expect(eventStore.subscribe).not.toHaveBeenCalled();
   });
 
   it("vortex_events schema carries the op discriminator", () => {
-    const events = getToolDef("vortex_events");
+    const events = getInternalToolDef("vortex_events");
     const schema = events?.schema as { properties?: { op?: { enum?: string[] } } };
     expect(schema?.properties?.op?.enum).toEqual(["subscribe", "unsubscribe", "drain"]);
   });
 
-  it("__mcp_ping__ action routes to ping handler", () => {
-    const ping = getToolDef("vortex_ping");
+  it("__mcp_ping__ action routes to ping handler (internal)", () => {
+    const ping = getInternalToolDef("vortex_ping");
     expect(ping?.action).toBe("__mcp_ping__");
   });
 
-  it("normal tools have non-underscore actions", () => {
-    const tabList = getToolDef("vortex_tab_list");
+  it("internal tools have non-underscore actions for non-MCP-internal handlers", () => {
+    const tabList = getInternalToolDef("vortex_tab_list");
     expect(tabList?.action).toBe("tab.list");
     expect(tabList?.action).not.toMatch(/^__/);
+  });
+
+  it("public tools (v0.6) all have either L4.* or v0.5 action prefix", () => {
+    for (const def of getToolDefs()) {
+      expect(def.action).toMatch(/^(L4\.|page\.|tab\.|capture\.|keyboard\.)/);
+    }
   });
 });
 

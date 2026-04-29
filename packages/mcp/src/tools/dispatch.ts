@@ -86,7 +86,116 @@ export function dispatchNewTool(
     }
     case "vortex_file_list_downloads":
       return { action: "file.getDownloads", params };
+
+    // ──────────────────────────────────────────────────────────────────
+    // v0.6 L4 public tools (PR #4)
+    // act/extract/observe 第一阶段：复用 v0.5 handler；descriptor target +
+    // 真 a11y subtree 集成留 v0.6.x follow-up（spec L4 §0.1 deferred）。
+    // ──────────────────────────────────────────────────────────────────
+    case "vortex_act": {
+      const { action: actionName, value, options, target, ...rest } = params;
+      const v05Action = ACT_TO_V05[actionName as string];
+      if (!v05Action) {
+        // unknown action → caller 会拿到 INVALID_PARAMS 通过 tool dispatch
+        return { action: "__invalid_action__", params };
+      }
+      const next: Record<string, unknown> = { target, ...rest };
+      // value 仅 fill/type/select/drag 需要
+      if (value !== undefined) next.value = value;
+      // options.timeout / options.force 透传
+      if (options && typeof options === "object") {
+        const o = options as Record<string, unknown>;
+        if (o.timeout !== undefined) next.timeout = o.timeout;
+        if (o.force !== undefined) next.force = o.force;
+      }
+      return { action: v05Action, params: next };
+    }
+    case "vortex_observe": {
+      const { scope, filter, ...rest } = params;
+      // scope 'viewport'|'full' → existing observe.snapshot 的 viewport 参数；
+      // filter 'interactive'|'all' → 透传（observe handler 已支持）
+      const next: Record<string, unknown> = { ...rest };
+      if (scope === "full") next.viewport = "full";
+      else if (scope === "viewport") next.viewport = "visible";
+      if (filter !== undefined) next.filter = filter;
+      return { action: "observe.snapshot", params: next };
+    }
+    case "vortex_extract": {
+      const { target, depth, include, ...rest } = params;
+      // 第一阶段：映射到 content.getText（最常用 case）；后续 follow-up 改 a11y subtree
+      const next: Record<string, unknown> = { ...rest };
+      if (target !== undefined && target !== null) next.target = target;
+      if (depth !== undefined) next.maxDepth = depth;
+      if (Array.isArray(include)) next.include = include;
+      return { action: "content.getText", params: next };
+    }
+    case "vortex_wait_for": {
+      const { mode, value, timeout, ...rest } = params;
+      const next: Record<string, unknown> = { ...rest };
+      if (timeout !== undefined) next.timeout = timeout;
+      switch (mode) {
+        case "url":
+          if (value !== undefined) next.url = value;
+          return { action: "page.wait", params: next };
+        case "element":
+          if (value !== undefined) next.selector = value;
+          return { action: "page.wait", params: next };
+        case "idle": {
+          // value: 'network' | 'xhr' | 'dom'
+          const action = value === "network"
+            ? "page.waitForNetworkIdle"
+            : value === "dom"
+            ? "dom.waitSettled"
+            : "page.waitForXhrIdle";
+          return { action, params: next };
+        }
+        case "info":
+          return { action: "page.info", params: next };
+        default:
+          return { action: "page.info", params: next };
+      }
+    }
+    case "vortex_debug_read": {
+      const { source, filter, tail, ...rest } = params;
+      const next: Record<string, unknown> = { ...rest };
+      if (filter && typeof filter === "object") Object.assign(next, filter);
+      if (tail !== undefined) next.limit = tail;
+      const action = source === "network" ? "network.getLogs" : "console.getLogs";
+      return { action, params: next };
+    }
+    case "vortex_storage": {
+      const { op, key, value, ...rest } = params;
+      const next: Record<string, unknown> = { ...rest };
+      if (key !== undefined) next.key = key;
+      if (value !== undefined) next.value = value;
+      switch (op) {
+        case "get":
+          return { action: "storage.getLocalStorage", params: next };
+        case "set":
+          return { action: "storage.setLocalStorage", params: next };
+        case "list":
+          return { action: "storage.getCookies", params: next };
+        case "session-get":
+          return { action: "storage.getSessionStorage", params: next };
+        case "session-set":
+          return { action: "storage.setSessionStorage", params: next };
+        default:
+          return { action: "__invalid_op__", params };
+      }
+    }
+
     default:
       return null;
   }
 }
+
+// vortex_act 的 action enum → v0.5 extension handler action
+const ACT_TO_V05: Record<string, string> = {
+  click: "dom.click",
+  fill: "dom.fill",
+  type: "dom.type",
+  select: "dom.select",
+  scroll: "dom.scroll",
+  hover: "dom.hover",
+  drag: "mouse.drag",
+};

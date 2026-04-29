@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getToolDefs, getToolDef } from "../src/tools/registry.js";
+import { getToolDefs, getToolDef, getInternalToolDef } from "../src/tools/registry.js";
 import { getAllToolDefs } from "../src/tools/schemas.js";
 
 describe("getToolDefs", () => {
@@ -15,49 +15,39 @@ describe("getToolDefs", () => {
     expect(a).toEqual(b);
   });
 
-  it("includes all required vortex_* prefixed tools (v0.5 set of 36)", () => {
+  it("returns v0.6 public 11 tools (3 task verbs + 8 atoms)", () => {
     const names = getToolDefs().map((d) => d.name);
-    // v0.5.0 合并 + vortex_mouse_drag 后的完整 36 工具名单（按 schemas.ts 定义顺序）
-    const expected = [
-      "vortex_ping",
-      "vortex_events",
-      "vortex_observe",
-      "vortex_tab_list",
-      "vortex_tab_create",
-      "vortex_tab_close",
+    expect(names.sort()).toEqual([
+      "vortex_act",
+      "vortex_debug_read",
+      "vortex_extract",
       "vortex_navigate",
-      "vortex_page_info",
-      "vortex_history",
-      "vortex_wait",
-      "vortex_wait_idle",
-      "vortex_click",
-      "vortex_type",
-      "vortex_fill",
-      "vortex_select",
-      "vortex_hover",
-      "vortex_batch",
-      "vortex_fill_form",
+      "vortex_observe",
       "vortex_press",
-      "vortex_get_text",
-      "vortex_get_html",
-      "vortex_evaluate",
-      "vortex_mouse_click",
-      "vortex_mouse_move",
-      "vortex_mouse_drag",
       "vortex_screenshot",
-      "vortex_console",
-      "vortex_network",
-      "vortex_network_response_body",
-      "vortex_storage_get",
-      "vortex_storage_set",
-      "vortex_storage_session",
-      "vortex_file_upload",
-      "vortex_file_download",
-      "vortex_file_list_downloads",
-      "vortex_frames_list",
+      "vortex_storage",
+      "vortex_tab_close",
+      "vortex_tab_create",
+      "vortex_wait_for",
+    ]);
+  });
+
+  it("v0.5 internalized tools are accessible via getInternalToolDef but not getToolDef", () => {
+    // v0.5 36 个 atom 中 25 个内部化（保留实现供 L4 dispatch 调）
+    const internalized = [
+      "vortex_click", "vortex_fill", "vortex_type", "vortex_select", "vortex_hover", "vortex_batch",
+      "vortex_fill_form", "vortex_get_text", "vortex_get_html", "vortex_evaluate",
+      "vortex_mouse_click", "vortex_mouse_drag", "vortex_mouse_move",
+      "vortex_console", "vortex_network", "vortex_network_response_body",
+      "vortex_storage_get", "vortex_storage_set", "vortex_storage_session",
+      "vortex_tab_list", "vortex_frames_list", "vortex_wait", "vortex_wait_idle",
+      "vortex_page_info", "vortex_history",
+      "vortex_file_upload", "vortex_file_download", "vortex_file_list_downloads",
+      "vortex_events", "vortex_ping",
     ];
-    for (const name of expected) {
-      expect(names).toContain(name);
+    for (const n of internalized) {
+      expect(getToolDef(n), `${n} should NOT be in public registry`).toBeUndefined();
+      expect(getInternalToolDef(n), `${n} should still be in internal map`).toBeDefined();
     }
   });
 
@@ -90,26 +80,21 @@ describe("getToolDefs", () => {
   });
 
   it("non-image tools do not have returnsImage flag", () => {
-    const tabList = getToolDef("vortex_tab_list");
-    expect(tabList?.returnsImage).toBeUndefined();
+    const navigate = getToolDef("vortex_navigate");
+    expect(navigate?.returnsImage).toBeUndefined();
   });
 
-  it("has exactly 36 tools (v0.5 consolidated set + vortex_mouse_drag)", () => {
-    expect(getToolDefs().length).toBe(36);
-  });
-
-  it("batch tool is included for batch DOM operations", () => {
-    const names = getToolDefs().map((d) => d.name);
-    expect(names).toContain("vortex_batch");
+  it("has exactly 11 public tools (v0.6 L4 surface)", () => {
+    expect(getToolDefs().length).toBe(11);
   });
 });
 
-describe("getToolDef", () => {
-  it("returns tool def by exact name", () => {
-    const def = getToolDef("vortex_ping");
+describe("getToolDef (public)", () => {
+  it("returns public tool def by exact name", () => {
+    const def = getToolDef("vortex_act");
     expect(def).toBeDefined();
-    expect(def!.name).toBe("vortex_ping");
-    expect(def!.action).toBe("__mcp_ping__");
+    expect(def!.name).toBe("vortex_act");
+    expect(def!.action).toBe("L4.act");
   });
 
   it("returns undefined for unknown tool name", () => {
@@ -118,10 +103,9 @@ describe("getToolDef", () => {
     expect(getToolDef("vortex_")).toBeUndefined();
   });
 
-  it("returns internal MCP action tools correctly (v0.5 unified events)", () => {
-    // v0.5: 三个 events_* 工具合并为 vortex_events({op})，action 统一为 __mcp_events__
-    expect(getToolDef("vortex_events")?.action).toBe("__mcp_events__");
-    expect(getToolDef("vortex_ping")?.action).toBe("__mcp_ping__");
+  it("internal tools (vortex_events / vortex_ping) reachable via getInternalToolDef", () => {
+    expect(getInternalToolDef("vortex_events")?.action).toBe("__mcp_events__");
+    expect(getInternalToolDef("vortex_ping")?.action).toBe("__mcp_ping__");
   });
 
   it("schema inputSchema is valid JSON Schema object", () => {
