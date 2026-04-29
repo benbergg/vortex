@@ -57,8 +57,8 @@ describe("VtxError", () => {
 });
 
 describe("VtxErrorCode enum", () => {
-  it("includes all 26 error codes", () => {
-    expect(Object.keys(VtxErrorCode)).toHaveLength(26);
+  it("includes all 34 error codes", () => {
+    expect(Object.keys(VtxErrorCode)).toHaveLength(34);
   });
 
   it("each constant equals its own string value (self-describing)", () => {
