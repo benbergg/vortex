@@ -81,13 +81,14 @@ export async function resolveDescriptor(
     }
   }
 
-  // Tier 2: visible text（substring 或 textHash）
+  // Tier 2: visible text（substring 匹配）。
+  // textHash field is intentionally NOT consulted here — it encodes
+  // `name|role|value` for cross-snapshot node identity (consumed by
+  // RefStore relocation), not for descriptor lookup. Trying to query it
+  // with a bare name string can never match a stored composite hash.
   const targetText = d.text ?? d.name;
   if (targetText) {
-    const hashKey = await sha16(targetText);
-    const matches = snap.nodes.filter(
-      n => n.name.includes(targetText) || n.textHash === hashKey,
-    );
+    const matches = snap.nodes.filter(n => n.name.includes(targetText));
     if (matches.length === 1) return pick(matches[0], 2);
     if (matches.length > 1) {
       if (d.strict !== false) {
@@ -101,25 +102,35 @@ export async function resolveDescriptor(
     }
   }
 
-  // Tier 3: CSS selector
+  // Tier 3: CSS selector. CDP `DOM.querySelector` returns only `{ nodeId }`,
+  // so a follow-up `DOM.describeNode` is required to obtain `backendNodeId`.
   if (d.selector && debuggerMgr) {
-    const result = (await debuggerMgr.sendCommand(snap.tabId, "DOM.querySelector", {
+    const qs = (await debuggerMgr.sendCommand(snap.tabId, "DOM.querySelector", {
       nodeId: 1,
       selector: d.selector,
-    })) as { nodeId?: number; backendNodeId?: number } | undefined;
-    if (!result || !result.nodeId) {
+    })) as { nodeId?: number } | undefined;
+    if (!qs || !qs.nodeId) {
       throw vtxError(
         VtxErrorCode.REF_NOT_FOUND,
         `css selector matched no element (selector=${d.selector})`,
         { selector: d.selector, extras: { tier: 3 } },
       );
     }
-    const matched = snap.nodes.find(n => n.backendDOMNodeId === result.backendNodeId);
-    if (matched) return pick(matched, 3);
-    // CSS 命中但 AX tree 无对应节点：用 backendNodeId 直接构造 ref
-    if (result.backendNodeId !== undefined) {
-      return { ref: "@css", backendDOMNodeId: result.backendNodeId, tier: 3 };
+    const desc = (await debuggerMgr.sendCommand(snap.tabId, "DOM.describeNode", {
+      nodeId: qs.nodeId,
+    })) as { node?: { backendNodeId?: number } } | undefined;
+    const backendNodeId = desc?.node?.backendNodeId;
+    if (backendNodeId === undefined) {
+      throw vtxError(
+        VtxErrorCode.REF_NOT_FOUND,
+        `DOM.describeNode returned no backendNodeId (selector=${d.selector})`,
+        { selector: d.selector, extras: { tier: 3 } },
+      );
     }
+    const matched = snap.nodes.find(n => n.backendDOMNodeId === backendNodeId);
+    if (matched) return pick(matched, 3);
+    // CSS 命中但 AX tree 无对应节点：用 backendNodeId 直接构造 synthetic ref
+    return { ref: "@css", backendDOMNodeId: backendNodeId, tier: 3 };
   }
 
   throw vtxError(

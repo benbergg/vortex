@@ -60,6 +60,9 @@ async function toAXNode(n: CDPAXNode, index: number): Promise<AXNode> {
   const role = n.role?.value ?? "generic";
   const name = ellipsize((n.name?.value ?? "").trim());
   const value = (n.value?.value as string | undefined) ?? undefined;
+  // textHash encodes the (name|role|value) tuple for cross-snapshot node
+  // identity (consumed by RefStore stale-relocation). It is NOT a descriptor
+  // lookup key — Tier 2 in descriptor.ts uses substring match, not this hash.
   const textHash = await sha16(`${name}|${role}|${value ?? ""}`);
 
   const properties: AXNode["properties"] = {};

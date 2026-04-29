@@ -193,7 +193,7 @@ export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
     recoverable: true,
   },
   CROSS_ORIGIN_IFRAME: {
-    hint: "Target iframe is cross-origin; CDP cannot attach due to same-origin policy. Switch to a same-origin entry point or operate within the iframe via its own context.",
+    hint: "Accessibility.getFullAXTree was rejected for a cross-origin frame; the AX tree cannot be queried across origin boundaries. Switch to a same-origin entry point or operate within the iframe via its own tab context.",
     recoverable: false,
   },
   CLOSED_SHADOW_DOM: {

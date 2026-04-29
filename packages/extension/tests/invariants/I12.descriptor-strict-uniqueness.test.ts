@@ -62,10 +62,11 @@ describe("I12: descriptor strict 唯一性", () => {
       .rejects.toMatchObject({ code: VtxErrorCode.REF_NOT_FOUND });
   });
 
-  it("tier 3 css selector → 调 DOM.querySelector", async () => {
+  it("tier 3 css selector → DOM.querySelector + DOM.describeNode 取 backendNodeId", async () => {
     const dbg = makeDebuggerMock();
     dbg.sendCommand.mockImplementation(async (_t, method) => {
-      if (method === "DOM.querySelector") return { nodeId: 5, backendNodeId: 100 };
+      if (method === "DOM.querySelector") return { nodeId: 5 };
+      if (method === "DOM.describeNode") return { node: { backendNodeId: 100 } };
       return undefined;
     });
     const s = snap([interactiveNode("1", "button", "Submit")]); // backendDOMNodeId = 100

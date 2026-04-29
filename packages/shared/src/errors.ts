@@ -74,7 +74,7 @@ export const VtxErrorCode = {
   REF_NOT_FOUND: "REF_NOT_FOUND",
   /** snapshot 已过期（> 5 min）。*/
   SNAPSHOT_EXPIRED: "SNAPSHOT_EXPIRED",
-  /** 跨源 iframe，CDP 无法 attach。*/
+  /** 跨源 iframe，Accessibility.getFullAXTree 拒绝（CDP 已 attach，但 AX tree 不能跨源查询）。*/
   CROSS_ORIGIN_IFRAME: "CROSS_ORIGIN_IFRAME",
   /** closed shadow host，无法穿透。*/
   CLOSED_SHADOW_DOM: "CLOSED_SHADOW_DOM",
