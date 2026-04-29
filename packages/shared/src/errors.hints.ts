@@ -200,6 +200,16 @@ export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
     hint: "Element lives inside a closed shadow root and cannot be pierced. Ask the component author to use { mode: 'open' } shadow, or expose an ARIA-rich light-DOM proxy.",
     recoverable: false,
   },
+
+  // -- L4 Task layer（@since 0.6.0 PR #4）--
+  INVALID_TARGET: {
+    hint: "target must be either an `@eN` ref string or a Descriptor object ({role, name, text, selector, near}). Pass exactly one form, not both.",
+    recoverable: false,
+  },
+  UNSUPPORTED_ACTION: {
+    hint: "action must be one of click / fill / type / select / scroll / hover / drag. Check the spelling.",
+    recoverable: false,
+  },
 };
 
 /**
