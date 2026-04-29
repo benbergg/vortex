@@ -2,6 +2,7 @@
 // spec: vortex重构-L3-spec.md §2.2
 
 import { describe, it, expect } from "vitest";
+import { VtxErrorCode } from "@bytenew/vortex-shared";
 import { resolveDescriptor } from "../../src/reasoning/descriptor.js";
 import type { AXSnapshot } from "../../src/reasoning/types.js";
 import { interactiveNode, makeDebuggerMock } from "../fixtures/ax-tree.js";
@@ -37,7 +38,7 @@ describe("I12: descriptor strict 唯一性", () => {
       interactiveNode("2", "button", "OK"),
     ]);
     await expect(resolveDescriptor({ role: "button", name: "OK" }, s))
-      .rejects.toThrow(/AMBIGUOUS_DESCRIPTOR/);
+      .rejects.toMatchObject({ code: VtxErrorCode.AMBIGUOUS_DESCRIPTOR });
   });
 
   it("tier 1 多匹配 + strict=false → 返回首个", async () => {
@@ -58,7 +59,7 @@ describe("I12: descriptor strict 唯一性", () => {
   it("全部 tier 失败 → 抛 REF_NOT_FOUND", async () => {
     const s = snap([interactiveNode("1", "button", "Cancel")]);
     await expect(resolveDescriptor({ role: "button", name: "NotExist" }, s))
-      .rejects.toThrow(/REF_NOT_FOUND/);
+      .rejects.toMatchObject({ code: VtxErrorCode.REF_NOT_FOUND });
   });
 
   it("tier 3 css selector → 调 DOM.querySelector", async () => {

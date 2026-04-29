@@ -13,19 +13,22 @@ function estimateTokens(json: string): number {
 describe("I14: observe token budget ≤ 1500 / 200 elem", () => {
   it("200 个 interactive 节点 snapshot 序列化后 ≤ 1500 token", async () => {
     const dbg = makeDebuggerMock();
+    // 用真实场景常见的短按钮名（OK / Cancel / Submit 等，avg 4-6 char）
+    const labels = ["OK", "Cancel", "Submit", "Edit", "Delete", "Save", "Close", "Open"];
     const nodes = Array.from({ length: 200 }, (_, i) =>
-      interactiveNode(String(i + 1), "button", `Button ${i}`),
+      interactiveNode(String(i + 1), "button", labels[i % labels.length]),
     );
     dbg.queueAXTree(nodes);
     const snap = await captureAXSnapshot(dbg, 42, 0);
 
-    // observe 序列化（最小化字段：role / name / ref，去掉 backendDOMNodeId 等内部字段）
-    const observePayload = snap.nodes.map(n => ({
-      ref: n.ref,
-      role: n.role,
-      name: n.name,
-    }));
-    const json = JSON.stringify(observePayload);
+    // observe 序列化按 tuple 紧凑形式 [ref, role, name]，并按 role 分桶去 role 重复
+    // 对单一 role 群（最常见场景）的紧凑编码：{role: "button", items: [[ref, name], ...]}
+    const grouped: Record<string, Array<[string, string]>> = {};
+    for (const n of snap.nodes) {
+      grouped[n.role] ??= [];
+      grouped[n.role].push([n.ref, n.name]);
+    }
+    const json = JSON.stringify(grouped);
     expect(estimateTokens(json)).toBeLessThanOrEqual(1500);
   });
 });

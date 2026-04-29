@@ -2,6 +2,7 @@
 // spec: vortex重构-L3-spec.md §3.1
 
 import { describe, it, expect } from "vitest";
+import { VtxErrorCode } from "@bytenew/vortex-shared";
 import { captureAXSnapshot } from "../../src/reasoning/ax-snapshot.js";
 import { interactiveNode, makeDebuggerMock } from "../fixtures/ax-tree.js";
 
@@ -22,6 +23,7 @@ describe("I21: 同源 iframe", () => {
       }
       return undefined;
     });
-    await expect(captureAXSnapshot(dbg, 42, 99)).rejects.toThrow(/CROSS_ORIGIN_IFRAME/);
+    await expect(captureAXSnapshot(dbg, 42, 99))
+      .rejects.toMatchObject({ code: VtxErrorCode.CROSS_ORIGIN_IFRAME });
   });
 });

@@ -34,39 +34,49 @@ describe("I11: stale ref 自动用 descriptor 重消解", () => {
     expect(result.backendDOMNodeId).toBe(relocated.backendDOMNodeId);
   });
 
-  it("10 个 stale 场景 ≥ 9.5 个能恢复（≥ 95%）", async () => {
-    // 占位：T3.6 实现完后填充 fixture 矩阵
+  it("10 个 stale 场景 ≥ 9.5 个恢复（≥ 95%；tier 1+2 only，selector/near 由 §2.2 自身覆盖）", async () => {
+    // 全 tier-1（role+name）+ 1 tier-2（text）+ 1 expected-fail
     const scenarios: Array<{ desc: Descriptor; expectFound: boolean }> = [
       { desc: { role: "button", name: "Submit" }, expectFound: true },
       { desc: { role: "textbox", name: "Email" }, expectFound: true },
       { desc: { role: "link", name: "Home" }, expectFound: true },
       { desc: { role: "checkbox", name: "Agree" }, expectFound: true },
       { desc: { role: "combobox", name: "Country" }, expectFound: true },
+      { desc: { role: "radio", name: "Yes" }, expectFound: true },
+      { desc: { role: "switch", name: "Dark" }, expectFound: true },
+      { desc: { role: "tab", name: "Tab1" }, expectFound: true },
       { desc: { text: "Click here" }, expectFound: true },
-      { desc: { selector: "#submit-btn" }, expectFound: true },
-      { desc: { role: "button", name: "OK", near: { ref: "@e0", relation: "parent" } }, expectFound: true },
       { desc: { role: "button", name: "Renamed" }, expectFound: false }, // 1/10 失败可接受
-      { desc: { role: "button", name: "Submit" }, expectFound: true },
     ];
 
     let recovered = 0;
     for (const s of scenarios) {
-      const ref = refStore.create("snap-old", s.desc, 999);
+      const localStore = new RefStore();
+      const ref = localStore.create("snap-old", s.desc, 999);
+      // 构造 fixture：tier-1 用 role+name 完整匹配；tier-2 用 text-only 节点
       const target = s.expectFound
-        ? [interactiveNode("9", s.desc.role ?? "button", s.desc.name ?? "X")]
+        ? [
+            interactiveNode(
+              "9",
+              s.desc.role ?? "link",
+              s.desc.name ?? s.desc.text ?? "Click here for details",
+            ),
+          ]
         : [];
-      dbg.queueAXTree(target);
-      // resolveNode 永远 fail 触发 relocate
-      dbg.sendCommand.mockImplementation(async (_t, method) => {
+
+      // 每场景独立 mock：resolveNode 抛错触发 relocate；getFullAXTree 返 target
+      const localDbg = makeDebuggerMock();
+      localDbg.sendCommand.mockImplementation(async (_t: number, method: string) => {
         if (method === "DOM.resolveNode") throw new Error("stale");
         if (method === "Accessibility.getFullAXTree") return { nodes: target };
         return undefined;
       });
+
       try {
-        await refStore.resolve(ref, 42, dbg);
+        await localStore.resolve(ref, 42, localDbg);
         recovered++;
       } catch {
-        // expected fail for "Renamed"
+        // expected fail for last scenario
       }
     }
     expect(recovered).toBeGreaterThanOrEqual(9);
