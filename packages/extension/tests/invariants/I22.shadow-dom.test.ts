@@ -1,8 +1,8 @@
-// I22: open shadow 通（CDP flatten） / closed shadow 抛 CLOSED_SHADOW_DOM
+// I22: open shadow 通（CDP flatten） / closed shadow detectClosedShadow 命中
 // spec: vortex重构-L3-spec.md §3.2
 
 import { describe, it, expect } from "vitest";
-import { captureAXSnapshot } from "../../src/reasoning/ax-snapshot.js";
+import { captureAXSnapshot, detectClosedShadow } from "../../src/reasoning/ax-snapshot.js";
 import { interactiveNode, makeDebuggerMock } from "../fixtures/ax-tree.js";
 
 describe("I22: shadow DOM 边界", () => {
@@ -18,19 +18,42 @@ describe("I22: shadow DOM 边界", () => {
     expect(inShadow).toBeDefined();
   });
 
-  it("closed shadow detect → 抛 CLOSED_SHADOW_DOM（含 hint）", async () => {
+  it("custom element + 无 shadowRoots + Runtime probe 真 → detectClosedShadow 返 true", async () => {
     const dbg = makeDebuggerMock();
-    // 模拟 CDP 探测 closed shadow
-    dbg.sendCommand.mockImplementation(async (_t, method) => {
-      if (method === "Runtime.evaluate") {
-        return { result: { value: "closed" } };
+    dbg.sendCommand.mockImplementation(async (_t: number, method: string) => {
+      if (method === "DOM.describeNode") {
+        return { node: { nodeName: "MY-WIDGET", shadowRoots: [] } };
       }
-      if (method === "Accessibility.getFullAXTree") {
-        return { nodes: [interactiveNode("1", "generic", "shadow-host")] };
+      if (method === "Runtime.evaluate") {
+        return { result: { value: true } };
       }
       return undefined;
     });
-    // 占位：实际 closed shadow 探测调用方决定，T3.7 实现时再补完整流程
-    expect(true).toBe(true); // TODO: T3.7 后填具体断言
+    const closed = await detectClosedShadow(dbg, 42, 100);
+    expect(closed).toBe(true);
+  });
+
+  it("普通元素（无 hyphen）→ detectClosedShadow 返 false", async () => {
+    const dbg = makeDebuggerMock();
+    dbg.sendCommand.mockImplementation(async (_t: number, method: string) => {
+      if (method === "DOM.describeNode") {
+        return { node: { nodeName: "DIV", shadowRoots: [] } };
+      }
+      return undefined;
+    });
+    const closed = await detectClosedShadow(dbg, 42, 100);
+    expect(closed).toBe(false);
+  });
+
+  it("custom element + 有 shadowRoots → detectClosedShadow 返 false（open shadow）", async () => {
+    const dbg = makeDebuggerMock();
+    dbg.sendCommand.mockImplementation(async (_t: number, method: string) => {
+      if (method === "DOM.describeNode") {
+        return { node: { nodeName: "MY-WIDGET", shadowRoots: [{ nodeId: 5 }] } };
+      }
+      return undefined;
+    });
+    const closed = await detectClosedShadow(dbg, 42, 100);
+    expect(closed).toBe(false);
   });
 });

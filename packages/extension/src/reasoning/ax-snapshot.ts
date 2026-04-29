@@ -100,6 +100,39 @@ function ulid(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+// closed shadow 探测：先 DOM.describeNode 取 shadowRoots；若 host 是 custom element（含 hyphen）
+// 且 shadowRoots 为空，再用 Runtime.evaluate 二次验证（el.shadowRoot 也为 null）→ 判定 closed。
+// 任意失败均放行（返回 false 不拦截调用方流程，由调用方决定是否 throw CLOSED_SHADOW_DOM）。
+export async function detectClosedShadow(
+  debuggerMgr: DebuggerLike,
+  tabId: number,
+  backendNodeId: number,
+): Promise<boolean> {
+  try {
+    const desc = (await debuggerMgr.sendCommand(tabId, "DOM.describeNode", {
+      backendNodeId,
+    })) as { node?: { nodeName?: string; shadowRoots?: unknown[] } } | undefined;
+    const node = desc?.node;
+    if (!node) return false;
+    const tag = (node.nodeName ?? "").toLowerCase();
+    const isCustomElement = tag.includes("-");
+    const hasOpenShadow = (node.shadowRoots ?? []).length > 0;
+    if (!isCustomElement || hasOpenShadow) return false;
+
+    const evalResult = (await debuggerMgr.sendCommand(tabId, "Runtime.evaluate", {
+      expression: `(() => {
+        const el = document.querySelector('${tag}');
+        if (!el) return false;
+        return el.shadowRoot === null && el.children.length === 0 && el.getBoundingClientRect().height > 0;
+      })()`,
+      returnByValue: true,
+    })) as { result?: { value?: boolean } } | undefined;
+    return evalResult?.result?.value === true;
+  } catch {
+    return false;
+  }
+}
+
 function isCrossOriginErr(err: unknown): boolean {
   const msg = err instanceof Error ? err.message : String(err);
   return /cross-origin|same-origin/i.test(msg);
