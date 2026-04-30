@@ -1,5 +1,7 @@
 // packages/mcp/src/lib/ref-parser.ts
 
+import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+
 export type ParsedRef =
   | { kind: "ref"; index: number; frameId: number }
   | { kind: "selector"; selector: string };
@@ -7,10 +9,17 @@ export type ParsedRef =
 const REF_RE = /^@(?:f(\d+))?e(\d+)$/;
 
 export function parseRef(input: string): ParsedRef {
-  if (!input) throw new Error("target is required");
+  if (!input) {
+    throw vtxError(VtxErrorCode.INVALID_PARAMS, "target is required");
+  }
   if (input.startsWith("@")) {
     const m = input.match(REF_RE);
-    if (!m) throw new Error(`invalid ref format: ${input} (expected @eN or @fNeM)`);
+    if (!m) {
+      throw vtxError(
+        VtxErrorCode.INVALID_PARAMS,
+        `invalid ref format: ${input} (expected @eN or @fNeM)`,
+      );
+    }
     const frameId = m[1] != null ? parseInt(m[1], 10) : 0;
     const index = parseInt(m[2], 10);
     return { kind: "ref", index, frameId };
@@ -33,7 +42,10 @@ export function resolveTargetParam(
   const r = parseRef(target);
   if (r.kind === "selector") return { selector: r.selector };
   if (!activeSnapshotId) {
-    throw new Error("StaleRef: no active snapshot — call vortex_observe first");
+    throw vtxError(
+      VtxErrorCode.STALE_SNAPSHOT,
+      "no active snapshot — call vortex_observe first",
+    );
   }
   return { index: r.index, snapshotId: activeSnapshotId, frameId: r.frameId };
 }

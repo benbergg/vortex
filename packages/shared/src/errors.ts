@@ -78,6 +78,12 @@ export const VtxErrorCode = {
   CROSS_ORIGIN_IFRAME: "CROSS_ORIGIN_IFRAME",
   /** closed shadow host，无法穿透。*/
   CLOSED_SHADOW_DOM: "CLOSED_SHADOW_DOM",
+
+  // -- L4 Task layer（2 类，@since 0.6.0 PR #4）--
+  /** target 既不是合法 ref 也不是 valid descriptor 对象。*/
+  INVALID_TARGET: "INVALID_TARGET",
+  /** action 不在 act 7 enum 内（click/fill/type/select/scroll/hover/drag）。*/
+  UNSUPPORTED_ACTION: "UNSUPPORTED_ACTION",
 } as const;
 
 export type VtxErrorCode = (typeof VtxErrorCode)[keyof typeof VtxErrorCode];

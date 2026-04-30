@@ -36,13 +36,21 @@ import {
   estimateImageBytes,
 } from "./lib/image-utils.js";
 import { eventStore } from "./lib/event-store.js";
-import type { VtxEventLevel } from "@bytenew/vortex-shared";
+import { VtxError, type VtxEventLevel } from "@bytenew/vortex-shared";
 
 type ContentItem =
   | { type: "text"; text: string }
   | { type: "image"; data: string; mimeType: string };
 
 /** 普通 tool response 附加 piggyback 事件 */
+function formatError(err: unknown): string {
+  if (err instanceof VtxError) {
+    const hint = err.extra?.hint ? `\nHint: ${err.extra.hint}` : "";
+    return `Error [${err.code}]: ${err.message}${hint}`;
+  }
+  return (err as Error)?.message ?? String(err);
+}
+
 function withEvents(content: ContentItem[]): { content: ContentItem[] } {
   const events = eventStore.drain();
   if (events.length > 0) {
@@ -370,7 +378,7 @@ async function handleCallTool(
     } catch (err) {
       return {
         isError: true,
-        content: [{ type: "text" as const, text: (err as Error).message }],
+        content: [{ type: "text" as const, text: formatError(err) }],
       };
     }
   }
@@ -474,6 +482,12 @@ async function handleCallTool(
 
     return withEvents([{ type: "text" as const, text: resultText }]);
   } catch (err: any) {
+    if (err instanceof VtxError) {
+      return {
+        isError: true,
+        content: [{ type: "text" as const, text: formatError(err) }],
+      };
+    }
     const msg = err?.message ?? String(err);
     let friendly = msg;
     if (msg.includes("ECONNREFUSED") || msg.includes("Failed to connect")) {
