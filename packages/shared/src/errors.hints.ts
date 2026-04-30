@@ -8,6 +8,12 @@ import type { VtxErrorContext, VtxErrorExtra } from "./errors.js";
  * - `true`：同一动作带参数调整后重试可能成功（如 ELEMENT_OCCLUDED 清理遮挡后重试）
  * - `false`：同一动作重试无意义，但 hint 可能指引换一个动作达成目标
  *   （如 TAB_CLOSED 需要换 tab，不是动作本身的重试）
+ *
+ * Hint quality contract（I19 + I20，see L5-spec §1.2/§1.4）:
+ * - 含 next-action 动词（call/use/verify/check/retry/wait/set/inspect/...）
+ * - 含工具名 OR 参数关键词（vortex_*, selector, mode, action, ...）
+ * - 长度 50-300 字符
+ * - 引用工具名必须在 v0.6 公开 11 之内（否则 LLM tools/list 看不到）
  */
 export interface VtxErrorMeta {
   hint: string;
@@ -17,197 +23,197 @@ export interface VtxErrorMeta {
 export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
   // -- 元素定位 --
   ELEMENT_NOT_FOUND: {
-    hint: "Element not found. Verify the selector, or call vortex_observe to list interactive elements. If the element may live inside an iframe, call vortex_observe({frames:'all-same-origin'}) to descend into iframes — then use the returned element.frameId with dom.* / mouse_click for auto-offset routing.",
+    hint: "Element not found. Verify the selector or call vortex_observe to list interactive elements with their refs. If the element may live inside an iframe, call vortex_observe with scope='full' to descend into iframes — the returned element.frameId routes follow-up vortex_act correctly.",
     recoverable: true,
   },
   ELEMENT_OCCLUDED: {
-    hint: "Element is covered by another (modal/overlay/cookie banner). Dismiss the overlay first, then retry.",
+    hint: "Element is covered by another (modal / overlay / cookie banner). Inspect via vortex_screenshot to identify the blocker, dismiss it via vortex_act with action='click' on its close selector, then retry.",
     recoverable: true,
   },
   ELEMENT_OFFSCREEN: {
-    hint: "Element is outside the viewport. Call vortex_dom_scroll to bring it into view, then retry.",
+    hint: "Element is outside the viewport. Call vortex_act with action='scroll' on the target to bring it into view, then retry the original action.",
     recoverable: true,
   },
   ELEMENT_DISABLED: {
-    hint: "Element has disabled attribute. Fill required prior fields or satisfy prerequisites to enable it.",
+    hint: "Element has the disabled attribute. Fill required prior fields via vortex_act or satisfy prerequisites to enable it, then retry.",
     recoverable: true,
   },
   ELEMENT_DETACHED: {
-    hint: "Element was removed from the DOM. Call vortex_observe again to get the current state.",
+    hint: "Element was removed from the DOM. Call vortex_observe to capture the current state and retry with the new ref.",
     recoverable: true,
   },
   SELECTOR_AMBIGUOUS: {
-    hint: "Selector matched multiple elements. Use a more specific selector, or call vortex_observe to get indexes.",
+    hint: "Selector matched multiple elements. Use a more specific selector, or call vortex_observe to get unique ref indexes (@eN form).",
     recoverable: true,
   },
 
   // -- 页面状态 --
   NAVIGATION_IN_PROGRESS: {
-    hint: "A page navigation is in progress. Call vortex_page_wait_for_network_idle before retrying.",
+    hint: "A page navigation is in progress. Call vortex_wait_for with mode='idle' and value='network' before retrying the action.",
     recoverable: true,
   },
   PAGE_NOT_READY: {
-    hint: "Page DOM not ready. Wait for load, or call vortex_page_wait before retrying.",
+    hint: "Page DOM is not ready. Call vortex_wait_for with mode='element' on a load-marker selector, or mode='idle' value='network', before retrying.",
     recoverable: true,
   },
   DIALOG_BLOCKING: {
-    hint: "A native browser dialog (alert/confirm/prompt) is blocking. Handle or dismiss it first.",
+    hint: "A native browser dialog (alert / confirm / prompt) is blocking. Handle or dismiss it via vortex_act with action='click' on the OK / Cancel selector, then retry.",
     recoverable: true,
   },
   IFRAME_NOT_READY: {
-    hint: "Target iframe is not ready or not yet loaded. Call vortex_frames_list after a short wait, or retry vortex_observe with frames:'all-same-origin' — the returned elements will carry frameId so follow-up mouse_click / dom.* can route correctly.",
+    hint: "Target iframe is not ready or not yet loaded. Retry vortex_observe with scope='full' to descend into iframes — the returned elements carry frameId so follow-up vortex_act routes correctly.",
     recoverable: true,
   },
 
   // -- Snapshot --
   STALE_SNAPSHOT: {
-    hint: "Page has changed since the snapshot. Call vortex_observe to get a fresh snapshot, then retry.",
+    hint: "Page has changed since the snapshot. Call vortex_observe to capture a fresh snapshot, then retry with the new ref.",
     recoverable: true,
   },
   INVALID_INDEX: {
-    hint: "Index does not exist in this snapshot. Call vortex_observe to list valid indexes.",
+    hint: "Index does not exist in this snapshot. Call vortex_observe to list valid ref indexes (@eN form).",
     recoverable: true,
   },
 
   // -- 网络与标签 --
   NAVIGATION_FAILED: {
-    hint: "Navigation failed (network error, blocked URL, or invalid URL). Verify the URL and retry.",
+    hint: "Navigation failed (network error, blocked URL, or invalid URL). Verify the url argument passed to vortex_navigate and retry; the context may carry the underlying browser error.",
     recoverable: true,
   },
   TAB_NOT_FOUND: {
-    hint: "Tab id does not exist. Call vortex_tab_list to find valid tab ids.",
+    hint: "tabId argument does not exist. Call vortex_tab_create to open a new tab, or omit tabId to operate on the active tab.",
     recoverable: false,
   },
   TAB_CLOSED: {
-    hint: "The target tab was closed during execution. Select another tab or create a new one.",
+    hint: "The target tab was closed during execution. Call vortex_tab_create to open a new tab and re-run the flow, or pick another tabId.",
     recoverable: false,
   },
 
   // -- 执行与权限 --
   TIMEOUT: {
-    hint: "Action timed out. Increase the timeout parameter, or check if the page is stuck.",
+    hint: "Action timed out. Increase the timeout argument, or call vortex_wait_for with mode='idle' to let the page settle before retrying.",
     recoverable: true,
   },
   JS_EXECUTION_ERROR: {
-    hint: "Injected JavaScript threw an error. Inspect the error message and adjust the code.",
+    hint: "Injected JavaScript threw an error. Inspect the error message in context.extras and adjust the selector or action arguments before retrying.",
     recoverable: false,
   },
   PERMISSION_DENIED: {
-    hint: "Operation blocked by browser permission (cross-origin, file access, or extension permission).",
+    hint: "Operation blocked by browser permission (cross-origin, file access, or extension permission). Verify the manifest permissions attribute and the target tab is not chrome://.",
     recoverable: false,
   },
   CSP_BLOCKED: {
-    hint: "Action blocked by Content-Security-Policy. Try a CDP-based alternative (e.g. vortex_dom_click with useRealMouse=true).",
+    hint: "Action blocked by Content-Security-Policy. Use vortex_act with action='click' (which routes via CDP real mouse and bypasses page-side CSP), or pick a selector outside the CSP-restricted frame.",
     recoverable: true,
   },
   INTERNAL_ERROR: {
-    hint: "Unexpected error in the vortex runtime (server/relay/mcp). Check logs; retry may work if transient.",
+    hint: "Unexpected error in the vortex runtime (server / relay / mcp). Inspect context.extras for the underlying message and retry — transient errors often recover.",
     recoverable: true,
   },
 
   // -- 传输层 --
   NATIVE_MESSAGING_ERROR: {
-    hint: "Native messaging channel error. Verify the vortex host is installed and the extension is reloaded.",
+    hint: "Native messaging channel error. Verify the vortex host is installed and the extension is reloaded; inspect the chrome://extensions page for the connection state.",
     recoverable: false,
   },
   EXTENSION_NOT_CONNECTED: {
-    hint: "Vortex extension is not connected. Ensure Chrome is open and the extension is enabled.",
+    hint: "Vortex extension is not connected. Ensure Chrome is open with the extension enabled at chrome://extensions, then call vortex_observe to re-check connectivity.",
     recoverable: false,
   },
   INVALID_PARAMS: {
-    hint: "Invalid parameters. Check the tool schema and retry with correct arguments.",
+    hint: "Invalid parameters. Check the tool schema for required fields and value constraints, then retry with corrected arguments.",
     recoverable: false,
   },
   UNKNOWN_ACTION: {
-    hint: "Unknown action. Check spelling or verify the action is supported in this vortex version.",
+    hint: "Unknown action. Verify the action argument spelling matches the tool's enum (e.g. vortex_act expects click / fill / type / select / scroll / hover).",
     recoverable: false,
   },
 
   // -- 组件 / 框架 --
   UNSUPPORTED_TARGET: {
-    hint: "Target is a framework-controlled component (e.g. Element Plus datetime-range picker). Use vortex_dom_commit with a matching kind instead of vortex_dom_fill/type.",
+    hint: "Target is a framework-controlled component (e.g. Element Plus datetime-range picker). The runtime auto-routes to a commit driver via vortex_act; if the framework version is not yet covered, inspect context.extras.kind and pick a CSS selector outside the controlled region.",
     recoverable: false,
   },
   COMMIT_FAILED: {
-    hint: "vortex_dom_commit driver failed mid-flow. Inspect context.extras.stage (open-picker / navigate-month / click-day / confirm / verify) to see which step broke. Page state may have changed between calls, or the framework version is not matched by any driver.",
+    hint: "Commit driver failed mid-flow. Inspect context.extras.stage (open-picker / navigate-month / click-day / confirm / verify) to see which step broke; the page state may have changed or the framework version may not be matched by any driver.",
     recoverable: true,
   },
 
   // -- L2 Action layer --
   NOT_ATTACHED: {
-    hint: "Element detached from DOM. Call vortex_observe to re-locate the element, then retry with the new ref.",
+    hint: "Element detached from DOM. Call vortex_observe to re-locate the element and retry vortex_act with the fresh ref.",
     recoverable: true,
   },
   NOT_VISIBLE: {
-    hint: "Element not visible (display:none / visibility:hidden / 0x0 box). Call vortex_wait with mode:'element' state:'visible', or check if the parent container is hidden.",
+    hint: "Element not visible (display:none / visibility:hidden / 0x0 box). Call vortex_wait_for with mode='element' on a parent visibility marker, or check whether the parent container is hidden.",
     recoverable: true,
   },
   NOT_STABLE: {
-    hint: "Element position is unstable (animating). Call vortex_wait with mode:'idle' to let the animation settle, then retry.",
+    hint: "Element position is unstable (animating). Call vortex_wait_for with mode='idle' to let the animation settle, then retry vortex_act.",
     recoverable: true,
   },
   OBSCURED: {
-    hint: "Element hit-test failed; covered by another element (e.g. modal/loading overlay). Inspect via vortex_screenshot, dismiss the overlay (context.extras.blocker may identify it), then retry.",
+    hint: "Element hit-test failed; covered by another element (e.g. modal / loading overlay). Inspect via vortex_screenshot, dismiss the overlay (context.extras.blocker may identify it), then retry.",
     recoverable: true,
   },
   DISABLED: {
-    hint: "Element is disabled (disabled attr / aria-disabled / fieldset[disabled]). Complete prerequisite interactions to unlock it before retrying.",
+    hint: "Element is disabled (disabled attribute / aria-disabled / fieldset[disabled]). Complete prerequisite vortex_act interactions to unlock it before retrying.",
     recoverable: true,
   },
   NOT_EDITABLE: {
-    hint: "Target is not editable (readonly or non-input element). Use vortex_extract or vortex_get_text to read instead, or pick a different selector.",
+    hint: "Target is not editable (readonly or non-input element). Use vortex_extract to read its text instead, or pick a different selector that points to an actual input.",
     recoverable: false,
   },
   ACTION_FAILED_ALL_PATHS: {
-    hint: "All fallback paths exhausted (dispatchEvent → CDP → ...). context.extras.attemptedPaths lists what was tried. Inspect via vortex_screenshot; consider coordinate-based click via vortex_evaluate, or check if the element is inside a closed shadow root.",
+    hint: "All fallback paths exhausted (dispatchEvent → CDP → ...). context.extras.attemptedPaths lists what was tried. Inspect via vortex_screenshot, retry with a different selector, or check whether the element lives in a closed shadow root.",
     recoverable: false,
   },
   DRAG_REQUIRES_CDP: {
-    hint: "Drag operation requires CDP, but CDP is unavailable (DevTools may be open, or chrome.debugger attach was denied). Close DevTools and retry, or rewrite the flow using vortex_evaluate primitives.",
+    hint: "Drag operation requires CDP, but CDP is unavailable (DevTools may be open, or chrome.debugger attach was denied). Close DevTools and retry; drag is exposed via vortex_act with action='drag' once CDP attaches.",
     recoverable: false,
   },
 
   // -- L3 Reasoning（@since 0.6.0 PR #3）--
   A11Y_UNAVAILABLE: {
-    hint: "Accessibility tree unavailable on this page (CSP-restricted or sandboxed). Switch to a regular page or fall back to CSS selectors via vortex_dom_*.",
+    hint: "Accessibility tree unavailable on this page (CSP-restricted or sandboxed). Switch to a regular page or fall back to CSS selectors via vortex_act and vortex_extract.",
     recoverable: false,
   },
   CDP_NOT_ATTACHED: {
-    hint: "chrome.debugger could not attach to the tab. Verify manifest has the 'debugger' permission and the tab is not chrome:// or chrome-extension://.",
+    hint: "chrome.debugger could not attach to the tab. Verify the manifest debugger attribute is granted, and the tab is not chrome:// or chrome-extension:// (CDP cannot attach to those).",
     recoverable: false,
   },
   STALE_REF: {
-    hint: "Element ref is stale and could not be re-resolved by descriptor. Call vortex_observe again to get fresh refs.",
+    hint: "Element ref is stale and could not be re-resolved by descriptor. Call vortex_observe to mint fresh refs and retry.",
     recoverable: true,
   },
   AMBIGUOUS_DESCRIPTOR: {
-    hint: "Descriptor matched multiple elements in strict mode. Add a 'near' relation to disambiguate, narrow the name, or set strict:false to take the first match.",
+    hint: "Descriptor matched multiple elements in strict mode. Add a 'near' relation to disambiguate, narrow the name attribute, or set strict:false to take the first match.",
     recoverable: true,
   },
   REF_NOT_FOUND: {
-    hint: "ref does not exist in the current RefStore. Call vortex_observe to mint fresh refs and retry.",
+    hint: "ref does not exist in the current RefStore. Call vortex_observe to mint fresh refs and retry the action.",
     recoverable: true,
   },
   SNAPSHOT_EXPIRED: {
-    hint: "Snapshot expired (> 5 min). Call vortex_observe to capture a new snapshot and retry.",
+    hint: "Snapshot expired (> 5 min). Call vortex_observe to capture a new snapshot and retry with the fresh ref.",
     recoverable: true,
   },
   CROSS_ORIGIN_IFRAME: {
-    hint: "Accessibility.getFullAXTree was rejected for a cross-origin frame; the AX tree cannot be queried across origin boundaries. Switch to a same-origin entry point or operate within the iframe via its own tab context.",
+    hint: "Accessibility.getFullAXTree was rejected for a cross-origin frameId; the AX tree cannot be queried across origin boundaries. Switch to a same-origin entry point or operate within the iframe via its own tab context.",
     recoverable: false,
   },
   CLOSED_SHADOW_DOM: {
-    hint: "Element lives inside a closed shadow root and cannot be pierced. Ask the component author to use { mode: 'open' } shadow, or expose an ARIA-rich light-DOM proxy.",
+    hint: "Element lives inside a closed shadow root and cannot be pierced. Ask the component author to switch the mode attribute to 'open', or expose an ARIA-rich light-DOM proxy selector.",
     recoverable: false,
   },
 
   // -- L4 Task layer（@since 0.6.0 PR #4）--
   INVALID_TARGET: {
-    hint: "target must be a ref string like `@e3` (from vortex_observe) or a CSS selector. Descriptor object form arrives in v0.6.x.",
+    hint: "Use a target ref string like @e3 (returned from vortex_observe) or a CSS selector. The Descriptor object form arrives in v0.6.x once the resolver lands.",
     recoverable: false,
   },
   UNSUPPORTED_ACTION: {
-    hint: "action must be one of click / fill / type / select / scroll / hover. drag is not yet exposed via vortex_act (v0.6.x).",
+    hint: "Verify the action argument matches one of vortex_act's enum values: click, fill, type, select, scroll, hover. The drag action is not yet exposed via vortex_act in v0.6.",
     recoverable: false,
   },
 };
