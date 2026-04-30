@@ -5,36 +5,24 @@
 // - description: imperative, ≤ 60 chars
 // - properties: NO description field
 // - shared inline $defs not possible across tools (MCP serializes each)
-//   so Descriptor / TabRef structures are duplicated per tool
+//   so Target / TabRef structures are duplicated per tool
 // - no `default` fields (handler defaults instead)
+//
+// v0.6 scope: target accepts ref string only (`@e3` / `@f1e2`) or null
+// (whole page where applicable). Descriptor object form arrives in v0.6.x
+// alongside L3 reasoning resolver — keeping schema honest with runtime.
 
 import type { ToolDef } from "./schemas.js";
-
-// reusable shape constants (inlined into each tool that needs them; deduped at write-time)
-const Descriptor = {
-  type: "object" as const,
-  properties: {
-    role: { type: "string" as const },
-    name: { type: "string" as const },
-    text: { type: "string" as const },
-    selector: { type: "string" as const },
-    near: {
-      type: "object" as const,
-      properties: {
-        ref: { type: "string" as const },
-        relation: { enum: ["parent", "sibling", "child"] as const },
-      },
-    },
-    strict: { type: "boolean" as const },
-  },
-};
-
-const Target = { oneOf: [{ type: "string" as const }, Descriptor] };
 
 const tabFields = {
   tabId: { type: "number" as const },
   frameId: { type: "number" as const },
 };
+
+// target: ref string only in v0.6. null variant lets extract/screenshot
+// target the whole page; act/wait_for require a concrete element.
+const TargetRequired = { type: "string" as const };
+const TargetOptional = { oneOf: [{ type: "string" as const }, { type: "null" as const }] };
 
 export const PUBLIC_TOOLS: ToolDef[] = [
   {
@@ -44,8 +32,8 @@ export const PUBLIC_TOOLS: ToolDef[] = [
     schema: {
       type: "object",
       properties: {
-        target: Target,
-        action: { enum: ["click", "fill", "type", "select", "scroll", "hover", "drag"] },
+        target: TargetRequired,
+        action: { enum: ["click", "fill", "type", "select", "scroll", "hover"] },
         value: {},
         options: {
           type: "object",
@@ -66,7 +54,7 @@ export const PUBLIC_TOOLS: ToolDef[] = [
     schema: {
       type: "object",
       properties: {
-        scope: { type: ["string"], enum: ["viewport", "full"] },
+        scope: { type: "string", enum: ["viewport", "full"] },
         filter: { enum: ["interactive", "all"] },
         ...tabFields,
       },
@@ -75,11 +63,11 @@ export const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "vortex_extract",
     action: "L4.extract",
-    description: "Extract a11y subtree under target.",
+    description: "Extract visible text from page or element.",
     schema: {
       type: "object",
       properties: {
-        target: { oneOf: [{ type: "string" }, Descriptor, { type: "null" }] },
+        target: TargetOptional,
         depth: { type: "number" },
         include: { type: "array", items: { enum: ["text", "value", "attrs"] } },
         ...tabFields,
@@ -129,7 +117,7 @@ export const PUBLIC_TOOLS: ToolDef[] = [
     schema: {
       type: "object",
       properties: {
-        target: { oneOf: [{ type: "string" }, Descriptor, { type: "null" }] },
+        target: TargetOptional,
         fullPage: { type: "boolean" },
         ...tabFields,
       },
@@ -139,11 +127,11 @@ export const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "vortex_wait_for",
     action: "L4.wait_for",
-    description: "Wait for url / element / idle / info.",
+    description: "Wait for element / idle / page info.",
     schema: {
       type: "object",
       properties: {
-        mode: { enum: ["url", "element", "idle", "info"] },
+        mode: { enum: ["element", "idle", "info"] },
         value: {},
         timeout: { type: "number" },
         ...tabFields,
@@ -154,14 +142,14 @@ export const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "vortex_press",
     action: "keyboard.press",
-    description: "Press a keyboard shortcut globally.",
+    description: "Press a key or shortcut globally.",
     schema: {
       type: "object",
       properties: {
-        keys: { type: "string" },
+        key: { type: "string" },
         ...tabFields,
       },
-      required: ["keys"],
+      required: ["key"],
     },
   },
   {
@@ -182,11 +170,11 @@ export const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "vortex_storage",
     action: "L4.storage",
-    description: "localStorage / sessionStorage CRUD.",
+    description: "localStorage / sessionStorage / cookies CRUD.",
     schema: {
       type: "object",
       properties: {
-        op: { enum: ["get", "set", "list", "session-get", "session-set"] },
+        op: { enum: ["get", "set", "session-get", "session-set", "cookies-get"] },
         key: { type: "string" },
         value: {},
         ...tabFields,

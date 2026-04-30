@@ -2,9 +2,14 @@
 // 新工具名 → extension action + 参数 reshape。
 // 与 server.ts 解耦，便于单元测试。
 
+import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+
 /**
  * 基于新 MCP tool 名，动态决定发哪个 extension action 以及如何 reshape 参数。
  * 返回 null 表示该工具直接使用 toolDef.action，无需特殊处理。
+ *
+ * 非法 enum / 缺少必要字段时直接 throw VtxError —— 由 server.ts 统一格式化为
+ * `Error [CODE]: msg + hint` 返给 LLM，避免 sentinel 字符串泄漏到 sendRequest。
  */
 export function dispatchNewTool(
   name: string,
@@ -96,11 +101,14 @@ export function dispatchNewTool(
       const { action: actionName, value, options, target, ...rest } = params;
       const v05Action = ACT_TO_V05[actionName as string];
       if (!v05Action) {
-        // unknown action → caller 会拿到 INVALID_PARAMS 通过 tool dispatch
-        return { action: "__invalid_action__", params };
+        throw vtxError(
+          VtxErrorCode.UNSUPPORTED_ACTION,
+          `act: action must be one of ${Object.keys(ACT_TO_V05).join("|")}, got ${String(actionName)}`,
+          { extras: { action: actionName } },
+        );
       }
       const next: Record<string, unknown> = { target, ...rest };
-      // value 仅 fill/type/select/drag 需要
+      // value 仅 fill/type/select 需要
       if (value !== undefined) next.value = value;
       // options.timeout / options.force 透传
       if (options && typeof options === "object") {
@@ -121,10 +129,17 @@ export function dispatchNewTool(
       return { action: "observe.snapshot", params: next };
     }
     case "vortex_extract": {
-      const { target, depth, include, ...rest } = params;
-      // 第一阶段：映射到 content.getText（最常用 case）；后续 follow-up 改 a11y subtree
+      // server.ts 已把 target=@ref 翻成 params.index/snapshotId（删了 params.target），
+      // 把 target=selector 翻成 params.selector。content.getText handler 当前只读 selector，
+      // 所以 ref 形式会静默回退到全页 innerText —— v0.6.x a11y subtree 上线前先 throw 提示。
+      const { target: _target, depth, include, ...rest } = params;
+      if (params.index != null) {
+        throw vtxError(
+          VtxErrorCode.INVALID_PARAMS,
+          "extract: @ref form not yet wired to a11y subtree (v0.6.x). Use a CSS selector for now, or omit target for whole-page text.",
+        );
+      }
       const next: Record<string, unknown> = { ...rest };
-      if (target !== undefined && target !== null) next.target = target;
       if (depth !== undefined) next.maxDepth = depth;
       if (Array.isArray(include)) next.include = include;
       return { action: "content.getText", params: next };
@@ -134,12 +149,17 @@ export function dispatchNewTool(
       const next: Record<string, unknown> = { ...rest };
       if (timeout !== undefined) next.timeout = timeout;
       switch (mode) {
-        case "url":
-          if (value !== undefined) next.url = value;
-          return { action: "page.wait", params: next };
-        case "element":
+        case "element": {
+          // value 不经 server.ts target translation；@ref 形式手动展开
+          if (typeof value === "string" && value.startsWith("@")) {
+            throw vtxError(
+              VtxErrorCode.INVALID_PARAMS,
+              "wait_for(mode=element): @ref form not supported here. Pass a CSS selector as value.",
+            );
+          }
           if (value !== undefined) next.selector = value;
           return { action: "page.wait", params: next };
+        }
         case "idle": {
           // value: 'network' | 'xhr' | 'dom'
           const action = value === "network"
@@ -152,7 +172,10 @@ export function dispatchNewTool(
         case "info":
           return { action: "page.info", params: next };
         default:
-          return { action: "page.info", params: next };
+          throw vtxError(
+            VtxErrorCode.INVALID_PARAMS,
+            `wait_for: mode must be one of element|idle|info, got ${String(mode)}`,
+          );
       }
     }
     case "vortex_debug_read": {
@@ -173,15 +196,22 @@ export function dispatchNewTool(
           return { action: "storage.getLocalStorage", params: next };
         case "set":
           return { action: "storage.setLocalStorage", params: next };
-        case "list":
-          return { action: "storage.getCookies", params: next };
         case "session-get":
           return { action: "storage.getSessionStorage", params: next };
         case "session-set":
           return { action: "storage.setSessionStorage", params: next };
+        case "cookies-get":
+          return { action: "storage.getCookies", params: next };
         default:
-          return { action: "__invalid_op__", params };
+          throw vtxError(
+            VtxErrorCode.INVALID_PARAMS,
+            `storage: op must be one of get|set|session-get|session-set|cookies-get, got ${String(op)}`,
+          );
       }
+    }
+    case "vortex_press": {
+      // schema 暴露 `key`（与 v0.5 + handler 一致），无需 reshape；这里 case 留空走 toolDef.action 即可
+      return null;
     }
 
     default:
@@ -190,6 +220,8 @@ export function dispatchNewTool(
 }
 
 // vortex_act 的 action enum → v0.5 extension handler action
+// 不含 drag —— mouse.drag 需要 fromX/fromY/toX/toY 坐标，act schema 只暴露 target+value
+// 无法表达；drag 用例留 v0.6.x（独立工具或扩展 value 形态）。
 const ACT_TO_V05: Record<string, string> = {
   click: "dom.click",
   fill: "dom.fill",
@@ -197,5 +229,4 @@ const ACT_TO_V05: Record<string, string> = {
   select: "dom.select",
   scroll: "dom.scroll",
   hover: "dom.hover",
-  drag: "mouse.drag",
 };

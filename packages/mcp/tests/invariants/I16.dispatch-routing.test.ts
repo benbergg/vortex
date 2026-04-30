@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest";
 import { dispatchNewTool } from "../../src/tools/dispatch.js";
 
 describe("I16: dispatch routing for 11 public tools", () => {
-  describe("vortex_act → 7 actions", () => {
+  describe("vortex_act → 6 actions", () => {
     const cases: Array<[string, string]> = [
       ["click", "dom.click"],
       ["fill", "dom.fill"],
@@ -13,7 +13,6 @@ describe("I16: dispatch routing for 11 public tools", () => {
       ["select", "dom.select"],
       ["scroll", "dom.scroll"],
       ["hover", "dom.hover"],
-      ["drag", "mouse.drag"],
     ];
     for (const [actionEnum, expectedAction] of cases) {
       it(`action=${actionEnum} → ${expectedAction}`, () => {
@@ -23,9 +22,14 @@ describe("I16: dispatch routing for 11 public tools", () => {
       });
     }
 
-    it("unknown action → __invalid_action__ sentinel", () => {
-      const r = dispatchNewTool("vortex_act", { target: "@e0", action: "destroy" });
-      expect(r?.action).toBe("__invalid_action__");
+    it("drag 已从 act enum 移除（v0.6.x follow-up），unknown action throws UNSUPPORTED_ACTION", () => {
+      expect(() => dispatchNewTool("vortex_act", { target: "@e0", action: "drag" }))
+        .toThrowError(/UNSUPPORTED_ACTION|action must be one of/);
+    });
+
+    it("unknown action throws UNSUPPORTED_ACTION", () => {
+      expect(() => dispatchNewTool("vortex_act", { target: "@e0", action: "destroy" }))
+        .toThrowError(/UNSUPPORTED_ACTION|action must be one of/);
     });
 
     it("options.timeout / options.force 透传到 params", () => {
@@ -59,37 +63,47 @@ describe("I16: dispatch routing for 11 public tools", () => {
     });
   });
 
-  describe("vortex_extract → content.getText (第一阶段)", () => {
-    it("target + depth → maxDepth + target", () => {
+  describe("vortex_extract → content.getText (selector / 全页 only — @ref a11y subtree v0.6.x)", () => {
+    it("selector 形式（server.ts target 翻译后）→ depth + include 透传", () => {
+      // server.ts 翻译普通 selector → params.selector，删 params.target
       const r = dispatchNewTool("vortex_extract", {
-        target: "@e0",
+        selector: "#main",
         depth: 5,
         include: ["text", "value"],
       });
       expect(r?.action).toBe("content.getText");
-      expect(r?.params.target).toBe("@e0");
+      expect(r?.params.selector).toBe("#main");
       expect(r?.params.maxDepth).toBe(5);
       expect(r?.params.include).toEqual(["text", "value"]);
+      expect(r?.params.target).toBeUndefined();
     });
 
-    it("target=null 透传不 set target 字段", () => {
+    it("target=null 全页文本 → 不 set target/selector/index", () => {
       const r = dispatchNewTool("vortex_extract", { target: null });
       expect(r?.action).toBe("content.getText");
       expect(r?.params.target).toBeUndefined();
+      expect(r?.params.selector).toBeUndefined();
+      expect(r?.params.index).toBeUndefined();
+    });
+
+    it("@ref 形式（server.ts 翻译后 params.index）throws INVALID_PARAMS（a11y subtree 待 v0.6.x）", () => {
+      // server.ts 把 @e3 翻译成 { index, snapshotId }，删 params.target
+      expect(() =>
+        dispatchNewTool("vortex_extract", { index: 3, snapshotId: "abc", depth: 2 }),
+      ).toThrowError(/INVALID_PARAMS|@ref form not yet/);
     });
   });
 
-  describe("vortex_wait_for → mode 分发", () => {
-    it("mode=url → page.wait + url 字段", () => {
-      const r = dispatchNewTool("vortex_wait_for", { mode: "url", value: "https://example.com" });
-      expect(r?.action).toBe("page.wait");
-      expect(r?.params.url).toBe("https://example.com");
-    });
-
-    it("mode=element → page.wait + selector 字段", () => {
+  describe("vortex_wait_for → mode 分发（element / idle / info；url 移除待 page.waitForUrl 实现）", () => {
+    it("mode=element + selector → page.wait + selector 字段", () => {
       const r = dispatchNewTool("vortex_wait_for", { mode: "element", value: "#submit" });
       expect(r?.action).toBe("page.wait");
       expect(r?.params.selector).toBe("#submit");
+    });
+
+    it("mode=element + @ref throws INVALID_PARAMS（value 不经 server.ts target 翻译）", () => {
+      expect(() => dispatchNewTool("vortex_wait_for", { mode: "element", value: "@e3" }))
+        .toThrowError(/INVALID_PARAMS|@ref form not supported/);
     });
 
     it("mode=idle value=network → page.waitForNetworkIdle", () => {
@@ -113,8 +127,18 @@ describe("I16: dispatch routing for 11 public tools", () => {
     });
 
     it("timeout 透传", () => {
-      const r = dispatchNewTool("vortex_wait_for", { mode: "url", value: "x", timeout: 12000 });
+      const r = dispatchNewTool("vortex_wait_for", { mode: "info", timeout: 12000 });
       expect(r?.params.timeout).toBe(12000);
+    });
+
+    it("非法 mode throws INVALID_PARAMS（不再静默回退 page.info）", () => {
+      expect(() => dispatchNewTool("vortex_wait_for", { mode: "ready" }))
+        .toThrowError(/INVALID_PARAMS|mode must be one of/);
+    });
+
+    it("mode=url 已移除（page.waitForUrl 待 v0.6.x）", () => {
+      expect(() => dispatchNewTool("vortex_wait_for", { mode: "url", value: "https://x" }))
+        .toThrowError(/INVALID_PARAMS|mode must be one of/);
     });
   });
 
@@ -136,9 +160,9 @@ describe("I16: dispatch routing for 11 public tools", () => {
     const cases: Array<[string, string]> = [
       ["get", "storage.getLocalStorage"],
       ["set", "storage.setLocalStorage"],
-      ["list", "storage.getCookies"],
       ["session-get", "storage.getSessionStorage"],
       ["session-set", "storage.setSessionStorage"],
+      ["cookies-get", "storage.getCookies"],
     ];
     for (const [op, expectedAction] of cases) {
       it(`op=${op} → ${expectedAction}`, () => {
@@ -148,9 +172,14 @@ describe("I16: dispatch routing for 11 public tools", () => {
       });
     }
 
-    it("unknown op → __invalid_op__ sentinel", () => {
-      const r = dispatchNewTool("vortex_storage", { op: "unknown" });
-      expect(r?.action).toBe("__invalid_op__");
+    it("op=list 已 rename → cookies-get（避免 description 与实际不符）", () => {
+      expect(() => dispatchNewTool("vortex_storage", { op: "list" }))
+        .toThrowError(/INVALID_PARAMS|op must be one of/);
+    });
+
+    it("unknown op throws INVALID_PARAMS", () => {
+      expect(() => dispatchNewTool("vortex_storage", { op: "unknown" }))
+        .toThrowError(/INVALID_PARAMS|op must be one of/);
     });
   });
 
@@ -159,8 +188,8 @@ describe("I16: dispatch routing for 11 public tools", () => {
       const r = dispatchNewTool("vortex_navigate", { url: "https://x", reload: true });
       expect(r?.action).toBe("page.reload");
     });
-    it("vortex_press 不在 dispatch（直接用 toolDef.action=keyboard.press）", () => {
-      const r = dispatchNewTool("vortex_press", { keys: "Ctrl+S" });
+    it("vortex_press 走 toolDef.action=keyboard.press（schema field=key 与 handler args.key 一致，无需 reshape）", () => {
+      const r = dispatchNewTool("vortex_press", { key: "Ctrl+S" });
       expect(r).toBeNull();
     });
     it("vortex_tab_create 不在 dispatch（直接用 toolDef.action=tab.create）", () => {

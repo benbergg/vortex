@@ -203,11 +203,11 @@ export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
 
   // -- L4 Task layer（@since 0.6.0 PR #4）--
   INVALID_TARGET: {
-    hint: "target must be either an `@eN` ref string or a Descriptor object ({role, name, text, selector, near}). Pass exactly one form, not both.",
+    hint: "target must be a ref string like `@e3` (from vortex_observe) or a CSS selector. Descriptor object form arrives in v0.6.x.",
     recoverable: false,
   },
   UNSUPPORTED_ACTION: {
-    hint: "action must be one of click / fill / type / select / scroll / hover / drag. Check the spelling.",
+    hint: "action must be one of click / fill / type / select / scroll / hover. drag is not yet exposed via vortex_act (v0.6.x).",
     recoverable: false,
   },
 };
