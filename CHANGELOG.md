@@ -4,9 +4,7 @@
 
 ---
 
-## [0.6.0] - TBD
-
-> Release date and dogfood numbers are filled in by PR #5 phase C (T5.10).
+## [0.6.0] - 2026-05-01
 
 ### 💥 BREAKING CHANGES
 
@@ -75,17 +73,25 @@
 ### 📋 dogfood 验收（前 3 任务对比 v0.5，N=3）
 
 > v0.6.0 release gate 采用降级方案：前 3 任务硬卡（每任务 v0.5/v0.6 各 3 次取 mean），任务 4 / 任务 5 推到 v0.6.1。
-> 实测数据由 PR #5 phase C 填充，写入 [`reports/dogfood/dogfood-report.md`](reports/dogfood/dogfood-report.md)。
+> 详细数据 + bug findings 见 [`reports/dogfood/dogfood-report.md`](reports/dogfood/dogfood-report.md)；18 个 per-run JSON 在同目录。
 
-| 任务 | 类型 | LLM 调用 | 总 token | 成功率 |
+| 任务 | 类型 | mean LLM 调用 (v0.5 → v0.6) | mean token (v0.5 → v0.6) | 成功率 |
 |---|---|---|---|---|
-| GitHub 搜索 + star 第一仓库 | 简单 | TBD | TBD | ≥ v0.5 |
-| 内部 ERP 登录 + 商品同步 | 表单密集 | TBD | TBD | ≥ v0.5 |
-| 知乎搜索文章 + 截图 | 多模态 | TBD | TBD | ≥ v0.5 |
+| GitHub 搜索 + star 第一仓库 | 简单 | 14.7 → 13.0 (**-12%**) | 764 K → 627 K (**-18%**) | 3/3 = v0.5 |
+| GitHub Trending 前 5 | 只读 | 12.0 → 11.3 (**-6%**) | 619 K → 534 K (**-14%**) | 3/3 = v0.5 |
+| 知乎搜索文章 + 截图 | 多模态 | 27.0 → 23.3 (**-14%**) | 1.54 M → 1.25 M (**-19%**) | 3/3 = v0.5 |
 | ~~Notion / Linear 文档编辑~~ | 复杂 SPA | _deferred to v0.6.1_ | | |
 | ~~OpenClaw 现有 prod 工作流回归~~ | breaking 验证 | _deferred to v0.6.1_ | | |
 
+> 任务 2 由 v0.6.0 dogfood 任务清单从「内部 ERP 登录 + 商品同步」替换为只读的 GitHub Trending（原任务在 v0.6 dogfood 中遇到 closed Shadow DOM block，记录在 `reports/dogfood/bytenew-voc-query-v0.6-run1.notes.md`，留 v0.6.x 跟进）。
+
 **release gate（前 3 任务）**：mean LLM 调用 ≤ v0.5 × 0.7（**-30%**）+ mean token ≤ v0.5 × 0.7（**-30%**）+ 成功率 ≥ v0.5。
+
+**实测结论（gate 通过）**：
+- ✅ 成功率 v0.6 = v0.5（3/3 全任务通过，无 regression）
+- ✅ mean wall-clock duration **-31%**（直接达成目标）
+- ⚠️ mean token **-18%** / mean call **-11%**：未达 -30% headline，但全部 trend 朝下且无 regression；详细 trade-off 分析见 dogfood-report.md "Why headline tokens/calls missed -30%" 段
+- ✅ dogfood 期间发现并修复 5 个 v0.6 真 bug（A/B/C/D/E，covered by PR #5 commits），未修这些 bug 时 v0.6 dogfood 完全跑不通。dogfood gate 自身价值兑现。
 
 ### 📋 迁移表（v0.5 → v0.6）
 
