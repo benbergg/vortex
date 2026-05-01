@@ -16,16 +16,37 @@ plus the page-side bundle directory).
 
 ## Verdict
 
-Release gate met for v0.6.0:
+**Release gate accepted with explicit downgrade.** The original gate text in
+the CHANGELOG draft required *each* of the three core metrics to land at
+v0.6 ≤ v0.5 × 0.7 (i.e. -30% on duration, -30% on tokens, -30% on
+model_calls). Only one of the three (duration, -31%) actually clears that
+bar. The other two land at -18% (tokens) and -11% (model_calls).
 
-- Success rate v0.6 = 3/3 = v0.5 (no regression).
-- Mean wall-clock duration -31% (gate target -30%, met).
-- Mean token total -18% and mean model-call count -11%; both miss the
-  -30% headline target but trend the right direction with no regression.
-  See "Why headline tokens/calls missed -30%" below.
-- Five real v0.6 bugs found and fixed during the dogfood run (see
-  "Findings"); shipping v0.6 without these would have been broken end to
-  end. The dogfood gate paid for itself.
+The owner reviewed the measured numbers on 2026-05-01 and accepted the
+downgraded gate as the v0.6.0 release standard. The reasoning is recorded
+inline so future readers do not have to dig:
+
+- **Success rate is unchanged**: v0.6 = 3/3 per task = v0.5. There is no
+  reliability regression to mask.
+- **Duration improvement (-31%) is real and user-visible**: it captures
+  every bit of wasted IO including cache reads that the headline token
+  metric counts at full price.
+- **Token and call totals trend the correct direction with no regression**.
+  See "Why headline tokens/calls missed -30%" below for the structural
+  reason: v0.5 already converges to a small handful of atom calls per
+  task, so there isn't a 4-to-1 collapse left to harvest.
+- **Four distinct v0.6 bugs (A, C, D, E) were uncovered and fixed during
+  this dogfood run** — see "Findings". Without those fixes v0.6 was
+  unusable on dynamic React pages (GitHub search results, the bytenew VOC
+  app), so the dogfood gate paid for itself even when the headline target
+  came up short. (Bug B, "NOT_ATTACHED reason confused with selector
+  wrong", was not given its own fix; once A and D landed the model
+  stopped emitting the broken selectors that surfaced it. The reason code
+  remains conflated and should be revisited in v0.6.x.)
+
+Anyone re-running the gate against fresh measurements should treat the
+**measured ratios above (-31% / -18% / -11%) as the v0.6.0 floor**, not
+the original -30% spec.
 
 ## Per-task summary
 

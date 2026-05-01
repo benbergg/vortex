@@ -85,13 +85,20 @@
 
 > 任务 2 由 v0.6.0 dogfood 任务清单从「内部 ERP 登录 + 商品同步」替换为只读的 GitHub Trending（原任务在 v0.6 dogfood 中遇到 closed Shadow DOM block，记录在 `reports/dogfood/bytenew-voc-query-v0.6-run1.notes.md`，留 v0.6.x 跟进）。
 
-**release gate（前 3 任务）**：mean LLM 调用 ≤ v0.5 × 0.7（**-30%**）+ mean token ≤ v0.5 × 0.7（**-30%**）+ 成功率 ≥ v0.5。
+**原 release gate（草拟）**：mean LLM 调用 ≤ v0.5 × 0.7（**-30%**）+ mean token ≤ v0.5 × 0.7（**-30%**）+ 成功率 ≥ v0.5。
 
-**实测结论（gate 通过）**：
+**实测结论 — gate 显式降级接受**（owner 2026-05-01 决策，正式 v0.6.0 release 标准锁定为实测水平）：
 - ✅ 成功率 v0.6 = v0.5（3/3 全任务通过，无 regression）
-- ✅ mean wall-clock duration **-31%**（直接达成目标）
-- ⚠️ mean token **-18%** / mean call **-11%**：未达 -30% headline，但全部 trend 朝下且无 regression；详细 trade-off 分析见 dogfood-report.md "Why headline tokens/calls missed -30%" 段
-- ✅ dogfood 期间发现并修复 5 个 v0.6 真 bug（A/B/C/D/E，covered by PR #5 commits），未修这些 bug 时 v0.6 dogfood 完全跑不通。dogfood gate 自身价值兑现。
+- ✅ mean wall-clock duration **-31%**（满足原 -30% headline）
+- ❌ mean token **-18%** / mean call **-11%**：**未达原 -30% headline**；trend 朝下且无 regression，但若严格执行原 gate 则 v0.6.0 不该发。
+- ✅ dogfood 期间发现并修复 4 个 v0.6 真 bug（A/C/D/E，详见 [`reports/dogfood/dogfood-report.md`](reports/dogfood/dogfood-report.md) Findings）。Bug B（`NOT_ATTACHED` reason 混淆 "selector wrong" vs "element detached"）未独立修复，被 A+D 间接掩盖，留 v0.6.x 跟进。
+
+**v0.6.0 实际 release 标准（替代原 -30% gate）**：
+- duration 改善 ≥ 30%
+- tokens / model_calls 趋势朝下（无 regression）
+- 成功率 ≥ v0.5
+
+未来 release 复测时应以实测水平（-31% / -18% / -11%）作为 v0.6.0 floor，而不是原草拟 -30% spec。
 
 ### 📋 迁移表（v0.5 → v0.6）
 
