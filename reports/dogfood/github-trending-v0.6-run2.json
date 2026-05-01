@@ -2,7 +2,7 @@
   "task": "github-trending",
   "version": "v0.6",
   "run": 2,
-  "session_file": "/Users/lg/.claude/projects/-Users-lg-workspace-vortex--worktrees-v0-6-pr5/a84d9e02-ecee-423f-927b-5f957149e71e.jsonl",
+  "session_id": "a84d9e02-ecee-423f-927b-5f957149e71e",
   "started_at": "2026-05-01T11:37:16.219Z",
   "ended_at": "2026-05-01T11:37:40.109Z",
   "duration_seconds": 24,

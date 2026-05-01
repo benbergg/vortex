@@ -2,7 +2,7 @@
   "task": "github-star",
   "version": "v0.6",
   "run": 1,
-  "session_file": "/Users/lg/.claude/projects/-Users-lg-workspace-vortex--worktrees-v0-6-pr5/79dfbb77-6241-4343-b3ea-a738a4e92e8f.jsonl",
+  "session_id": "79dfbb77-6241-4343-b3ea-a738a4e92e8f",
   "started_at": "2026-05-01T10:40:17.823Z",
   "ended_at": "2026-05-01T10:40:41.732Z",
   "duration_seconds": 24,

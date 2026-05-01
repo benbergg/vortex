@@ -2,7 +2,7 @@
   "task": "zhihu-search-screenshot",
   "version": "v0.6",
   "run": 2,
-  "session_file": "/Users/lg/.claude/projects/-Users-lg-workspace-vortex--worktrees-v0-6-pr5/9ddc7ff1-0520-4a78-86d5-ac93f6371c58.jsonl",
+  "session_id": "9ddc7ff1-0520-4a78-86d5-ac93f6371c58",
   "started_at": "2026-05-01T11:46:35.095Z",
   "ended_at": "2026-05-01T11:48:53.789Z",
   "duration_seconds": 139,

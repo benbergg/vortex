@@ -15,6 +15,7 @@
 // JSON to stdout suitable for dogfood-report.md aggregation.
 
 import { readFileSync } from "node:fs";
+import { basename } from "node:path";
 import { argv, exit, stdout, stderr } from "node:process";
 
 function parseArgs(argv) {
@@ -107,11 +108,17 @@ const totalTokens = inputTokens + outputTokens + cacheReadTokens + cacheCreation
 const durationSeconds =
   firstAt != null && lastAt != null ? Math.round((lastAt - firstAt) / 1000) : 0;
 
+// Carry the session uuid (jsonl basename without extension) instead of the
+// full path: the dogfood reports live in a public repo and the absolute path
+// leaks the local username + worktree layout. The uuid alone is enough to
+// re-locate the transcript on whoever runs it next.
+const sessionId = basename(filePath, ".jsonl");
+
 const summary = {
   task: args.task ?? null,
   version: args.version ?? null,
   run: args.run ? Number(args.run) : null,
-  session_file: filePath,
+  session_id: sessionId,
   started_at: firstAt ? new Date(firstAt).toISOString() : null,
   ended_at: lastAt ? new Date(lastAt).toISOString() : null,
   duration_seconds: durationSeconds,

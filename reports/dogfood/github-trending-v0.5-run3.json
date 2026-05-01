@@ -2,7 +2,7 @@
   "task": "github-trending",
   "version": "v0.5",
   "run": 3,
-  "session_file": "/Users/lg/.claude/projects/-Users-lg-workspace-vortex--worktrees-v0-5-dogfood/bb697638-6afe-427f-9dee-1d938d316edf.jsonl",
+  "session_id": "bb697638-6afe-427f-9dee-1d938d316edf",
   "started_at": "2026-05-01T07:30:37.264Z",
   "ended_at": "2026-05-01T07:31:14.622Z",
   "duration_seconds": 37,

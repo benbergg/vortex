@@ -2,7 +2,7 @@
   "task": "github-star",
   "version": "v0.5",
   "run": 3,
-  "session_file": "/Users/lg/.claude/projects/-Users-lg-workspace-vortex--worktrees-v0-5-dogfood/3142ce6c-6f7e-4fdb-b45e-6d8fde355f56.jsonl",
+  "session_id": "3142ce6c-6f7e-4fdb-b45e-6d8fde355f56",
   "started_at": "2026-05-01T07:19:16.577Z",
   "ended_at": "2026-05-01T07:19:57.448Z",
   "duration_seconds": 41,

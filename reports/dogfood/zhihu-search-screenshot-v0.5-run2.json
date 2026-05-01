@@ -2,7 +2,7 @@
   "task": "zhihu-search-screenshot",
   "version": "v0.5",
   "run": 2,
-  "session_file": "/Users/lg/.claude/projects/-Users-lg-workspace-vortex--worktrees-v0-5-dogfood/a0030f2d-ce1f-468b-b221-c9134dec15ae.jsonl",
+  "session_id": "a0030f2d-ce1f-468b-b221-c9134dec15ae",
   "started_at": "2026-05-01T07:38:58.162Z",
   "ended_at": "2026-05-01T07:41:06.731Z",
   "duration_seconds": 129,

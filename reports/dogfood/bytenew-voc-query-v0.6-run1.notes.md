@@ -35,7 +35,7 @@ The signature (login DOM works, sub-app DOM doesn't, a11y tree empty, all class 
 
 ## Repro steps
 
-1. Start a fresh Claude Code session in `/Users/lg/workspace/vortex` with vortex MCP attached.
+1. Start a fresh Claude Code session at the vortex repo root with vortex MCP attached.
 2. Paste `docs/dogfood-prompts/02-bytenew-voc-query.prompt.md` verbatim.
 3. Page lands on `app.html#/login` (session expired). User pastes credentials in chat; agent logs in via `act` on the login page → succeeds.
 4. After redirect to `app.html#/applet/voc`, all observe/extract/act calls aimed at the VOC sub-app fail as above.
