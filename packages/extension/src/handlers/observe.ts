@@ -246,6 +246,16 @@ async function scanOneFrame(
           return (el.innerText || "").trim().slice(0, 80);
         }
 
+        // Pre-index aria-label occurrences once per snapshot so buildSelector
+        // can decide uniqueness in O(1) instead of running a fresh
+        // querySelectorAll for every observed element. On a 50-element
+        // search results page that turns an O(N²) DOM scan into O(N).
+        const ariaLabelCount = new Map<string, number>();
+        for (const el of document.querySelectorAll("[aria-label]")) {
+          const lbl = el.getAttribute("aria-label");
+          if (lbl) ariaLabelCount.set(lbl, (ariaLabelCount.get(lbl) ?? 0) + 1);
+        }
+
         function buildSelector(el: Element): string {
           if (el.id && /^[a-zA-Z][\w-]*$/.test(el.id)) return `#${CSS.escape(el.id)}`;
           const testId =
@@ -258,19 +268,19 @@ async function scanOneFrame(
           // (button / link / form control). It survives React re-renders that
           // shift nth-of-type indices, which made GitHub Star buttons unclickable
           // via @eN refs in v0.6 dogfood (search results — sibling repos kept
-          // re-mounting). Verify uniqueness before using; if multiple matches,
-          // fall through to the path-based fallback so dom.click won't trip
-          // SELECTOR_AMBIGUOUS.
+          // re-mounting). Only emit when the label is page-unique so dom.click
+          // won't trip SELECTOR_AMBIGUOUS; otherwise fall through to the
+          // path-based fallback below.
           const ariaLabel = el.getAttribute("aria-label");
-          if (ariaLabel && ariaLabel.length > 0 && ariaLabel.length < 120) {
+          if (
+            ariaLabel &&
+            ariaLabel.length > 0 &&
+            ariaLabel.length < 120 &&
+            ariaLabelCount.get(ariaLabel) === 1
+          ) {
             const tag = el.tagName.toLowerCase();
             const escaped = ariaLabel.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-            const candidate = `${tag}[aria-label="${escaped}"]`;
-            try {
-              if (document.querySelectorAll(candidate).length === 1) return candidate;
-            } catch {
-              // malformed escape — fall through to path-based fallback
-            }
+            return `${tag}[aria-label="${escaped}"]`;
           }
           const parts: string[] = [];
           let cur: Element | null = el;
