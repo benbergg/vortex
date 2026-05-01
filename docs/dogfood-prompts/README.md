@@ -28,7 +28,7 @@
 | # | 任务 | release gate |
 |---|---|---|
 | 1 | [github-star](01-github-star.prompt.md) | ✅ 硬卡 |
-| 2 | [erp-product-sync](02-erp-product-sync.prompt.md) | ✅ 硬卡 |
+| 2 | [bytenew-voc-query](02-bytenew-voc-query.prompt.md) | ✅ 硬卡 |
 | 3 | [zhihu-search-screenshot](03-zhihu-search-screenshot.prompt.md) | ✅ 硬卡 |
 
 任务 4（Linear）和任务 5（OpenClaw）按 v0.6.0 release gate 降级方案推到 v0.6.1。

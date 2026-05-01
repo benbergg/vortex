@@ -44,30 +44,34 @@
 
 ---
 
-## 任务 2：内部 ERP 登录 + 商品同步
+## 任务 2：班牛 VOC 工作台只读查询
 
-**类别**：表单密集（SSO）
+**类别**：表单密集（多筛选 + 列表读数）
 
-**目标**：内部 ERP 系统登录后跑一次商品数据同步流程，等待同步完成
+**目标**：登录测试环境班牛 VOC 工作台，依次完成 5 个只读查询并报答案。仅查不改，避免污染测试数据。
 
-**起点**：ERP 登录页（需 SSO，仅内网 VPN 可访问）
+**起点**：`https://testc.bytenew.com/`（已登录，cookie 持久化）
+
+**子任务（按顺序）**：
+1. 打开 VOC 小程序，报告一级菜单数量（ground truth: 4）
+2. "智能辅助回评"，筛选 `平台评价情感 = 好评`，报告总条数（ground truth: 1480）
+3. 同页筛选 `平台评价情感 = 中评 + 差评`，报告总条数（ground truth: 317）
+4. 同页筛选 `店铺 = 【天猫】欧莱雅男士官方旗舰店`，报告总条数（ground truth: 711）
+5. 同页筛选 `订单号 = <ORDER_ID>`，读出该行的 **商品 ID**（ground truth: 527758354524）
 
 **成功定义**：
-- ERP 商品列表页显示同步状态 "已完成"
-- 同步任务 ID 可在系统日志中追溯
-- agent 主动确认任务完成
+- 5 个子任务的答案与 ground truth 全部匹配
+- 任务过程中无写操作（不点犇犇打标 / 不修改任何字段）
+- agent 主动汇总 + 确认任务完成
 
 **凭据**：
-- ERP 测试账号：`__erp_user__` / `__erp_pass__`
-- SSO 登录方式：`__erp_sso_method__`（飞书 / 钉钉 / 邮箱 / 其他）
-- 测试同步范围：`__sync_scope__`（如固定 SKU 集合，避免误改生产数据）
-- VPN：`__vpn_endpoint__`（必须接通后才能访问）
+- 班牛测试账号：`13735849365`（密码本地保存，不入 git）
+- 测试环境 URL：`https://testc.bytenew.com/app.html#/login`
 
 **v0.5 跑通最小配置**：
-- vortex-mcp + 内网代理（如有）
-- chrome SSO cookie 预登录（首次跑前手动登录持久化）
-- vortex-server 已起 ws 6800
-- VPN 已连接
+- vortex-mcp + Claude Code
+- chrome 已登录 testc.bytenew.com（cookie 持久化）
+- 子任务 5 的具体订单号 ID 在 prompt 中替换 `<ORDER_ID_PLACEHOLDER>` 占位符
 
 ---
 
