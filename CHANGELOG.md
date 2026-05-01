@@ -72,19 +72,20 @@
 - spec 文档：5 个 layer spec（L1-L5）落 obsidian Knowledge Library；slim spec 实验（L3/L4/L5 共 1255 行 vs L1/L2 4805 行 = -74%）
 - bench 基线：`baselines/v0.5.json` 锁定（27 cases，CDP P50 = 3289 ms / Native P50 = 5 ms）+ dogfood 5 任务定义在 `cases/dogfood/`
 
-### 📋 dogfood 验收（5 任务对比 v0.5）
+### 📋 dogfood 验收（前 3 任务对比 v0.5，N=3）
 
-> 实测数据由 PR #5 phase C 填充。
+> v0.6.0 release gate 采用降级方案：前 3 任务硬卡（每任务 v0.5/v0.6 各 3 次取 mean），任务 4 / 任务 5 推到 v0.6.1。
+> 实测数据由 PR #5 phase C 填充，写入 [`reports/dogfood/dogfood-report.md`](reports/dogfood/dogfood-report.md)。
 
 | 任务 | 类型 | LLM 调用 | 总 token | 成功率 |
 |---|---|---|---|---|
 | GitHub 搜索 + star 第一仓库 | 简单 | TBD | TBD | ≥ v0.5 |
 | 内部 ERP 登录 + 商品同步 | 表单密集 | TBD | TBD | ≥ v0.5 |
 | 知乎搜索文章 + 截图 | 多模态 | TBD | TBD | ≥ v0.5 |
-| Notion / Linear 文档编辑 | 复杂 SPA | TBD | TBD | ≥ v0.5 |
-| OpenClaw 现有 prod 工作流回归 | breaking 验证 | TBD | TBD | 100% |
+| ~~Notion / Linear 文档编辑~~ | 复杂 SPA | _deferred to v0.6.1_ | | |
+| ~~OpenClaw 现有 prod 工作流回归~~ | breaking 验证 | _deferred to v0.6.1_ | | |
 
-**release gate**：前 3 任务硬卡 -30% LLM 调用 + -30% token + 成功率 ≥ v0.5；Notion / OpenClaw 软指标作 release notes 数据。
+**release gate（前 3 任务）**：mean LLM 调用 ≤ v0.5 × 0.7（**-30%**）+ mean token ≤ v0.5 × 0.7（**-30%**）+ 成功率 ≥ v0.5。
 
 ### 📋 迁移表（v0.5 → v0.6）
 
