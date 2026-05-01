@@ -59,9 +59,19 @@ export function transformSource(input: string, opts: TransformOptions = {}): Mig
     const nameVal = stringLiteralValue((nameProp as AnyProp & { value: unknown }).value);
 
     if (nameVal == null) {
-      // Could be `{ name: someVar, arguments: {...} }` — emit a soft warning
-      // ONLY when the value is an identifier referencing a v0.5 tool name (we
-      // can't know that here cheaply). To avoid noise, skip silently.
+      // Indirect call: { name: someVar, arguments: {...} }. spec §2.3 asks
+      // us to warn so the operator can review by hand. We only flag when the
+      // payload looks MCP-shaped (arguments is an object literal) so generic
+      // `{ name, arguments }` data is left alone.
+      if (j.ObjectExpression.check((argsProp as AnyProp & { value: unknown }).value)) {
+        const ident = (nameProp as AnyProp & { value: unknown }).value as { type?: string; name?: string };
+        const hint = ident?.type === "Identifier" && ident.name ? ` (\`${ident.name}\`)` : "";
+        warnings.push({
+          line,
+          tool: "<indirect>",
+          reason: `tool name is not a string literal${hint}; cannot auto-migrate — replace with a literal v0.6 tool name`,
+        });
+      }
       return;
     }
 
@@ -95,7 +105,10 @@ export function transformSource(input: string, opts: TransformOptions = {}): Mig
       return;
     }
 
-    // Rename + reshape arguments.
+    // Skip kept-name entries that have no rewrites — they're already on v0.6.
+    const isNoop = entry.v06 === nameVal && (entry.rewrites?.length ?? 0) === 0;
+    if (isNoop) return;
+
     setStringLiteral(j, nameProp, entry.v06);
 
     const argsValue = (argsProp as AnyProp & { value: unknown }).value;
