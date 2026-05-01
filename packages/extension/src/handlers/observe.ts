@@ -254,6 +254,24 @@ async function scanOneFrame(
             const attr = el.getAttribute("data-testid") ? "data-testid" : "data-test";
             return `[${attr}="${testId.replace(/"/g, '\\"')}"]`;
           }
+          // aria-label is the next-most-stable anchor for actionable widgets
+          // (button / link / form control). It survives React re-renders that
+          // shift nth-of-type indices, which made GitHub Star buttons unclickable
+          // via @eN refs in v0.6 dogfood (search results — sibling repos kept
+          // re-mounting). Verify uniqueness before using; if multiple matches,
+          // fall through to the path-based fallback so dom.click won't trip
+          // SELECTOR_AMBIGUOUS.
+          const ariaLabel = el.getAttribute("aria-label");
+          if (ariaLabel && ariaLabel.length > 0 && ariaLabel.length < 120) {
+            const tag = el.tagName.toLowerCase();
+            const escaped = ariaLabel.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+            const candidate = `${tag}[aria-label="${escaped}"]`;
+            try {
+              if (document.querySelectorAll(candidate).length === 1) return candidate;
+            } catch {
+              // malformed escape — fall through to path-based fallback
+            }
+          }
           const parts: string[] = [];
           let cur: Element | null = el;
           let depth = 0;
@@ -511,7 +529,8 @@ export function registerObserveHandlers(router: ActionRouter): void {
       };
       type FullElementOut = Omit<ScannedElement, "_sel"> & {
         frameId: number;
-        suggestedUsage: { click: string; domClick: string };
+        ref: string;
+        suggestedUsage: { act: string; mouseClick: string };
       };
       const elementsOut: Array<CompactElementOut | FullElementOut> = [];
       const elementMap: SnapshotElement[] = [];
@@ -558,7 +577,11 @@ export function registerObserveHandlers(router: ActionRouter): void {
               frameId: s.frameId,
             });
           } else {
-            // 保持 v0.4 full 结构：完整字段 + suggestedUsage
+            // v0.6 full 结构：携带 ref 字符串（@eN / @fNeM）+ suggestedUsage 直接给
+            // v0.6 工具门面命令。v0.5 风格 hint（vortex_dom_click / vortex_mouse_click）
+            // 已下线，旧 hint 会让 LLM 错猜 "snap_xxx#N" 形态触发 page-side 的
+            // querySelector SyntaxError → null.ok JS_EXECUTION_ERROR。
+            const ref = s.frameId === 0 ? `@e${globalIdx}` : `@f${s.frameId}e${globalIdx}`;
             elementsOut.push({
               index: globalIdx,
               tag: e.tag,
@@ -571,12 +594,13 @@ export function registerObserveHandlers(router: ActionRouter): void {
               attrs: e.attrs,
               ...(e.state ? { state: e.state } : {}),
               frameId: s.frameId,
-              // LLM-friendly 下一步命令提示。coordSpace="frame" 默认按 frameId 自动换算。
+              ref,
               suggestedUsage: {
-                // 首选：按 snapshot index 路由（最稳，不怕选择器变化）
-                domClick: `vortex_dom_click({ index: ${globalIdx}, snapshotId: "<this-snapshot-id>" })`,
-                // 需要真实鼠标事件时：frame-local 坐标 + frameId，server 自动换算
-                click: `vortex_mouse_click({ x: ${centerX}, y: ${centerY}, frameId: ${s.frameId} })`,
+                // 首选：act 门面 + ref（最稳，不怕选择器变化）
+                act: `vortex_act({ target: "${ref}", action: "click" })`,
+                // 需要真实鼠标事件时：frame-local 坐标 + frameId（mouse 不在 v0.6 11
+                // 工具门面里，但 server 内部 action 仍叫 mouse.click —— 留作 escape hatch）
+                mouseClick: `mouse.click({ x: ${centerX}, y: ${centerY}, frameId: ${s.frameId} })`,
               },
             });
           }
