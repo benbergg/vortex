@@ -118,16 +118,11 @@ export function dispatchNewTool(
       }
       return { action: v05Action, params: next };
     }
-    case "vortex_observe": {
-      const { scope, filter, ...rest } = params;
-      // scope 'viewport'|'full' → existing observe.snapshot 的 viewport 参数；
-      // filter 'interactive'|'all' → 透传（observe handler 已支持）
-      const next: Record<string, unknown> = { ...rest };
-      if (scope === "full") next.viewport = "full";
-      else if (scope === "viewport") next.viewport = "visible";
-      if (filter !== undefined) next.filter = filter;
-      return { action: "observe.snapshot", params: next };
-    }
+    // vortex_observe is fully handled by the special branch in
+    // server.ts (compact rendering + activeSnapshotId tracking + scope/filter
+    // reshape live there). That branch returns before dispatchNewTool is
+    // called, so a case here would be dead code; the I16 invariant test now
+    // guards against re-introducing it (see invariants/I16.dispatch-routing).
     case "vortex_extract": {
       // server.ts 已把 target=@ref 翻成 params.index/snapshotId（删了 params.target），
       // 把 target=selector 翻成 params.selector。content.getText handler 当前只读 selector，

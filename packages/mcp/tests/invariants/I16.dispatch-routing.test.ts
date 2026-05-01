@@ -43,23 +43,18 @@ describe("I16: dispatch routing for 11 public tools", () => {
     });
   });
 
-  describe("vortex_observe → observe.snapshot + scope/filter mapping", () => {
-    it("scope=viewport → viewport='visible'", () => {
-      const r = dispatchNewTool("vortex_observe", { scope: "viewport", filter: "interactive" });
-      expect(r?.action).toBe("observe.snapshot");
-      expect(r?.params.viewport).toBe("visible");
-      expect(r?.params.filter).toBe("interactive");
-    });
-
-    it("scope=full → viewport='full'", () => {
-      const r = dispatchNewTool("vortex_observe", { scope: "full" });
-      expect(r?.action).toBe("observe.snapshot");
-      expect(r?.params.viewport).toBe("full");
-    });
-
-    it("filter=all → 透传", () => {
-      const r = dispatchNewTool("vortex_observe", { scope: "viewport", filter: "all" });
-      expect(r?.params.filter).toBe("all");
+  describe("vortex_observe is NOT routed via dispatchNewTool", () => {
+    // Regression: an earlier draft reshape lived in dispatch.ts case
+    // "vortex_observe", but server.ts intercepts the tool earlier in the
+    // request handler (compact rendering + activeSnapshotId tracking live
+    // there). PR #4 renamed toolDef.action to "L4.observe", which silently
+    // skipped the server.ts branch and exposed activeSnapshotId tracking
+    // as the v0.6 dogfood STALE_SNAPSHOT bug. Lock the contract: dispatch
+    // must return null for vortex_observe so the dead code can't grow back.
+    it("dispatchNewTool returns null (handled by server.ts special path)", () => {
+      expect(dispatchNewTool("vortex_observe", { scope: "viewport", filter: "interactive" })).toBeNull();
+      expect(dispatchNewTool("vortex_observe", { scope: "full" })).toBeNull();
+      expect(dispatchNewTool("vortex_observe", { filter: "all" })).toBeNull();
     });
   });
 
