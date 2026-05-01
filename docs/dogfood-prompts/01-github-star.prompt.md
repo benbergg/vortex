@@ -4,6 +4,11 @@
 
 ---
 
+[isolation] This is a fresh dogfood baseline run. Do NOT read any project
+file, CLAUDE.md, git history, or memory. Do NOT consult prior sessions.
+Use only the `vortex` MCP tools to perform the task below — execute it as
+if seeing it for the first time.
+
 You have access to the `vortex` MCP server (browser automation).
 
 Goal: on `github.com`, search for the keyword **playwright**, then click the
