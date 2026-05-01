@@ -35,6 +35,25 @@ describe("parseRef", () => {
     expect(() => parseRef(123 as never)).toThrow(/target must be a string/i);
     expect(() => parseRef(true as never)).toThrow(/target must be a string/i);
   });
+  // Regression: v0.6 dogfood run 1 (2026-05-01) — LLM emitted "snap_xxx#54"
+  // (v0.5 habit) and parseRef silently treated it as a CSS selector. The raw
+  // string then hit document.querySelector inside page-side actionability,
+  // throwing SyntaxError; chrome.scripting returned a nullish result and
+  // `.ok` access surfaced as JS_EXECUTION_ERROR("Cannot read properties of
+  // null (reading 'ok')"). Pre-flight reject these shapes with a clear
+  // migration message instead.
+  it("v0.5 风格 snap_xxx#N → INVALID_PARAMS 含 @eN 提示", () => {
+    expect(() => parseRef("snap_momm8049_1#54")).toThrow(/v0\.5 snapshot reference/i);
+    expect(() => parseRef("snap_abc#3")).toThrow(/@eN/);
+  });
+  it("v0.5 风格纯 #N / 纯数字 → 同样拒绝", () => {
+    expect(() => parseRef("#54")).toThrow(/v0\.5 snapshot reference/i);
+    expect(() => parseRef("54")).toThrow(/v0\.5 snapshot reference/i);
+  });
+  it("CSS id 选择器（非纯数字）依旧通过", () => {
+    expect(parseRef("#my-btn")).toEqual({ kind: "selector", selector: "#my-btn" });
+    expect(parseRef("#btn-3a")).toEqual({ kind: "selector", selector: "#btn-3a" });
+  });
 });
 
 describe("resolveTargetParam", () => {

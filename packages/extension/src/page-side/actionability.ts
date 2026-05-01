@@ -144,7 +144,16 @@ export type ActionabilityResult =
     selector: string,
     needsEditable: boolean,
   ): Promise<ActionabilityResult> {
-    const el = document.querySelector(selector);
+    // querySelector throws SyntaxError on invalid CSS (e.g. raw v0.5-style
+    // snapshot ref slipped past mcp ref-parser). Swallow it as not-attached
+    // so the host wrapper sees a structured result instead of a nullish
+    // chrome.scripting result triggering `null.ok` JS_EXECUTION_ERROR.
+    let el: Element | null;
+    try {
+      el = document.querySelector(selector);
+    } catch {
+      el = null;
+    }
     if (!el) return { ok: false, reason: "NOT_ATTACHED" };
     if (!isAttached(el)) return { ok: false, reason: "NOT_ATTACHED" };
     if (!isVisible(el)) return { ok: false, reason: "NOT_VISIBLE" };
@@ -169,7 +178,12 @@ export type ActionabilityResult =
 
   // Stable re-check: host-side calls this immediately after probe ok to confirm position is stable.
   async function probeStable(selector: string): Promise<{ ok: boolean }> {
-    const el = document.querySelector(selector);
+    let el: Element | null;
+    try {
+      el = document.querySelector(selector);
+    } catch {
+      el = null;
+    }
     if (!el) return { ok: false };
     const stable = await isStable(el);
     return { ok: stable };
