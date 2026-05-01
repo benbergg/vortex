@@ -4,6 +4,161 @@
 
 ---
 
+## [0.6.0] - TBD
+
+> Release date and dogfood numbers are filled in by PR #5 phase C (T5.10).
+
+### 💥 BREAKING CHANGES
+
+- **工具面收敛 36 → 11**。所有 v0.5 `vortex_<atom>` 工具被删除或改名，必须迁移代码。见下方迁移表 + `vortex-migrate` CLI。
+- **三动词架构**：写操作走 `vortex_act`、读结构走 `vortex_extract`、探查走 `vortex_observe`；6 个 atom 操作（click / fill / type / select / scroll / hover）合并到 `vortex_act` 的 `action` 参数。
+- **`vortex_ping` 删除**（无业务价值）。
+- **错误码契约化**：53 个错误码全部走 `vtxError` 工厂 + `DEFAULT_ERROR_META` hint 表。手写 `throw new Error()` 在 `src/` 下被 invariant I19 拦截。
+
+### ✨ Features
+
+#### L1 Adapter 拆分（PR #1）
+
+- `extension/src/adapter/cdp.ts` 抽取共享 CDP 操作（`clickBBox` 去重 3 份）
+- `extension/src/adapter/native.ts` 抽取共享 page-side 探测（`pageQuery` 去重 3 份）
+- `extension/src/adapter/detector.ts` `CapabilityDetector` 检测 `chrome.debugger` 可用性 + timeout-late-attach race 修复
+- depcruise 静态依赖检查 + CI workflow（I1 invariant）
+- **`dom.ts` 减 41%**（2233 → 1312 行）
+
+#### L2 Action 层（PR #2）
+
+- **6 项 actionability 探测**（Attached / Visible / Stable / ReceivesEvents / Enabled / Editable）按 Playwright 移植，page-side IIFE 实现
+- **auto-wait** RAF polling + reason-aware retry（`NOT_VISIBLE` 50 ms / `NOT_STABLE` 1 RAF / `OBSCURED` 100 ms / `DISABLED` 200 ms / `NOT_ATTACHED` 立即重试 / `NOT_EDITABLE` 不重试）
+- **fallback chain**：click/fill/type/drag 差异化策略（`dispatchEvent` → CDP `Input.dispatch` → `Input.insertText`）
+- **micro-verify** 按 action 类型矩阵 verify
+- **page-side bundle 机制**：vite + page-side-loader，page-side 代码可跨文件 import（解决 `chrome.scripting.executeScript` 序列化限制）
+- 9 L2 错误码：`NOT_ATTACHED` / `NOT_VISIBLE` / `NOT_STABLE` / `OBSCURED` / `DISABLED` / `NOT_EDITABLE` / `TIMEOUT` / `ACTION_FAILED_ALL_PATHS` / `DRAG_REQUIRES_CDP`
+
+#### L3 Reasoning 层（PR #3）
+
+- **`captureAXSnapshot`**：CDP `Accessibility.getFullAXTree` + interesting-node filter（INTERACTIVE_ROLES 14 + STRUCTURAL_ROLES 10 + 显式状态属性）
+- **`resolveDescriptor`** 三级消解：role+name → text → CSS selector，strict 模式默认 + first-match opt-in
+- **`RefStore`** stale ref 自动 relocate：`DOM.resolveNode` 探活 → 失败用 descriptor 重消解
+- **`detectClosedShadow`** custom-element + `DOM.describeNode` + `Runtime.evaluate` 启发式探测
+- 8 L3 错误码：`A11Y_UNAVAILABLE` / `CDP_NOT_ATTACHED` / `STALE_REF` / `AMBIGUOUS_DESCRIPTOR` / `REF_NOT_FOUND` / `SNAPSHOT_EXPIRED` / `CROSS_ORIGIN_IFRAME` / `CLOSED_SHADOW_DOM`
+- 17 invariant 测试（I10-I14, I21, I22）
+
+#### L4 Task 门面（PR #4）
+
+- **三动词 + 八基础 atom = 11 工具**：`vortex_act` / `vortex_extract` / `vortex_observe` / `vortex_navigate` / `vortex_tab_create` / `vortex_tab_close` / `vortex_screenshot` / `vortex_wait_for` / `vortex_press` / `vortex_debug_read` / `vortex_storage`
+- **`target` ref-or-descriptor**：`act` / `extract` 接受 `@eN` ref 或 descriptor 对象（schema 强制二选一）；descriptor 显式调用自动分配 ref（`effects.assigned_ref`）
+- **`act` effects**：`url_changed` / `ref_relocated` / `assigned_ref` / `ref_state_change` / `new_visible_elements`，LLM 链式决策依据
+- **atom 合并参数化**：`wait_for(mode=)` / `debug_read(source=)` / `storage(op=)`
+- 2 L4 错误码：`INVALID_TARGET` / `UNSUPPORTED_ACTION`
+- **`tools/list` 字节 14,500 B → 4,500 B（-69%）**，估计 LLM token ~3,400 → ~1,000
+
+#### 错误处方化（PR #5）
+
+- 53 错误码全部满足 hint 质量标准：next-action verb + 工具名/参数提示 + 50-300 char
+- I19 invariant：抛错处全经 `vtxError` 工厂（白名单 `lib/internal/`）
+- I20 invariant：错误消息 + hint 不含 v0.5 已删工具名（grep regression）
+
+#### 自动迁移工具（PR #5）
+
+- 新增 `@bytenew/vortex-migrate` CLI（jscodeshift codemod backend）
+- 覆盖 36 v0.5 atom：6 保持名 + 16 改写 + 1 删除（`vortex_ping`）+ 13 warn-only
+- 默认 dry-run；`--write` 应用；`--json` 机器可读摘要；`--ignore` / `--ext` 自定义扫描
+- 间接调用（变量名传入工具名）emit `<indirect>` warning，需手工迁移
+
+### 🔧 Internal
+
+- **`dom.ts` 总计减 -64%**：2233（v0.5）→ 1312（PR #1）→ 895（PR #2）→ ≤ 800（PR #4 拆 datetimerange page-side fallback 完成）
+- 新 packages：`@bytenew/vortex-migrate`
+- spec 文档：5 个 layer spec（L1-L5）落 obsidian Knowledge Library；slim spec 实验（L3/L4/L5 共 1255 行 vs L1/L2 4805 行 = -74%）
+- bench 基线：`baselines/v0.5.json` 锁定（27 cases，CDP P50 = 3289 ms / Native P50 = 5 ms）+ dogfood 5 任务定义在 `cases/dogfood/`
+
+### 📋 dogfood 验收（5 任务对比 v0.5）
+
+> 实测数据由 PR #5 phase C 填充。
+
+| 任务 | 类型 | LLM 调用 | 总 token | 成功率 |
+|---|---|---|---|---|
+| GitHub 搜索 + star 第一仓库 | 简单 | TBD | TBD | ≥ v0.5 |
+| 内部 ERP 登录 + 商品同步 | 表单密集 | TBD | TBD | ≥ v0.5 |
+| 知乎搜索文章 + 截图 | 多模态 | TBD | TBD | ≥ v0.5 |
+| Notion / Linear 文档编辑 | 复杂 SPA | TBD | TBD | ≥ v0.5 |
+| OpenClaw 现有 prod 工作流回归 | breaking 验证 | TBD | TBD | 100% |
+
+**release gate**：前 3 任务硬卡 -30% LLM 调用 + -30% token + 成功率 ≥ v0.5；Notion / OpenClaw 软指标作 release notes 数据。
+
+### 📋 迁移表（v0.5 → v0.6）
+
+完整迁移指南见 [`docs/v0.5-to-v0.6-migration.md`](docs/v0.5-to-v0.6-migration.md)。下表为速查节选。
+
+#### 写操作 → `vortex_act`
+
+| v0.5 | v0.6 |
+|---|---|
+| `vortex_click({ target })` | `vortex_act({ action: "click", target })` |
+| `vortex_fill({ target, value })` | `vortex_act({ action: "fill", target, value })` |
+| `vortex_type({ target, value })` | `vortex_act({ action: "type", target, value })` |
+| `vortex_select({ target, value })` | `vortex_act({ action: "select", target, value })` |
+| `vortex_hover({ target })` | `vortex_act({ action: "hover", target })` |
+| `vortex_scroll({ target })` | `vortex_act({ action: "scroll", target })` |
+
+#### 读 → `vortex_extract` / `vortex_observe`
+
+| v0.5 | v0.6 |
+|---|---|
+| `vortex_get_text({ target })` | `vortex_extract({ include: ["text"], target })` |
+| `vortex_observe` | unchanged（语义吸收 frames_list / tab_list） |
+
+#### 等待 → `vortex_wait_for`（合并 mode）
+
+| v0.5 | v0.6 |
+|---|---|
+| `vortex_wait({ target, timeout })` | `vortex_wait_for({ mode: "element", value: target, timeout })` |
+| `vortex_wait_idle({ kind, idleMs })` | `vortex_wait_for({ mode: "idle", value: kind, timeout: idleMs })` |
+| `vortex_page_info` | `vortex_wait_for({ mode: "info" })` |
+
+#### 调试 → `vortex_debug_read`（合并 source）
+
+| v0.5 | v0.6 |
+|---|---|
+| `vortex_console({ tail })` | `vortex_debug_read({ source: "console", tail })` |
+| `vortex_network({ tail, filter })` | `vortex_debug_read({ source: "network", tail, filter })` |
+
+#### 存储 → `vortex_storage`（合并 op）
+
+| v0.5 | v0.6 |
+|---|---|
+| `vortex_storage_get({ scope: "local", key })` | `vortex_storage({ op: "get", key })` |
+| `vortex_storage_get({ scope: "session", key })` | `vortex_storage({ op: "session-get", key })` |
+| `vortex_storage_get({ scope: "cookie", key })` | `vortex_storage({ op: "cookies-get", key })` |
+| `vortex_storage_set(...)` | `vortex_storage({ op: "set"\|"session-set", ... })` |
+
+#### 删除 / 内部化（无 v0.6 等价物，需手工迁移）
+
+`vortex_ping`（删除）、`vortex_evaluate` / `vortex_get_html` / `vortex_history` / `vortex_events` / `vortex_network_response_body` / `vortex_storage_session` / `vortex_frames_list` / `vortex_tab_list` / `vortex_batch` / `vortex_fill_form` / `vortex_file_upload` / `vortex_file_download` / `vortex_file_list_downloads` / `vortex_mouse_move` / `vortex_mouse_drag`。详见迁移指南 §2.4。
+
+### 🛠 自动迁移
+
+```bash
+npm install -g @bytenew/vortex-migrate@^0.6
+vortex-migrate ./src           # dry run
+vortex-migrate ./src --write   # apply
+vortex-migrate ./src --json    # machine-readable summary
+```
+
+直接调用形态 100% 自动改写；变量名传入需手动 review（脚本 emit `<indirect>` warning）。
+
+### 🔗 v0.5 LTS
+
+`v0.5.x` 维护分支保留至少 2 个月：
+
+```bash
+git checkout v0.5.x
+```
+
+仅接 critical bug fix；新 feature 一律 v0.6+。
+
+---
+
 ## [0.5.0] - 2026-04-20
 
 ### 💥 BREAKING CHANGES
