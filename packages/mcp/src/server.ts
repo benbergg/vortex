@@ -16,8 +16,20 @@ import { getToolDefs, getToolDef } from "./tools/registry.js";
 import { dispatchNewTool } from "./tools/dispatch.js";
 export { dispatchNewTool };
 
+// Read package.json via createRequire so the bundle works under both ts-node
+// and the compiled dist layout. The relative path is resolved against this
+// file's URL; vitest occasionally re-roots that URL, so swallow resolution
+// errors and fall back to a sentinel rather than refusing to load the
+// module (handleCallTool is unit-tested through this path).
 const require_ = createRequire(import.meta.url);
-const MCP_VERSION: string = (require_("../../package.json") as { version: string }).version;
+let MCP_VERSION = "0.0.0-test";
+try {
+  MCP_VERSION = (require_("../../package.json") as { version: string }).version;
+} catch {
+  // package.json not resolvable (test sandbox); MCP_VERSION stays at the
+  // sentinel — production paths always succeed because dist/ ships next to
+  // package.json.
+}
 
 /**
  * 计算当前 MCP 注册的所有工具指纹。
@@ -149,7 +161,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-async function handleCallTool(
+// Exported for unit tests so the vortex_observe special path (and the
+// activeSnapshotId follow-on) can be exercised without standing up the MCP
+// transport. Production callers still go through the SDK request handler
+// registered above.
+export async function handleCallTool(
   request: { params: { name: string; arguments?: unknown } },
 ): Promise<{ content: ContentItem[]; isError?: boolean }> {
   const { name, arguments: args } = request.params;
