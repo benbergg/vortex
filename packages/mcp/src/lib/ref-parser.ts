@@ -9,8 +9,14 @@ export type ParsedRef =
 const REF_RE = /^@(?:f(\d+))?e(\d+)$/;
 
 export function parseRef(input: string): ParsedRef {
-  if (!input) {
+  if (input == null || input === "") {
     throw vtxError(VtxErrorCode.INVALID_PARAMS, "target is required");
+  }
+  if (typeof input !== "string") {
+    throw vtxError(
+      VtxErrorCode.INVALID_PARAMS,
+      `target must be a string (CSS selector or @ref), got ${typeof input}. Descriptor object form (role/name/...) is reserved for v0.6.x.`,
+    );
   }
   if (input.startsWith("@")) {
     const m = input.match(REF_RE);

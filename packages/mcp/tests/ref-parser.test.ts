@@ -23,6 +23,18 @@ describe("parseRef", () => {
     expect(() => parseRef("@e")).toThrow();
     expect(() => parseRef("@f1")).toThrow();
   });
+  // Regression: descriptor target object → friendly INVALID_PARAMS, not raw TypeError
+  // Repro: agent passes target={role:"textbox", name:"密码"} → schema dist still ad-
+  // vertised the old object form, runtime crashed with `input.startsWith is not a
+  // function`. Source schema has since been narrowed to string-only; this guards
+  // against any client (or stale schema cache) still sending a non-string target.
+  it("非字符串输入 → INVALID_PARAMS（防 input.startsWith 崩溃）", () => {
+    expect(() => parseRef({ role: "textbox", name: "密码" } as never)).toThrow(
+      /target must be a string/i,
+    );
+    expect(() => parseRef(123 as never)).toThrow(/target must be a string/i);
+    expect(() => parseRef(true as never)).toThrow(/target must be a string/i);
+  });
 });
 
 describe("resolveTargetParam", () => {
