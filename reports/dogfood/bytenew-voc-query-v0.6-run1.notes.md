@@ -1,9 +1,19 @@
 # bytenew-voc-query · v0.6 · run 1 · BLOCKED
 
 - **Date**: 2026-05-01
-- **Session**: `~/.claude/projects/-Users-lg-workspace-vortex/492916f8-a189-4611-acf3-c9368334b10b.jsonl`
+- **Session**: `492916f8-a189-4611-acf3-c9368334b10b`
 - **Outcome**: ❌ **Hard block** — completed Q1 only; Q2/Q3/Q5 unreachable; Q4 partial.
 - **Metrics**: see `bytenew-voc-query-v0.6-run1.json` (128 model calls, 762 s, 9.58 M tokens, 48 vortex tool calls).
+
+> **2026-05-01 update — root cause re-diagnosed via Playwright MCP**:
+> The original "closed Shadow DOM" hypothesis below is **wrong**. The actual
+> structure is a single cross-origin iframe (`https://voc-testc.bytenew.com/`,
+> sandbox attribute, occupies the post-60 px region). vortex did not see it
+> because `resolveTargetFrames` in `observe.ts` defaults to `framesParam="main"`
+> and the v0.6 `vortex_observe` schema does not expose a `frames` parameter,
+> so the LLM cannot opt in. Filed as a v0.6.x backlog item — see "Real root
+> cause" section below. The original investigation is preserved verbatim
+> after that section so the reasoning trail is auditable.
 
 ## Per-question result
 
@@ -15,7 +25,42 @@
 | 4 | 店铺=【天猫】欧莱雅男士官方旗舰店 count | **597** (unverified) | screenshot — page already had this filter on the chip and table was uniform; "重置 then re-apply" not done | ⚠️ partial |
 | 5 | 订单号 → 商品 ID | — | — | ❌ blocked (also needs real order id; prompt template still has `<ORDER_ID_PLACEHOLDER>`) |
 
-## Root cause — vortex cannot see the VOC sub-app DOM
+## Real root cause — `vortex_observe` defaults to scanning frame 0 only
+
+Confirmed on 2026-05-01 via a separate Playwright MCP probe of the same
+URL. The VOC sub-app loads inside a cross-origin sandbox iframe:
+
+- `<iframe src="https://voc-testc.bytenew.com/biztable/login/redirect.html?…" sandbox="allow-scripts allow-same-origin allow-downloads allow-forms allow-popups …">`
+- iframe origin (`voc-testc.bytenew.com`) ≠ host page origin (`testc.bytenew.com`).
+- iframe bbox `{ w: 1140, h: 692, x: 60, y: 0 }` — exactly the region
+  vortex was reporting as "DOM-empty".
+- Top frame: 0 open shadow roots, 0 custom-element tags. The
+  closed-Shadow-DOM hypothesis below was a red herring caused by vortex
+  not surfacing the iframe at all.
+
+The bug is in `packages/extension/src/handlers/observe.ts`
+`resolveTargetFrames`: when no `frames` parameter is passed, it falls
+through to the default branch and returns only the main frame
+(`frameId === 0`). The v0.6 public `vortex_observe` schema does not
+expose a `frames` parameter (`packages/mcp/src/tools/schemas-public.ts`),
+so the LLM has no way to opt into multi-frame scan. `frameCount=1` in
+this run's metrics is therefore a tautology, not an observation about
+the page.
+
+### v0.6.x backlog (filed against this finding)
+
+1. Default `resolveTargetFrames` to `"all-permitted"` (vortex extension
+   manifest declares `host_permissions: <all_urls>`, so this includes
+   cross-origin iframes the user actually has access to).
+2. Optionally expose `frames` on the public `vortex_observe` schema so
+   power users can constrain the scan, mirroring the v0.5 surface.
+3. Add a regression test that stages a cross-origin iframe in a fixture
+   and asserts `vortex_observe` (default args) returns elements from
+   both frames.
+
+---
+
+## Original investigation (incorrect closed-Shadow-DOM hypothesis, preserved for audit)
 
 Once the page enters `https://testc.bytenew.com/app.html#/applet/voc` after login, every vortex DOM-facing tool returns near-empty:
 

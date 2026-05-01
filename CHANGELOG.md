@@ -83,7 +83,7 @@
 | ~~Notion / Linear 文档编辑~~ | 复杂 SPA | _deferred to v0.6.1_ | | |
 | ~~OpenClaw 现有 prod 工作流回归~~ | breaking 验证 | _deferred to v0.6.1_ | | |
 
-> 任务 2 由 v0.6.0 dogfood 任务清单从「内部 ERP 登录 + 商品同步」替换为只读的 GitHub Trending（原任务在 v0.6 dogfood 中遇到 closed Shadow DOM block，记录在 `reports/dogfood/bytenew-voc-query-v0.6-run1.notes.md`，留 v0.6.x 跟进）。
+> 任务 2 由 v0.6.0 dogfood 任务清单从「内部 ERP 登录 + 商品同步」（bytenew VOC）替换为只读的 GitHub Trending。原 bytenew VOC 任务在 v0.6 dogfood 中跑挂，初判 closed Shadow DOM；2026-05-01 用 Playwright MCP 重新诊断后确认根因是 **`vortex_observe` 默认仅扫主 frame，看不到 cross-origin iframe** —— 修复路径（默认改 `all-permitted` + schema 暴露 `frames`）填到 v0.6.x backlog。完整记录见 [`reports/dogfood/bytenew-voc-query-v0.6-run1.notes.md`](reports/dogfood/bytenew-voc-query-v0.6-run1.notes.md)。
 
 **原 release gate（草拟）**：mean LLM 调用 ≤ v0.5 × 0.7（**-30%**）+ mean token ≤ v0.5 × 0.7（**-30%**）+ 成功率 ≥ v0.5。
 
