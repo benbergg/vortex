@@ -8,9 +8,26 @@ export type ParsedRef =
 
 const REF_RE = /^@(?:f(\d+))?e(\d+)$/;
 
+// v0.5 snapshot-ref shapes that LLMs sometimes emit when guessing at v0.6
+// target syntax (e.g. carrying habits from v0.5 vortex_dom_click({index, snapshotId})).
+// Reject early with a clear migration hint instead of silently dropping the
+// raw string into document.querySelector — that would throw SyntaxError deep
+// inside page-side actionability and surface as `null.ok` JS_EXECUTION_ERROR.
+const V05_REF_PATTERNS: Array<{ re: RegExp; example: string }> = [
+  { re: /^snap_[a-z0-9_]+#\d+$/i, example: "snap_xxx#54" },
+  { re: /^#\d+$/, example: "#54" },
+  { re: /^\d+$/, example: "54" },
+];
+
 export function parseRef(input: string): ParsedRef {
-  if (!input) {
+  if (input == null || input === "") {
     throw vtxError(VtxErrorCode.INVALID_PARAMS, "target is required");
+  }
+  if (typeof input !== "string") {
+    throw vtxError(
+      VtxErrorCode.INVALID_PARAMS,
+      `target must be a string (CSS selector or @ref), got ${typeof input}. Descriptor object form (role/name/...) is reserved for v0.6.x.`,
+    );
   }
   if (input.startsWith("@")) {
     const m = input.match(REF_RE);
@@ -23,6 +40,14 @@ export function parseRef(input: string): ParsedRef {
     const frameId = m[1] != null ? parseInt(m[1], 10) : 0;
     const index = parseInt(m[2], 10);
     return { kind: "ref", index, frameId };
+  }
+  for (const { re, example } of V05_REF_PATTERNS) {
+    if (re.test(input)) {
+      throw vtxError(
+        VtxErrorCode.INVALID_PARAMS,
+        `target "${input}" looks like a v0.5 snapshot reference (${example}). v0.6 uses @eN / @fNeM — see vortex_observe output for the correct ref per element (e.g. target: "@e54" or "@f1e2").`,
+      );
+    }
   }
   return { kind: "selector", selector: input };
 }

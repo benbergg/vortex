@@ -44,30 +44,29 @@
 
 ---
 
-## 任务 2：内部 ERP 登录 + 商品同步
+## 任务 2：GitHub Trending top 5
 
-**类别**：表单密集（SSO）
+**类别**：列表读数（多 observe / extract）
 
-**目标**：内部 ERP 系统登录后跑一次商品数据同步流程，等待同步完成
+**目标**：访问 `https://github.com/trending`，报告今日 trending 列表前 5 个仓库的名称 + stars today。
 
-**起点**：ERP 登录页（需 SSO，仅内网 VPN 可访问）
+**起点**：`https://github.com/`
 
 **成功定义**：
-- ERP 商品列表页显示同步状态 "已完成"
-- 同步任务 ID 可在系统日志中追溯
-- agent 主动确认任务完成
+- 5 个仓库 owner/name 与页面实际一致
+- 每个仓库的 "stars today" 数值与页面显示一致
+- agent 主动汇总 5 行 + 确认任务完成
 
-**凭据**：
-- ERP 测试账号：`__erp_user__` / `__erp_pass__`
-- SSO 登录方式：`__erp_sso_method__`（飞书 / 钉钉 / 邮箱 / 其他）
-- 测试同步范围：`__sync_scope__`（如固定 SKU 集合，避免误改生产数据）
-- VPN：`__vpn_endpoint__`（必须接通后才能访问）
+**凭据**：无（公网，无登录要求）
 
 **v0.5 跑通最小配置**：
-- vortex-mcp + 内网代理（如有）
-- chrome SSO cookie 预登录（首次跑前手动登录持久化）
-- vortex-server 已起 ws 6800
-- VPN 已连接
+- vortex-mcp + Claude Code
+- chrome 在 `https://github.com/` 起点（登录与否不影响 trending 页可见）
+
+**为什么这个任务能区分 v0.5/v0.6**：
+trending 列表是"列表读数"代表场景：v0.5 observe 默认 JSON 输出 / 多次 extract / 重复 ref；v0.6 observe Markdown 紧凑输出 + 单次 extract include=text 即可拿全列表。token / 调用次数差距应明显。
+
+**历史**：原任务 2 为内部 ERP，2026-05-01 切换为班牛 VOC（testc.bytenew.com），但 vortex 在该子应用域抓不到 DOM（疑 closed Shadow DOM，v0.5 / v0.6 同坑），无 dogfood 差异化价值。当日切到 GitHub Trending（公网、列表 DOM 干净）。详见 memory `vortex_v0_6_pr5_dogfood_bytenew_blocked.md`。
 
 ---
 

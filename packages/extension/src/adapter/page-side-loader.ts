@@ -69,3 +69,28 @@ if (typeof chrome !== "undefined" && chrome.tabs?.onRemoved) {
     }
   });
 }
+
+// Navigation cleanup: a committed navigation discards window globals on the
+// target frame, so any previously-injected page-side bundle (e.g. the IIFE on
+// `window.__vortexActionability`) is gone. Without this listener `loadedModules`
+// would still claim the bundle is "loaded" and the next actionability probe
+// returns NOT_ATTACHED — observed during v0.6 dogfood (run 2 of github-star
+// after a `vortex_navigate`, see PR #5 dogfood notes).
+//
+// Main-frame nav purges the whole tab (subframes go away with the parent
+// document); subframe nav purges only that frameId's entries.
+if (typeof chrome !== "undefined" && chrome.webNavigation?.onCommitted) {
+  chrome.webNavigation.onCommitted.addListener((details) => {
+    const { tabId, frameId } = details;
+    if (frameId === 0) {
+      for (const k of Array.from(loadedModules.keys())) {
+        if (k.startsWith(`${tabId}::`)) loadedModules.delete(k);
+      }
+    } else {
+      const prefix = `${tabId}::${frameId}::`;
+      for (const k of Array.from(loadedModules.keys())) {
+        if (k.startsWith(prefix)) loadedModules.delete(k);
+      }
+    }
+  });
+}

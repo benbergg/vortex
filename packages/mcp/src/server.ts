@@ -16,8 +16,20 @@ import { getToolDefs, getToolDef } from "./tools/registry.js";
 import { dispatchNewTool } from "./tools/dispatch.js";
 export { dispatchNewTool };
 
+// Read package.json via createRequire so the bundle works under both ts-node
+// and the compiled dist layout. The relative path is resolved against this
+// file's URL; vitest occasionally re-roots that URL, so swallow resolution
+// errors and fall back to a sentinel rather than refusing to load the
+// module (handleCallTool is unit-tested through this path).
 const require_ = createRequire(import.meta.url);
-const MCP_VERSION: string = (require_("../../package.json") as { version: string }).version;
+let MCP_VERSION = "0.0.0-test";
+try {
+  MCP_VERSION = (require_("../../package.json") as { version: string }).version;
+} catch {
+  // package.json not resolvable (test sandbox); MCP_VERSION stays at the
+  // sentinel — production paths always succeed because dist/ ships next to
+  // package.json.
+}
 
 /**
  * 计算当前 MCP 注册的所有工具指纹。
@@ -149,7 +161,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-async function handleCallTool(
+// Exported for unit tests so the vortex_observe special path (and the
+// activeSnapshotId follow-on) can be exercised without standing up the MCP
+// transport. Production callers still go through the SDK request handler
+// registered above.
+export async function handleCallTool(
   request: { params: { name: string; arguments?: unknown } },
 ): Promise<{ content: ContentItem[]; isError?: boolean }> {
   const { name, arguments: args } = request.params;
@@ -279,14 +295,28 @@ async function handleCallTool(
   }
 
   // observe.snapshot 专用分发：compact → 紧凑文本，full → 原 JSON pretty
-  if (toolDef.action === "observe.snapshot") {
+  // PR #4 把 vortex_observe 的 toolDef.action 从 "observe.snapshot" 改成 "L4.observe"，
+  // 这条 condition 必须同时识别两者，否则 v0.6 vortex_observe 会绕开整个 special
+  // path（含 activeSnapshotId tracking + compact rendering），导致后续 @eN ref 全部
+  // STALE_SNAPSHOT，且 observe 输出退化为 60KB raw JSON。
+  const isObserveTool =
+    toolDef.name === "vortex_observe" || toolDef.action === "observe.snapshot";
+  if (isObserveTool) {
     const detail = (params.detail as "compact" | "full") ?? "compact";
-    const { tabId, timeout, ...rest } = params;
+    const { scope, filter, tabId, timeout, ...rest } = params;
     const effectiveTimeout = (timeout as number) ?? DEFAULT_TIMEOUT;
-    // 把 MCP 的 detail 翻译成 extension handler 内部的 format 字段
+    // v0.6 schema 暴露 scope/filter 而非 v0.5 的 viewport/filter；在此 reshape，
+    // 与 dispatch.ts case "vortex_observe" 保持等价（special path 会先 return，
+    // 不会再落到 dispatchNewTool）。
+    const next: Record<string, unknown> = { ...rest, format: detail };
+    if (scope === "full") next.viewport = "full";
+    else if (scope === "viewport") next.viewport = "visible";
+    if (filter !== undefined) next.filter = filter;
+    // 始终用显式 "observe.snapshot" 作为发到 extension 的 action（toolDef.action
+    // 在 v0.6 是 "L4.observe"，extension 端无对应 handler）。
     const resp = await sendRequest(
-      toolDef.action,
-      { ...rest, format: detail },
+      "observe.snapshot",
+      next,
       PORT,
       tabId as number | undefined,
       effectiveTimeout,
