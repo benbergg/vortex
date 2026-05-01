@@ -44,34 +44,29 @@
 
 ---
 
-## 任务 2：班牛 VOC 工作台只读查询
+## 任务 2：GitHub Trending top 5
 
-**类别**：表单密集（多筛选 + 列表读数）
+**类别**：列表读数（多 observe / extract）
 
-**目标**：登录测试环境班牛 VOC 工作台，依次完成 5 个只读查询并报答案。仅查不改，避免污染测试数据。
+**目标**：访问 `https://github.com/trending`，报告今日 trending 列表前 5 个仓库的名称 + stars today。
 
-**起点**：`https://testc.bytenew.com/`（已登录，cookie 持久化）
-
-**子任务（按顺序）**：
-1. 打开 VOC 小程序，报告一级菜单数量（ground truth: 4）
-2. "智能辅助回评"，筛选 `平台评价情感 = 好评`，报告总条数（ground truth: 1480）
-3. 同页筛选 `平台评价情感 = 中评 + 差评`，报告总条数（ground truth: 317）
-4. 同页筛选 `店铺 = 【天猫】欧莱雅男士官方旗舰店`，报告总条数（ground truth: 711）
-5. 同页筛选 `订单号 = <ORDER_ID>`，读出该行的 **商品 ID**（ground truth: 527758354524）
+**起点**：`https://github.com/`
 
 **成功定义**：
-- 5 个子任务的答案与 ground truth 全部匹配
-- 任务过程中无写操作（不点犇犇打标 / 不修改任何字段）
-- agent 主动汇总 + 确认任务完成
+- 5 个仓库 owner/name 与页面实际一致
+- 每个仓库的 "stars today" 数值与页面显示一致
+- agent 主动汇总 5 行 + 确认任务完成
 
-**凭据**：
-- 班牛测试账号：`13735849365`（密码本地保存，不入 git）
-- 测试环境 URL：`https://testc.bytenew.com/app.html#/login`
+**凭据**：无（公网，无登录要求）
 
 **v0.5 跑通最小配置**：
 - vortex-mcp + Claude Code
-- chrome 已登录 testc.bytenew.com（cookie 持久化）
-- 子任务 5 的具体订单号 ID 在 prompt 中替换 `<ORDER_ID_PLACEHOLDER>` 占位符
+- chrome 在 `https://github.com/` 起点（登录与否不影响 trending 页可见）
+
+**为什么这个任务能区分 v0.5/v0.6**：
+trending 列表是"列表读数"代表场景：v0.5 observe 默认 JSON 输出 / 多次 extract / 重复 ref；v0.6 observe Markdown 紧凑输出 + 单次 extract include=text 即可拿全列表。token / 调用次数差距应明显。
+
+**历史**：原任务 2 为内部 ERP，2026-05-01 切换为班牛 VOC（testc.bytenew.com），但 vortex 在该子应用域抓不到 DOM（疑 closed Shadow DOM，v0.5 / v0.6 同坑），无 dogfood 差异化价值。当日切到 GitHub Trending（公网、列表 DOM 干净）。详见 memory `vortex_v0_6_pr5_dogfood_bytenew_blocked.md`。
 
 ---
 
