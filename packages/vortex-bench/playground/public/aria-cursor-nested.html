@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>ARIA + cursor:pointer 嵌套 fixture</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    ul { list-style: none; padding: 0; }
+    [role="menuitem"] { cursor: pointer; padding: 8px 16px; border-bottom: 1px solid #eee; }
+    [role="menuitem"] > div { cursor: pointer; } /* 内层 div 继承 cursor:pointer，应被跨池 short-circuit 跳过 */
+    label { cursor: pointer; display: inline-block; padding: 6px 12px; }
+    label > span { cursor: pointer; } /* 同样情况 */
+    button { cursor: pointer; }
+    button > span { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>ARIA + cursor:pointer 嵌套测试</h1>
+  <p>这个 fixture 复刻 testc voc-testc menubar / Element Plus el-radio / button 内 span 的形态：
+    ARIA 元素（role=menuitem / label / button）外层包 cursor:pointer 子。
+    Fix A 后 vortex_observe 应**只**输出 ARIA 路径，不输出 cursor:pointer 子的 dual-instance 副本。</p>
+
+  <h2>1. menubar (role=menuitem 内 div cursor:pointer)</h2>
+  <ul role="menubar">
+    <li role="menuitem" data-testid="mi-home">
+      <div>首页</div>
+    </li>
+    <li role="menuitem" data-testid="mi-products">
+      <div>商品</div>
+    </li>
+    <li role="menuitem" data-testid="mi-orders">
+      <div>订单</div>
+    </li>
+  </ul>
+
+  <h2>2. radio group (label 内 input + span cursor:pointer，模拟 Element Plus)</h2>
+  <div>
+    <label data-testid="opt-good">
+      <input type="radio" name="rating" value="good"/>
+      <span>好评</span>
+    </label>
+    <label data-testid="opt-mid">
+      <input type="radio" name="rating" value="mid"/>
+      <span>中评</span>
+    </label>
+    <label data-testid="opt-bad">
+      <input type="radio" name="rating" value="bad"/>
+      <span>差评</span>
+    </label>
+  </div>
+
+  <h2>3. button (内 span cursor:pointer)</h2>
+  <button data-testid="btn-confirm"><span>确定</span></button>
+  <button data-testid="btn-cancel"><span>取消</span></button>
+
+  <h2>4. 控制：bytenew 风格 cursor:pointer li (无 ARIA, 应正常被收)</h2>
+  <ul>
+    <li style="cursor: pointer" data-testid="raw-1">
+      <div>纯 cursor:pointer 1</div>
+    </li>
+    <li style="cursor: pointer" data-testid="raw-2">
+      <div>纯 cursor:pointer 2</div>
+    </li>
+  </ul>
+</body>
+</html>

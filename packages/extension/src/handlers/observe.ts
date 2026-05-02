@@ -479,6 +479,19 @@ async function scanOneFrame(
           // table cells with cursor:pointer still get collected when
           // filter='all'.)
           if (el.querySelector(INTERACTIVE_SELECTORS)) continue;
+          // Cross-pool ancestor short-circuit: 若祖先链上有 INTERACTIVE_SELECTORS
+          // 元素（如 `<li role=menuitem><div cursor:pointer>`、`<label>` 包
+          // `<span cursor:pointer>`、`<button>` 包装饰 span 等），整个 ARIA
+          // 子树由 ARIA 池独家表述，fallback 跳过避免双现 dual-instance。
+          // 走 parentElement 链，命中第一个 ARIA 祖先即停（O(depth)）。
+          let hasInteractiveAncestor = false;
+          for (let p = el.parentElement; p && p !== docBody; p = p.parentElement) {
+            if (interactiveSet.has(p)) {
+              hasInteractiveAncestor = true;
+              break;
+            }
+          }
+          if (hasInteractiveAncestor) continue;
           const htmlEl = el as HTMLElement;
           if (htmlEl.offsetWidth === 0 || htmlEl.offsetHeight === 0) continue;
           if (getComputedStyle(htmlEl).cursor !== "pointer") continue;
