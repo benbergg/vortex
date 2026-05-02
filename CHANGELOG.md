@@ -4,6 +4,24 @@
 
 ---
 
+## [0.7.3] - 2026-05-02
+
+### 🐛 Fixed (post-ship reflexion correction of v0.7.2)
+
+经 `/reflexion:reflect` 严谨自查发现 v0.7.2 ship 包含两类问题，本版修正。
+
+- **CHANGELOG / memory 误分类**：v0.7.2 把 el-slider 列入 "v0.6 真缺特性"，但 `el-slider.case.ts` 实际用 click + Backspace + type "50" + Enter 的纯键盘流，零 drag。真分类应为 case 逻辑问题。修：剩余 13 fail 真 split = 5 v0.6 missing + 8 case logic（不是原写的 6/7）。
+- **codemod tool-map 隐式 dispatch loss**（`packages/vortex-migrate/src/tool-map.ts`）。v0.5 `vortex_fill { kind: "daterange" }` 在 dispatch.ts:46-49 路由到 `dom.commit`（compound widget driver），v0.6 `vortex_act + action="fill"` 始终路由到 `dom.fill`，**`kind` 参数被静默丢弃**。codemod 原 `vortex_fill` entry 仅 `set action=fill`，无 partial 标记，无 warning，掩盖此变更。这是 el-date-picker × 2 / el-form-composite 部分迁移损坏的根因，不是单纯"v0.6 缺特性"。修：(1) `ToolMapEntry` 加 `conditionalPartial?: { key: string; note: string }` 字段；(2) codemod 在 ObjectExpression 和 CallExpression 两 pass 都做 hasKey 检查，仅当原 args 含该 key 时 emit warning（避免 plain fill 误警）；(3) `vortex_fill` 加 `conditionalPartial: { key: "kind", ... }`。4 新 unit test，52/52 测试全过。
+
+### 📋 Known issues / v0.7.x backlog (修订版)
+
+剩余 13 fail case 真分类：
+
+- **5 个 v0.6 真缺特性**：el-slider-drag (`vortex_mouse_drag`)、el-upload (`vortex_file_upload`)、el-date-picker-{daterange,datetimerange} (`dom.commit kind` 路径未在 L4 暴露，且 codemod 静默丢失 kind dispatch — 见上文 fix)、latency-p50 (`vortex_evaluate`)。需 v0.6.x 决定是否在 L4 加对应 action。
+- **8 个 case 逻辑问题**：el-cascader / el-dialog-nested / el-form-composite / el-select-{single,multiple,v2,v2-virtual} / el-slider — 重命名工具后 case 内部 observe→click 流程需调整（多步交互、虚拟列表、级联、键盘输入流），不是 codemod 缺陷。
+
+---
+
 ## [0.7.2] - 2026-05-02
 
 ### ✨ Added
