@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>icon name priority fixture (P6)</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button, .clickable { cursor: pointer; padding: 6px 10px; }
+    .row { display: flex; gap: 12px; align-items: center; margin: 8px 0; }
+    /* 模拟 Element Plus el-icon: pure framework class，应进 denylist */
+    .el-icon { display: inline-flex; cursor: pointer; }
+    /* 模拟 testc CSS-modules wrapping 的 el-popover trigger（trailing _ 副产物） */
+    ._el-popover__reference_a1b2c3 { cursor: pointer; }
+    /* CSS Modules 命名 closeIcon: 应**保留**作为 fallback (hash 5 字符匹配 regex {4,}) */
+    ._closeIcon_x9krm_42 { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>P6 icon name priority fixture</h1>
+
+  <h2>1. svg &lt;title&gt; preferred over class</h2>
+  <button id="btn-with-svg-title" data-testid="btn-svg-title">
+    <svg width="14" height="14"><title>关闭</title><path d="M0 0L14 14"/></svg>
+  </button>
+
+  <h2>2. img alt preferred over class</h2>
+  <a href="#x" id="link-img-alt" data-testid="link-img-alt">
+    <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="GitHub"/>
+  </a>
+
+  <h2>3. svg aria-label preferred over class</h2>
+  <button id="btn-svg-aria" data-testid="btn-svg-aria">
+    <svg width="14" height="14" aria-label="设置"><path/></svg>
+  </button>
+
+  <h2>4. framework prefix denylist (Element Plus el-icon)</h2>
+  <!-- 应**不**进 ref：cursor:pointer + svg child + className `el-icon` 命中 denylist -->
+  <i class="el-icon" data-testid="icon-el-noise">
+    <svg width="14" height="14"><path d="M0 0L14 14"/></svg>
+  </i>
+
+  <h2>5. framework prefix denylist (CSS-modules wrapped Element Plus)</h2>
+  <!-- 应**不**进 ref：trailing _ 处理 + el- 前缀命中 denylist -->
+  <div class="_el-popover__reference_a1b2c3" data-testid="popover-noise">
+    <svg width="14" height="14"><path/></svg>
+  </div>
+
+  <h2>6. CSS Modules legitimate name (closeIcon) preserved</h2>
+  <!-- 应进 ref：name="closeIcon"（类不在 denylist，无 svg title） -->
+  <div class="_closeIcon_x9krm_42" data-testid="close-keep">
+    <svg width="14" height="14" aria-hidden="true"><path/></svg>
+  </div>
+
+  <h2>7. generic name denylist (iconfont)</h2>
+  <!-- 应**不**进 ref：cursor:pointer + svg child + className `iconfont` 命中 denylist
+       注意只放一个 className，避免 fallback 落到第二个非 deny 的 helper class -->
+  <span class="iconfont" style="cursor: pointer" data-testid="iconfont-noise">
+    <svg width="14" height="14"><path/></svg>
+  </span>
+</body>
+</html>

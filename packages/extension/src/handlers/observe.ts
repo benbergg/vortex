@@ -229,26 +229,46 @@ async function scanOneFrame(
           return tag;
         }
 
-        // Icon-only fallback：从 className 第一个有意义 segment 提取人类可读单词
-        // （CSS Modules 形态 `_closeIcon_1ygkr_39` → `closeIcon`）。
+        // Icon-only fallback：先 svg `<title>` / img alt / aria-label，失败再 className。
         // 触发条件：元素含 svg/img 后代（典型 svg/img 图标按钮）。
-        // **不**包含 `<i>` 标签兜底——之前 P3 设计为覆盖 icon font (`<i class="iconfont">`)
-        // 但这种空 `<i>` 多为 CSS pseudo-element 渲染的纯装饰，不是独立 click target，
-        // 收为 candidate 反而 LLM 拿到一堆 "iconfont"/"el-icon" noise（testc 实测
-        // ~16 个 ref 噪声）。`<i><svg/></i>` 形态仍触发（querySelector 找到 svg）。
+        // **不**包含 `<i>` 标签兜底——空 `<i>` 多为 CSS pseudo-element 渲染的装饰。
+        // className 路径带 denylist，过滤掉 Element Plus / Ant / Vant 等框架前缀类
+        // 和通用泛词 (icon/iconfont/btn/button/wrapper/container)——它们对 LLM 等同
+        // "icon"/"button"，零信息（testc 实测 `el-icon` × 3 + `el-popover_*` × 2）。
+        // CSS Modules `_closeIcon_1ygkr_39` → `closeIcon` 仍正常保留（不在 denylist）。
         // 共用于：(1) cursor:pointer fallback gate (2) getAccessibleName 末尾兜底。
+        const ICON_CLASS_DENY_PREFIXES = ["el-", "ant-", "anticon", "van-"];
+        const ICON_CLASS_DENY_NAMES = new Set([
+          "icon", "iconfont", "btn", "button", "wrapper", "container",
+        ]);
         function iconNameFromClass(el: Element): string {
-          if (!el.querySelector("svg, img")) return "";
+          const inner = el.querySelector("svg, img") as Element | null;
+          if (!inner) return "";
+          // 1. svg `<title>` / img alt / aria-label —— 真语义来源
+          if (inner.tagName === "svg") {
+            const t = inner.querySelector("title")?.textContent?.trim();
+            if (t) return t.slice(0, 80);
+          } else if (inner.tagName === "IMG") {
+            const alt = (inner as HTMLImageElement).alt?.trim();
+            if (alt) return alt.slice(0, 80);
+          }
+          const aria = inner.getAttribute("aria-label")?.trim();
+          if (aria) return aria.slice(0, 80);
+          // 2. className 兜底，带 denylist
           const cls =
             el.className && typeof el.className === "string" ? el.className : "";
           for (const c of cls.split(/\s+/).filter(Boolean)) {
             const m = c.match(/^_?([a-zA-Z][a-zA-Z0-9_-]{2,})/);
             if (!m || !m[1]) continue;
-            // 去 CSS Modules 末尾哈希后缀（_1ygkr_39 / _1ygkr 两种形态）
             const cleaned = m[1]
               .replace(/_[a-z0-9]{4,}_\d+$/i, "")
               .replace(/_[a-z0-9]{4,}$/i, "");
-            if (cleaned.length >= 3) return cleaned;
+            if (cleaned.length < 3) continue;
+            // 去 BEM 副产物 trailing `_`（`el-popover__reference` → strip hash → `el-popover_`）
+            const lower = cleaned.toLowerCase().replace(/_+$/, "");
+            if (ICON_CLASS_DENY_NAMES.has(lower)) continue;
+            if (ICON_CLASS_DENY_PREFIXES.some((p) => lower.startsWith(p))) continue;
+            return cleaned;
           }
           return "";
         }
