@@ -511,6 +511,26 @@ async function scanOneFrame(
           const role = withAX ? getRole(htmlEl) : htmlEl.tagName.toLowerCase();
           const name = withText ? getAccessibleName(htmlEl) : "";
 
+          // BUG-3: in filter='interactive' mode, drop wrappers that the
+          // selector caught structurally but carry no semantic info —
+          // typically Element Plus el-popover__reference triggers
+          // (`<div tabindex="0">` with no role / aria-label / text). On
+          // bytenew testc this produced 3 phantom `[div]` entries on the
+          // main frame that LLMs could not interpret.
+          if (filter === "interactive") {
+            const tag = htmlEl.tagName.toLowerCase();
+            const formLike =
+              tag === "input" ||
+              tag === "select" ||
+              tag === "textarea" ||
+              tag === "button" ||
+              tag === "a";
+            const hasExplicitRole =
+              !!htmlEl.getAttribute("role") ||
+              !!htmlEl.getAttribute("aria-label");
+            if (!formLike && !hasExplicitRole && !name) continue;
+          }
+
           // 这里的 index 是 frame 内局部 id，observer handler 侧重编全局 index
           const state = getUiState(htmlEl);
           elements.push({
