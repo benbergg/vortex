@@ -61,13 +61,20 @@ export function renderObserveCompact(data: CompactObserve): string {
     const name = el.name ? ` "${escapeName(el.name)}"` : "";
     lines.push(`${refOf(el)} [${el.role}]${name}${stateFlags(el.state)}`);
   }
-  // 未扫 frame 提示
-  const unscanned = (data.frames ?? []).filter((f) => !f.scanned);
-  if (unscanned.length > 0) {
-    lines.push("");
-    for (const f of unscanned) {
-      lines.push(`# frame ${f.frameId} not scanned (url=${f.url})`);
+  // Frame 状态提示：1) 未扫的（cross-origin/destroyed）2) 扫描成功但 0 元素的
+  // sub-frame。后者之前沉默 → 多 frame 场景下 LLM 看不到子 frame 存在就会
+  // 下结论 "frame walker 漏掉了"（见 testc 评价分析 dogfood 误诊）。
+  const scanNotes: string[] = [];
+  for (const f of data.frames ?? []) {
+    if (!f.scanned) {
+      scanNotes.push(`# frame ${f.frameId} not scanned (url=${f.url})`);
+    } else if (f.elementCount === 0 && f.frameId !== 0) {
+      scanNotes.push(`# frame ${f.frameId} scanned, 0 interactive elements (url=${f.url})`);
     }
+  }
+  if (scanNotes.length > 0) {
+    lines.push("");
+    lines.push(...scanNotes);
   }
   return lines.join("\n");
 }

@@ -74,4 +74,45 @@ describe("renderObserveCompact", () => {
     // 含完整头部（title/viewport/frames）约 200B，元素列表 ~2KB；整体 ≤ 2.5KB
     expect(bytes).toBeLessThan(2560);
   });
+
+  it("scanned 但 0 元素的 sub-frame 公开为注释提示", () => {
+    // bytenew testc 评价分析嵌套 iframe 场景：fid=22 已被扫描但页面无 interactive
+    // 元素，prior renderer 沉默不报 → 多 frame 调试时误诊为 frame walker 漏。
+    const data = {
+      ...sample,
+      frames: [
+        { frameId: 0, parentFrameId: -1, url: "https://main.example/", offset: { x: 0, y: 0 }, elementCount: 1, truncated: false, scanned: true },
+        { frameId: 22, parentFrameId: 19, url: "https://main.example/sub", offset: { x: 0, y: 0 }, elementCount: 0, truncated: false, scanned: true },
+      ],
+      elements: [{ index: 0, tag: "button", role: "button", name: "ok", frameId: 0 }],
+    };
+    const out = renderObserveCompact(data);
+    expect(out).toContain("# frame 22 scanned, 0 interactive elements");
+  });
+
+  it("scanned 但 0 元素的主 frame 不重复输出（避免噪声）", () => {
+    const data = {
+      ...sample,
+      frames: [
+        { frameId: 0, parentFrameId: -1, url: "https://main.example/", offset: { x: 0, y: 0 }, elementCount: 0, truncated: false, scanned: true },
+      ],
+      elements: [],
+    };
+    const out = renderObserveCompact(data);
+    expect(out).not.toContain("# frame 0");
+  });
+
+  it("未扫 sub-frame 仍用 not scanned 提示（向后兼容）", () => {
+    const data = {
+      ...sample,
+      frames: [
+        { frameId: 0, parentFrameId: -1, url: "https://main.example/", offset: { x: 0, y: 0 }, elementCount: 1, truncated: false, scanned: true },
+        { frameId: 5, parentFrameId: 0, url: "https://other.example/", offset: { x: 0, y: 0 }, elementCount: 0, truncated: false, scanned: false },
+      ],
+      elements: [{ index: 0, tag: "button", role: "button", name: "ok", frameId: 0 }],
+    };
+    const out = renderObserveCompact(data);
+    expect(out).toContain("# frame 5 not scanned");
+    expect(out).not.toContain("# frame 5 scanned");
+  });
 });

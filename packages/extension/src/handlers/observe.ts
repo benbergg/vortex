@@ -628,8 +628,9 @@ async function scanOneFrame(
       world: "MAIN",
     });
     return (results[0]?.result as FramePageResult | undefined) ?? null;
-  } catch {
+  } catch (err) {
     // 跨源 iframe 无权限 / frame 已销毁：不 throw，返回 null 让上层标记为未扫
+    console.warn(`[vortex.scanOneFrame] failed fid=${frameId} err=`, err);
     return null;
   }
 }
@@ -683,6 +684,9 @@ export function registerObserveHandlers(router: ActionRouter): void {
           includeAX,
           filterMode,
         );
+        if (page === null) {
+          console.warn(`[vortex.observe] scanOneFrame null fid=${f.frameId} url=${f.url}`);
+        }
         scans.push({
           frameId: f.frameId,
           url: f.url,
