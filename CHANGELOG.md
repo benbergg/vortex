@@ -4,6 +4,30 @@
 
 ---
 
+## [Unreleased] - v0.7.1 dogfood batch 2 (JD 评价弹窗)
+
+### 🐛 Fixed
+
+通过京东商品评价弹窗 dogfood（10万+评价真站 + static HTML fixture）暴露的 3 个新 bug。
+
+- **P0 — `vortex_extract` 不过滤 hidden 文本**（`packages/extension/src/handlers/content.ts`）。Chrome `el.innerText` 在 `display:none` 元素上仍返回 textContent，违反 schema "Extract visible text" 描述。RM-04 fixture 用 extract 验证 modal 关闭曾返回 hidden 全部内容。修：getText 显式 ancestor 链检查 `display:none` / `visibility:hidden` / `[hidden]`，hidden 时返回 `""`。
+- **P1 — observe leaf-only filter 拆碎嵌套 cursor:pointer**（`packages/extension/src/handlers/observe.ts`）。`<div>差评<span>200+</span></div>` 形态原本只输出 `[span] "200+"`，主标签"差评"丢失。修：异文本时（ancestor 文本严格大于 leaf 且包含 leaf 子串）保留 ancestor，同文本时（嵌套同名 wrapper 链）保留 leaf。testc menuitem 同名嵌套 + JD 标签 dual-pattern 双向兼容。
+- **P2 — `vortex_act(scroll)` L4 facade 屏蔽 container/position**（`packages/mcp/src/tools/dispatch.ts`）。dispatch 把 value 整体当作 `next.value` 透传，但 `dom.scroll` handler 直接读 `args.container/args.position/args.x/args.y`。修：scroll 时 value 是参数对象 → spread 到 args，且 strip `selector/target/index`（server.ts 已把 `target` 翻译成 `selector`，必须移除否则 dom.scroll 走 sel 分支 scrollIntoView 屏蔽 container/position）。fixture + 真站 fixture scrollTop 0→473 验证通过。
+
+### ✨ Added
+
+- **bench 增 6 case**：4 个 JD 评价弹窗 dogfood case（rm-01 open / rm-02 switch-tab / rm-03 scroll-load / rm-04 close）+ 2 个延伸（rm-05 keyword tag / rm-06 sort toggle），全 PASS。
+- **bench 输出 bytes instrumentation**（`CaseMetrics.outputBytes` + `outputBytesByTool`）：bench CLI 增 `bytes=X.XKB` 列；diff threshold +20% warning / +50% critical（防 regression）。新 unit test 4 dispatch + 3 renderer。
+- **3 层嵌套 iframe fixture**：`playground/public/iframe-nested-{top,mid,deep}.html` + 2 cases（with-content / empty-deep），证伪"vortex 不进 3 层 iframe"假设；renderer hint 公开 0 元素 sub-frame 提示。
+
+### 💥 Behavior changes
+
+- `vortex_extract { target: <hidden-element-selector> }` 现返回 `""`，旧实现返回 hidden 文本。如果调用方依赖此返回作 LLM 上下文，需重新核对（应为破坏性收益）。
+- `vortex_observe` 对带文本主标签 + count 子 span 的 cursor:pointer 复合元素，现输出外层 ancestor 文本（如 `[div] "差评 200+"`）而非 inner span（`[span] "200+"`）。LLM prompt 若含 ref/name 字面量需重测。
+- `vortex_act(scroll, value={container, position})` 现真生效（dispatch strip selector/target/index）。schema 仍要求 `target`，目前作 placeholder（任意 selector），下一版 (#36) 一致化。
+
+---
+
 ## [0.7.0] - 2026-05-02
 
 ### 🐛 Fixed (observe scanner overhaul, PR #19)

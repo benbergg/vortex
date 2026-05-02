@@ -120,13 +120,14 @@ export function dispatchNewTool(
         !Array.isArray(value)
       ) {
         Object.assign(next, value as Record<string, unknown>);
-        // 当 value 提供了 container/position/x/y 时，target 是 schema 强制的占位符
-        // （schema required: ["target", "action"]）。这种情况下用户意图是"滚动 container"，
-        // 而 dom.scroll 只要 sel 在就走 scrollIntoView 路径（屏蔽 container/position），
-        // 故 strip target 让 handler 走 position 分支。
+        // server.ts 已把 params.target 翻译成 params.selector（@ref → selector
+        // 或 raw selector 直传）；strip selector / target 二者，让 dom.scroll 走
+        // position 分支，否则 handler 见 sel 即 scrollIntoView 屏蔽 container/position。
         const v = value as Record<string, unknown>;
         if ("container" in v || "position" in v || "x" in v || "y" in v) {
           delete next.target;
+          delete next.selector;
+          delete next.index; // ref 形式翻成 index 时也 strip
         }
       } else if (value !== undefined) {
         next.value = value;

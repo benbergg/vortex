@@ -96,6 +96,10 @@
         <div id="review-list"></div>
         <div class="empty-hint" id="empty-hint" style="display:none;"></div>
       </div>
+      <!-- 测试 instrumentation：暴露当前 container scrollTop / scrollHeight 让 vortex_extract 读 -->
+      <div id="scroll-debug" data-testid="scroll-debug" style="font-size:11px; color:#888; padding:4px;">
+        scrollTop=0 / scrollHeight=0
+      </div>
     </div>
   </div>
 
@@ -251,9 +255,11 @@
       renderInitial();
     });
 
-    // 滚动懒加载
+    // 滚动懒加载 + scroll-debug 指示器
     document.getElementById('review-scroll-container').addEventListener('scroll', (e) => {
       const el = e.currentTarget;
+      document.getElementById('scroll-debug').textContent =
+        `scrollTop=${el.scrollTop} / scrollHeight=${el.scrollHeight}`;
       const data = dataForTab(currentTab);
       if (renderedCount >= data.length) return;
       // 接近底部 100px 触发

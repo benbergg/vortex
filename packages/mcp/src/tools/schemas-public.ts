@@ -28,7 +28,7 @@ export const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "vortex_act",
     action: "L4.act",
-    description: "Perform a write action on a UI element.",
+    description: "Write to a UI element. scroll: value={container?,position}.",
     schema: {
       type: "object",
       properties: {

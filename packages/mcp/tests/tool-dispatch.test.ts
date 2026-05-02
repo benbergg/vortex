@@ -165,31 +165,47 @@ describe("dispatchNewTool", () => {
   });
 
   // v0.7.1 P2 fix: vortex_act(scroll) value 是参数对象而非数据值
-  it("vortex_act(scroll, value={container, position}) 把 value spread 到 args", () => {
+  // 注：server.ts 已把 params.target 翻成 params.selector（@ref→selector，或
+  // raw CSS selector 直透），所以 dispatch 收到的是 params.selector 而非 params.target。
+  it("vortex_act(scroll, value={container, position}) 把 value spread + strip selector", () => {
     const { action, params } = dispatchNewTool("vortex_act", {
-      target: "body",
+      selector: "body", // server.ts 已翻译过的形态
       action: "scroll",
       value: { container: ".scroll-box", position: "bottom" },
     })!;
     expect(action).toBe("dom.scroll");
     expect(params.container).toBe(".scroll-box");
     expect(params.position).toBe("bottom");
-    // target 必须被 strip，否则底层 dom.scroll 走 scrollIntoView 屏蔽 container/position
+    // selector / target 都必须被 strip，否则底层 dom.scroll 走 scrollIntoView 屏蔽 container/position
     expect(params).not.toHaveProperty("target");
+    expect(params).not.toHaveProperty("selector");
     // value 字段不应再透传（避免底层误读）
     expect(params).not.toHaveProperty("value");
   });
 
-  it("vortex_act(scroll, value={x, y}) 同样 spread + strip target", () => {
+  it("vortex_act(scroll, value={x, y}) 同样 spread + strip selector/target/index", () => {
     const { params } = dispatchNewTool("vortex_act", {
-      target: "body",
+      selector: "body",
+      index: 5, // ref 形式翻译后会带 index
+      snapshotId: "snap_x",
       action: "scroll",
       value: { x: 100, y: 500 },
     })!;
     expect(params.x).toBe(100);
     expect(params.y).toBe(500);
     expect(params).not.toHaveProperty("target");
+    expect(params).not.toHaveProperty("selector");
+    expect(params).not.toHaveProperty("index");
     expect(params).not.toHaveProperty("value");
+  });
+
+  it("vortex_act(scroll, target=...) 不带 value 时 selector 保留（scrollIntoView 路径）", () => {
+    const { action, params } = dispatchNewTool("vortex_act", {
+      selector: "._lastItem",
+      action: "scroll",
+    })!;
+    expect(action).toBe("dom.scroll");
+    expect(params.selector).toBe("._lastItem");
   });
 
   it("vortex_act(fill, value='hello') 仍透传 value（数据值语义不变）", () => {
