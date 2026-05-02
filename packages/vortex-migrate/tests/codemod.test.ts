@@ -139,6 +139,43 @@ describe("transformSource — targeted reshapes", () => {
     expect(r.source).toBe(input);
   });
 
+  // ── positional ctx.call("X", {...}) form (v0.7.2) ───────────────────────
+  it("rewrites ctx.call(\"vortex_click\", ...) positional form", () => {
+    const input = `await ctx.call("vortex_click", { target: "@e2" });`;
+    const r = transformSource(input);
+    expect(r.changed).toBe(true);
+    expect(r.source).toContain('"vortex_act"');
+    expect(r.source).toContain('action: "click"');
+  });
+
+  it("rewrites tools.call(\"vortex_wait_idle\", ...) positional form", () => {
+    const input = `await tools.call("vortex_wait_idle", { kind: "dom", idleMs: 500 });`;
+    const r = transformSource(input);
+    expect(r.changed).toBe(true);
+    expect(r.source).toContain('"vortex_wait_for"');
+    expect(r.source).toContain('mode: "idle"');
+    expect(r.source).toContain('value: "dom"');
+  });
+
+  it("warns on positional ctx.call(\"vortex_evaluate\", ...) — no v0.6 equivalent", () => {
+    const input = `await ctx.call("vortex_evaluate", { code: "1+1" });`;
+    const r = transformSource(input);
+    expect(r.changed).toBe(false);
+    expect(r.warnings.some((w) => w.tool === "vortex_evaluate")).toBe(true);
+  });
+
+  it("does not touch ctx.call with unknown tool name", () => {
+    const input = `await ctx.call("some_other_tool", { x: 1 });`;
+    const r = transformSource(input);
+    expect(r.changed).toBe(false);
+  });
+
+  it("does not touch ctx.call with non-string first arg", () => {
+    const input = `await ctx.call(toolName, { x: 1 });`;
+    const r = transformSource(input);
+    expect(r.changed).toBe(false);
+  });
+
   it("warns on indirect tool name (variable) but does not rewrite", () => {
     const input = [
       `const tool = "vortex_click";`,

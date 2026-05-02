@@ -128,6 +128,65 @@ export function transformSource(input: string, opts: TransformOptions = {}): Mig
     rewrites++;
   });
 
+  // Second pass: positional call form `fn("vortex_X", {...})`. Covers
+  // ctx.call("X", {...}) (vortex-bench helpers), tools.call("X", {...}),
+  // mcp.call("X", {...}) — any helper that takes (toolName, args) directly.
+  // We don't constrain the callee shape: matching arg[0] string literal +
+  // arg[1] object literal + TOOL_MAP key is specific enough to avoid
+  // unrelated helpers (vortex_* names are namespaced).
+  root.find(j.CallExpression).forEach((path) => {
+    const node = path.node;
+    const args = node.arguments as unknown[];
+    if (args.length < 2) return;
+    const nameVal = stringLiteralValue(args[0]);
+    if (nameVal == null) return;
+    if (V06_TOOL_NAMES.has(nameVal)) return;
+    const entry = TOOL_MAP[nameVal];
+    if (!entry) return;
+    const argsNode = args[1] as { type?: string };
+    const line = node.loc?.start.line ?? 0;
+
+    if (entry.v06 === "__DELETE__") {
+      warnings.push({
+        line,
+        tool: nameVal,
+        reason: `${nameVal}: deletion not auto-applied for ctx.call form — remove the enclosing statement manually`,
+      });
+      return;
+    }
+
+    if (entry.v06 == null) {
+      warnings.push({
+        line,
+        tool: nameVal,
+        reason: entry.warnReason ?? `${nameVal}: no automatic migration available`,
+      });
+      return;
+    }
+
+    // Skip noop kept-name entries.
+    const isNoop = entry.v06 === nameVal && (entry.rewrites?.length ?? 0) === 0;
+    if (isNoop) return;
+
+    // Replace the first arg (string literal) with the new tool name.
+    args[0] = j.literal(entry.v06) as never;
+
+    if (j.ObjectExpression.check(argsNode as never)) {
+      applyRewrites(j, argsNode as ObjectExpression, entry.rewrites ?? []);
+    } else {
+      warnings.push({
+        line,
+        tool: nameVal,
+        reason: `${nameVal} → ${entry.v06}: second argument is not an object literal; arg shape was not reshaped`,
+      });
+    }
+
+    if (entry.partial && entry.partialNote) {
+      warnings.push({ line, tool: nameVal, reason: `${nameVal} → ${entry.v06}: ${entry.partialNote}` });
+    }
+    rewrites++;
+  });
+
   const source = rewrites > 0 ? root.toSource({ quote: "double" } as never) : input;
   return { source, rewrites, deletions, warnings, changed: source !== input };
 }
