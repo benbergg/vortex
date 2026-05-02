@@ -146,6 +146,7 @@ async function scanOneFrame(
   viewport: "visible" | "full",
   includeText: boolean,
   includeAX: boolean,
+  filterMode: "interactive" | "all",
 ): Promise<FramePageResult | null> {
   try {
     const results = await chrome.scripting.executeScript({
@@ -155,6 +156,7 @@ async function scanOneFrame(
         mode: string,
         withText: boolean,
         withAX: boolean,
+        filter: "interactive" | "all",
       ) => {
         // Per-observe rid prefix used as identity fallback when buildSelector
         // can't produce a page-unique CSS selector (e.g. Element Plus v-for
@@ -397,7 +399,19 @@ async function scanOneFrame(
           return Object.keys(s).length > 0 ? s : undefined;
         }
 
-        const nodeList = document.querySelectorAll(INTERACTIVE_SELECTORS);
+        // BUG-2: filter='all' previously was a dead parameter — server.ts
+        // forwarded it but the handler never read args.filter, so the public
+        // schema's promise of "non-interactive elements too" silently
+        // degraded to the interactive whitelist. Honor it now by appending
+        // structural roles that table-heavy pages expose (rows / cells /
+        // column headers) so LLMs can reference data grid coordinates.
+        const TABLE_EXTRA_SELECTORS =
+          "tr,td,th,[role=row],[role=cell],[role=columnheader],[role=rowheader],[role=gridcell]";
+        const ROOT_SELECTORS =
+          filter === "all"
+            ? `${INTERACTIVE_SELECTORS},${TABLE_EXTRA_SELECTORS}`
+            : INTERACTIVE_SELECTORS;
+        const nodeList = document.querySelectorAll(ROOT_SELECTORS);
 
         // BUG-1: cursor:pointer fallback for custom interactive elements.
         // bytenew / Element Plus / Ant Design 等中文 SaaS 框架普遍用
@@ -413,6 +427,9 @@ async function scanOneFrame(
           if (interactiveSet.has(el)) continue;
           // Skip wrappers that already contain a real interactive child —
           // we don't want both the <li> and the <button> inside it.
+          // (Use INTERACTIVE_SELECTORS, not the table-extended set, so
+          // table cells with cursor:pointer still get collected when
+          // filter='all'.)
           if (el.querySelector(INTERACTIVE_SELECTORS)) continue;
           const htmlEl = el as HTMLElement;
           if (htmlEl.offsetWidth === 0 || htmlEl.offsetHeight === 0) continue;
@@ -530,7 +547,7 @@ async function scanOneFrame(
           truncated: elements.length >= max,
         };
       },
-      args: [maxElements, viewport, includeText, includeAX],
+      args: [maxElements, viewport, includeText, includeAX, filterMode],
       world: "MAIN",
     });
     return (results[0]?.result as FramePageResult | undefined) ?? null;
@@ -555,6 +572,11 @@ export function registerObserveHandlers(router: ActionRouter): void {
       const includeText = (args.includeText as boolean | undefined) ?? true;
       const includeAX = (args.includeAX as boolean | undefined) ?? true;
       const format = (args.format as "compact" | "full" | undefined) ?? "full";
+      // BUG-2: filter was a dead parameter — public schema exposed
+      // ['interactive','all'] but the handler never read it. 'all' now
+      // also collects table rows / cells / column headers.
+      const filterMode =
+        (args.filter as "interactive" | "all" | undefined) ?? "interactive";
 
       const frameTargets = await resolveTargetFrames(tid, explicitFrameId, framesParam);
       if (frameTargets.length === 0) {
@@ -582,6 +604,7 @@ export function registerObserveHandlers(router: ActionRouter): void {
           viewport,
           includeText,
           includeAX,
+          filterMode,
         );
         scans.push({
           frameId: f.frameId,
