@@ -23,7 +23,10 @@ export function extractEvalJson<T = unknown>(res: unknown): T {
 
 /** 读取 [data-testid="result"] 的可见文本 */
 export async function readResult(ctx: CaseContext): Promise<string> {
-  const res = await ctx.call("vortex_get_text", { target: "[data-testid=\"result\"]" });
+  const res = await ctx.call("vortex_extract", {
+    target: "[data-testid=\"result\"]",
+    include: ["text"],
+  });
   return extractText(res);
 }
 
