@@ -419,8 +419,12 @@ async function scanOneFrame(
         // 静态白名单完全捕获不到。事件挂在 Vue/React vnode 层，元素本身
         // 没 onclick 也没 framework key，所以走 computed style 兜底。
         const interactiveSet = new Set<Element>(Array.from(nodeList));
+        // Sweep all elements (Vue/React UI libs frequently use custom
+        // tags like <el-button> / <a-link> / <van-cell> for interactive
+        // widgets — bytenew testc 行操作 link is <el-button> not <div>),
+        // skipping svg internals + non-rendered tags for perf.
         const fallbackPool = document.querySelectorAll(
-          "div, li, span, a:not([href])",
+          "*:not(svg *):not(script):not(style):not(meta):not(link):not(head):not(head *)",
         );
         const cursorPointerExtras: Element[] = [];
         for (const el of Array.from(fallbackPool)) {
@@ -447,9 +451,22 @@ async function scanOneFrame(
           if (!name) continue;
           cursorPointerExtras.push(el);
         }
+        // Leaf-only: bytenew sidebar (and many Element Plus components)
+        // nest cursor:pointer over 3-4 levels (li → div → div → div with
+        // text), and emitting every level burns the maxElements budget on
+        // duplicates. Prefer the innermost candidate — it's closest to
+        // the actual click target and downstream act will event-bubble
+        // to ancestors anyway.
+        const cursorPointerLeaves = cursorPointerExtras.filter((el) => {
+          for (const other of cursorPointerExtras) {
+            if (other === el) continue;
+            if (el.contains(other)) return false; // ancestor of a candidate
+          }
+          return true;
+        });
         const allCandidates: Element[] = [
           ...Array.from(nodeList),
-          ...cursorPointerExtras,
+          ...cursorPointerLeaves,
         ];
 
         const elements: Array<{
