@@ -75,6 +75,30 @@ describe("vortex_observe special path (Bug C regression)", () => {
     expect((params as Record<string, unknown>).viewport).toBe("full");
   });
 
+  // Bug F transit-path regression: server.ts:306 currently destructures
+  // { scope, filter, tabId, timeout, ...rest } and frames falls through via
+  // `rest`. If a refactor names `frames` explicitly in the destructure and
+  // forgets to forward it into `next`, schemas-public still exposes the
+  // param (I15 passes) but the value never reaches the extension — the
+  // exact symmetric failure mode of Bug F itself.
+  it("frames param is forwarded to extension (Bug F transit-path lock)", async () => {
+    const { sendRequest } = await import("../src/client.js");
+    vi.mocked(sendRequest).mockResolvedValue({
+      result: { snapshotId: "snap_test_3", url: "", elements: [] },
+    } as any);
+
+    const { handleCallTool } = await import("../src/server.js");
+    await handleCallTool({
+      params: {
+        name: "vortex_observe",
+        arguments: { scope: "viewport", frames: "all-permitted" },
+      },
+    });
+
+    const [, params] = vi.mocked(sendRequest).mock.calls[0];
+    expect((params as Record<string, unknown>).frames).toBe("all-permitted");
+  });
+
   it("subsequent vortex_act with @eN ref reuses the activeSnapshotId set by observe (no STALE_SNAPSHOT)", async () => {
     const { sendRequest } = await import("../src/client.js");
     // observe → returns snapshotId

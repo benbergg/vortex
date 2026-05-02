@@ -87,3 +87,37 @@ describe("I15: tools/list budget + count + internalized grep", () => {
     }
   });
 });
+
+// Bug F (v0.6.0 dogfood): PR #4 门面化把 vortex_observe schema 砍到 scope/filter，
+// 漏掉 frames 参数。底层路由（server.ts spread rest, observe.ts:486 args.frames）
+// 全部就位，但 LLM 看到的公开 schema 不暴露 → cross-origin iframe / SPA 嵌入场景
+// 无从触发 all-permitted。本测试锁住 frames 暴露，防止门面收窄再次静默丢参数。
+describe("Bug F regression: vortex_observe surface must expose frames", () => {
+  const observe = getToolDefs().find(d => d.name === "vortex_observe")!;
+  const props = (observe.schema as { properties: Record<string, any> }).properties;
+
+  it("vortex_observe.schema.properties.frames exists", () => {
+    expect(props.frames).toBeDefined();
+  });
+
+  // Strict equality (not arrayContaining) — guards against silent enum
+  // drift in either direction: subset (capability removed) or superset
+  // (untested value sneaked in). Order matches schemas.ts:111 internal enum.
+  it("frames enum equals exactly main / all-same-origin / all-permitted / all", () => {
+    expect(props.frames.enum).toEqual([
+      "main",
+      "all-same-origin",
+      "all-permitted",
+      "all",
+    ]);
+  });
+
+  // The whole point of the description change is to nudge LLMs to switch
+  // away from the implicit 'main' default when iframes are involved.
+  // If a future edit drops the hint (e.g. reverts to "List interactive
+  // elements in scope."), the schema-shape tests above still pass but
+  // discoverability silently regresses — Bug F all over again.
+  it("description hints frames usage for iframe contexts", () => {
+    expect(observe.description).toMatch(/frames/);
+  });
+});
