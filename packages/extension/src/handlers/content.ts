@@ -13,9 +13,24 @@ export function registerContentHandlers(router: ActionRouter): void {
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string | undefined) => {
           try {
+            // Hidden 检查：display:none / visibility:hidden / [hidden] 自身或祖先
+            // —— Chrome 的 el.innerText 在 display:none 元素上仍返回 textContent，
+            // 违反 schema 描述 "Extract visible text"。这里显式过滤。
+            // （innerText 对 visible 父元素的 hidden 后代已正确过滤，故仅需检查目标
+            // 自身链上的 hidden 状态）
+            const isHiddenChain = (el: Element | null): boolean => {
+              for (let cur: Element | null = el; cur; cur = cur.parentElement) {
+                if (cur.nodeType !== 1) continue;
+                if ((cur as HTMLElement).hidden) return true;
+                const cs = getComputedStyle(cur);
+                if (cs.display === "none" || cs.visibility === "hidden") return true;
+              }
+              return false;
+            };
             if (sel) {
               const el = document.querySelector(sel) as HTMLElement | null;
               if (!el) return { error: `Element not found: ${sel}` };
+              if (isHiddenChain(el)) return { result: "" };
               return { result: el.innerText };
             }
             return { result: document.body.innerText };

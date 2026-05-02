@@ -18,18 +18,14 @@ const def: CaseDefinition = {
     await ctx.call("vortex_act", { target: triggerRef!, action: "click" });
     await new Promise((r) => setTimeout(r, 300));
 
-    // 找差评 tag 的 ref —— 但 v0.7 bug：vortex 把 tag 拆成 inner span，
-    // observe 只输出 "200+" 不含 "差评"。fallback 用 selector 形式。
-    // 这条 case 同时测：(a) 切 tab 行为 (b) 隐性记录 bug —— observe 拆嵌套 cursor:pointer
+    // P1 fix 后：tag observe 输出完整 ancestor 文本（"差评200+"），可直接 ref click
     const s1 = extractText(await ctx.call("vortex_observe", {}));
     const badRefMatch = s1.match(/(@\w+)\s+\[\w+\]\s+"[^"]*差评[^"]*"/);
-    ctx.recordMetric("observeFoundBadTagAsLeaf", badRefMatch ? 1 : 0);
+    ctx.assert(badRefMatch !== null, `应找到含 "差评" 的 ref：${s1.slice(0, 600)}`);
+    ctx.recordMetric("observeFoundBadTagAsLeaf", 1);
 
-    // 不论 ref 是否含「差评」全名，都用 selector 走（确保 case 不被 bug 阻塞）
-    await ctx.call("vortex_act", {
-      target: '[data-tab-id="bad"]',
-      action: "click",
-    });
+    // 用 ref 直点（验证 P1 fix 让 LLM 不再需 selector workaround）
+    await ctx.call("vortex_act", { target: badRefMatch![1], action: "click" });
     await new Promise((r) => setTimeout(r, 400));
 
     // 差评 tab 切换后，列表应出现「商家：」回复 + b*** 用户名（fixture data）

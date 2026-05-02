@@ -44,11 +44,13 @@ const def: CaseDefinition = {
     ctx.assert(/最新/.test(snap2), `observe 应含 "最新" 排序`);
     ctx.assert(/当前商品/.test(snap2), `observe 应含 "当前商品" 排序`);
 
-    // 记录 tag bug 指标（预期会 fail 因为只有 inner span 被收）
-    const tagFullMatches = (snap2.match(/全部 96%好评|图\/视频 5000\+|好评 2万\+|差评 200\+/g) ?? []);
+    // P1 fix verify：tag 现在应输出完整 ancestor 文本（"好评2万+" 而非 "2万+"）
+    const tagFullMatches = (snap2.match(/全部96%好评|图\/视频5000\+|好评2万\+|差评200\+/g) ?? []);
     ctx.recordMetric("fullTagNamesObserved", tagFullMatches.length);
-    const tagInnerMatches = (snap2.match(/96%好评|5000\+|2万\+|200\+/g) ?? []);
-    ctx.recordMetric("innerSpanCountsObserved", tagInnerMatches.length);
+    ctx.assert(
+      tagFullMatches.length >= 4,
+      `P1 fix 应让 4 个完整 tag 文本可见，实际 ${tagFullMatches.length}：${snap2.slice(0, 600)}`,
+    );
   },
 };
 

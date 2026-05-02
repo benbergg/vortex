@@ -476,29 +476,37 @@ async function scanOneFrame(
           if (!probe) continue;
           cursorPointerExtras.push(el);
         }
-        // Leaf-only: bytenew sidebar (and many Element Plus components)
-        // nest cursor:pointer over 3-4 levels (li → div → div → div with
-        // text), and emitting every level burns the maxElements budget on
-        // duplicates. Prefer the innermost candidate — it's closest to
-        // the actual click target and downstream act will event-bubble
-        // to ancestors anyway.
-        // Walk parents once per candidate (O(N·depth)) instead of the
-        // O(N²) `el.contains(other)` cross-product the original implementation
-        // used (review feedback on PR #19).
+        // 嵌套 cursor:pointer 时择一保留：
+        // - 同文本（如 bytenew sidebar `li > div > div > div` 全是 "首页"）
+        //   保留 leaf，drop ancestor；leaf 离 click 目标最近、文本无损失
+        // - 异文本（如 JD 标签 `<div>全部<span>96%好评</span></div>` ancestor
+        //   "全部 96%好评" 含 leaf 子串 + 主标签）保留 ancestor，drop leaf；
+        //   leaf 仅含 inner span 部分文本会让 LLM 拿不到主标签
+        // 走每条 candidate 至多一次到最近的 candidate ancestor (O(N·depth))。
         const candidateSet = new Set<Element>(cursorPointerExtras);
-        const isAncestorOfCandidate = new WeakSet<Element>();
-        for (const el of cursorPointerExtras) {
-          let p: Element | null = el.parentElement;
+        const dropSet = new WeakSet<Element>();
+        const normText = (el: Element): string =>
+          (el.textContent ?? "").replace(/\s+/g, " ").trim();
+        for (const leaf of cursorPointerExtras) {
+          let p: Element | null = leaf.parentElement;
           while (p) {
             if (candidateSet.has(p)) {
-              isAncestorOfCandidate.add(p);
-              break; // chain marked; deeper ancestors handled when reached
+              const leafText = normText(leaf);
+              const ancText = normText(p);
+              if (ancText.length > leafText.length && ancText.includes(leafText)) {
+                // ancestor 有额外文本（主标签+leaf 子串），保留 ancestor
+                dropSet.add(leaf);
+              } else {
+                // 文本等价（嵌套同文本 wrapper），保留 leaf
+                dropSet.add(p);
+              }
+              break; // 链上更深 ancestor 由它们各自的 leaf 触发处理
             }
             p = p.parentElement;
           }
         }
         const cursorPointerLeaves = cursorPointerExtras.filter(
-          (el) => !isAncestorOfCandidate.has(el),
+          (el) => !dropSet.has(el),
         );
         const allCandidates: Element[] = [
           ...Array.from(nodeList),
