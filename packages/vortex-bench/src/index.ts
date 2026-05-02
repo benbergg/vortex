@@ -57,7 +57,8 @@ async function listCaseNames(): Promise<string[]> {
 
 function formatRow(m: CaseMetrics): string {
   const status = m.passed ? "✓" : "✗";
-  return `${status} ${m.case.padEnd(32)} calls=${String(m.callCount).padStart(3)} fallback=${m.fallbackToEvaluate} missed=${m.observeMissedPopperItems} ${m.durationMs}ms${m.failureReason ? `  ← ${m.failureReason}` : ""}`;
+  const bytesKB = ((m.outputBytes ?? 0) / 1024).toFixed(1);
+  return `${status} ${m.case.padEnd(32)} calls=${String(m.callCount).padStart(3)} fallback=${m.fallbackToEvaluate} missed=${m.observeMissedPopperItems} bytes=${bytesKB.padStart(6)}KB ${m.durationMs}ms${m.failureReason ? `  ← ${m.failureReason}` : ""}`;
 }
 
 async function writeLatest(report: BenchReport): Promise<string> {

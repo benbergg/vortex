@@ -12,6 +12,13 @@ export interface CaseMetrics {
   /** observe 本应捕捉但漏掉的 popper / teleport 项数量 */
   observeMissedPopperItems: number;
   durationMs: number;
+  /**
+   * v0.7.1 新增：tool result text 累计字节数（utf-8 length 加和）。
+   * 反映 LLM 上下文消耗——比 callCount 更直接的成本指标。
+   */
+  outputBytes: number;
+  /** v0.7.1 新增：按工具名拆分的 outputBytes，用于看哪些 tool 是 token hog */
+  outputBytesByTool?: Record<string, number>;
   failureReason?: string;
   /** v0.6 新增：case 自定义数值指标（如 P50/P90 延迟、token baseline 等） */
   customMetrics?: Record<string, number>;

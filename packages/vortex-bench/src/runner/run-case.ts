@@ -27,6 +27,8 @@ export async function runCase(def: CaseDefinition, opts: RunCaseOptions): Promis
   let callCount = 0;
   let fallback = 0;
   let missed = 0;
+  let outputBytes = 0;
+  const outputBytesByTool: Record<string, number> = {};
   const customMetrics: Record<string, number> = {};
 
   async function callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
@@ -35,6 +37,11 @@ export async function runCase(def: CaseDefinition, opts: RunCaseOptions): Promis
     const res = await mcp.client.callTool({ name, arguments: args });
     const text = extractText(res);
     const errorCodes = extractErrorCodes(text);
+    // v0.7.1 instrument: 累加 utf-8 字节数（Buffer.byteLength 比 .length 准——
+    // 中文 3 倍）。LLM token 估算用 bytes/4 粗算或专用 tokenizer。
+    const bytes = Buffer.byteLength(text, "utf-8");
+    outputBytes += bytes;
+    outputBytesByTool[name] = (outputBytesByTool[name] ?? 0) + bytes;
     trace.push({
       kind: "tool_result",
       name,
@@ -77,10 +84,10 @@ export async function runCase(def: CaseDefinition, opts: RunCaseOptions): Promis
 
     await def.run(ctx);
 
-    return buildMetrics(def, true, undefined, callCount, fallback, missed, Date.now() - started, customMetrics);
+    return buildMetrics(def, true, undefined, callCount, fallback, missed, outputBytes, outputBytesByTool, Date.now() - started, customMetrics);
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    return buildMetrics(def, false, reason, callCount, fallback, missed, Date.now() - started, customMetrics);
+    return buildMetrics(def, false, reason, callCount, fallback, missed, outputBytes, outputBytesByTool, Date.now() - started, customMetrics);
   } finally {
     await closeMcpConnection(mcp);
     void trace; void mcp as unknown as McpConnection; // 保留引用抑制 unused 警告
@@ -94,6 +101,8 @@ function buildMetrics(
   callCount: number,
   fallback: number,
   missed: number,
+  outputBytes: number,
+  outputBytesByTool: Record<string, number>,
   durationMs: number,
   customMetrics: Record<string, number>,
 ): CaseMetrics {
@@ -103,8 +112,10 @@ function buildMetrics(
     callCount,
     fallbackToEvaluate: fallback,
     observeMissedPopperItems: missed,
+    outputBytes,
     durationMs,
   };
+  if (Object.keys(outputBytesByTool).length > 0) m.outputBytesByTool = { ...outputBytesByTool };
   if (reason !== undefined) m.failureReason = reason;
   if (Object.keys(customMetrics).length > 0) m.customMetrics = { ...customMetrics };
   return m;

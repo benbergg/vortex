@@ -32,7 +32,23 @@ function compareCases(before: CaseMetrics, after: CaseMetrics): MetricDiff[] {
   diffs.push(numDiff("fallbackToEvaluate", before.fallbackToEvaluate, after.fallbackToEvaluate, thresholdsFallback));
   diffs.push(numDiff("observeMissedPopperItems", before.observeMissedPopperItems, after.observeMissedPopperItems, thresholdsObserveMiss));
   diffs.push(numDiff("durationMs", before.durationMs, after.durationMs, thresholdsDuration(before.durationMs)));
+  // v0.7.1 outputBytes diff: 旧 baseline 没这个字段 → ?? 0 让首次入 baseline 时
+  // 不被误判。+20% warning / +50% critical（output 增长直接侵占 LLM 上下文）
+  const beforeBytes = before.outputBytes ?? 0;
+  const afterBytes = after.outputBytes ?? 0;
+  diffs.push(numDiff("outputBytes", beforeBytes, afterBytes, thresholdsOutputBytes(beforeBytes)));
   return diffs;
+}
+
+function thresholdsOutputBytes(baseBytes: number) {
+  return (delta: number): Severity => {
+    if (delta <= 0) return "ok";
+    if (baseBytes === 0) return "ok"; // 首次记录，无对比基线
+    const pct = delta / baseBytes;
+    if (pct > 0.5) return "critical";
+    if (pct > 0.2) return "warning";
+    return "ok";
+  };
 }
 
 function boolDiff(metric: keyof CaseMetrics, before: boolean, after: boolean): MetricDiff {
@@ -101,15 +117,15 @@ function classify(changes: MetricDiff[]): CaseDiff["status"] {
 
 export function renderDiffTable(diffs: CaseDiff[]): string {
   const lines: string[] = [];
-  lines.push("| case | status | callCount | fallback | missedPopper | duration |");
-  lines.push("|------|--------|-----------|----------|--------------|----------|");
+  lines.push("| case | status | callCount | fallback | missedPopper | bytes | duration |");
+  lines.push("|------|--------|-----------|----------|--------------|-------|----------|");
   for (const d of diffs) {
     if (d.status === "added") {
-      lines.push(`| ${d.case} | ➕ added | — | — | — | — |`);
+      lines.push(`| ${d.case} | ➕ added | — | — | — | — | — |`);
       continue;
     }
     if (d.status === "removed") {
-      lines.push(`| ${d.case} | ➖ removed | — | — | — | — |`);
+      lines.push(`| ${d.case} | ➖ removed | — | — | — | — | — |`);
       continue;
     }
     const fmt = (m: keyof CaseMetrics) => {
@@ -123,7 +139,7 @@ export function renderDiffTable(diffs: CaseDiff[]): string {
     const statusIcon =
       d.status === "regressed" ? "🔴 regressed" : d.status === "improved" ? "🟢 improved" : "= unchanged";
     lines.push(
-      `| ${d.case} | ${statusIcon} | ${fmt("callCount")} | ${fmt("fallbackToEvaluate")} | ${fmt("observeMissedPopperItems")} | ${fmt("durationMs")} |`,
+      `| ${d.case} | ${statusIcon} | ${fmt("callCount")} | ${fmt("fallbackToEvaluate")} | ${fmt("observeMissedPopperItems")} | ${fmt("outputBytes")} | ${fmt("durationMs")} |`,
     );
   }
   return lines.join("\n");

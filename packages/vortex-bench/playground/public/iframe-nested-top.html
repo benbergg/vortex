@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>iframe-nested-top</title>
+</head>
+<body>
+  <h1 data-testid="top-marker">iframe-nested-top</h1>
+  <p>静态 HTML 3 层嵌套 iframe top（不走 vue-router 避免 hash 嵌套问题）</p>
+  <iframe data-testid="iframe-mid"
+          src="/iframe-nested-mid.html"
+          style="width: 100%; height: 600px; border: 1px solid #999;"></iframe>
+</body>
+</html>

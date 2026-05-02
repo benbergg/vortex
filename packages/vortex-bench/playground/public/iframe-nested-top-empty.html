@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>iframe-nested-top-empty</title>
+</head>
+<body>
+  <h1 data-testid="top-empty-marker">iframe-nested-top-empty</h1>
+  <p>嵌入 mid-empty（mid 嵌入 deep-empty，不渲染任何 interactive）</p>
+  <iframe data-testid="iframe-mid"
+          src="/iframe-nested-mid-empty.html"
+          style="width: 100%; height: 600px; border: 1px solid #999;"></iframe>
+</body>
+</html>
