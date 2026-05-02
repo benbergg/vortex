@@ -4,6 +4,12 @@
 
 ---
 
+## [Unreleased]
+
+_新工作进入此段；ship 时改为版本号 + 日期。_
+
+---
+
 ## [0.7.3] - 2026-05-02
 
 ### 🐛 Fixed (post-ship reflexion correction of v0.7.2)

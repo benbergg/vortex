@@ -10,6 +10,28 @@
 // When v0.5 → v0.6 cannot be expressed declaratively (cookie-delete branch,
 // freeform url-based waits) we still emit the rename + a `partialNote` so
 // callers know to review the call site by hand.
+//
+// ── Dispatch-branching audit (v0.7.3) ────────────────────────────────────
+// `packages/mcp/src/tools/dispatch.ts` translates v0.5 calls to extension
+// actions. Several legacy tools branch on a param key — when the v0.6
+// equivalent collapses these branches, the codemod must either rewrite all
+// branches or warn (else silent loss). This table tracks every such tool;
+// adding a new entry that branches on params requires the SAME audit.
+//
+// | legacy tool          | branches on              | tool-map status            |
+// |----------------------|--------------------------|----------------------------|
+// | vortex_fill          | kind (→ dom.commit)      | conditionalPartial(kind)   |
+// | vortex_wait_idle     | kind (→ network/dom/xhr) | remap(kind→value) covers all|
+// | vortex_storage_get   | scope (→ cookies/etc)    | remap(scope→op) covers all |
+// | vortex_storage_set   | scope, (op==="delete")   | partial: cookies-delete N/A|
+// | vortex_console       | op (clear vs getLogs)    | warn-only (v06=null)       |
+// | vortex_network       | op, filter               | warn-only (v06=null)       |
+// | vortex_storage_session| op (import vs export)   | warn-only (v06=null)       |
+//
+// Hard rule: when adding a v0.5 → v0.6 entry whose v0.5 dispatch reads ANY
+// param to choose action, you MUST cover every branch with rewrites OR
+// flag with `partial: true` / `conditionalPartial: { key, note }`.
+// Silent dispatch loss is the bug class that bit v0.7.2 (vortex_fill+kind).
 
 export type ArgRewrite =
   | {
