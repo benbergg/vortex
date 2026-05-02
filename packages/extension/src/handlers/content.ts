@@ -1,6 +1,6 @@
 import { ContentActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
-import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
+import { getActiveTabId, buildExecuteTarget, ensureFrameAttached } from "../lib/tab-utils.js";
 import { truncateWithTextTrailer, truncateWithHtmlTrailer } from "../lib/truncate.js";
 
 export function registerContentHandlers(router: ActionRouter): void {
@@ -9,6 +9,7 @@ export function registerContentHandlers(router: ActionRouter): void {
       const selector = args.selector as string | undefined;
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string | undefined) => {
@@ -56,6 +57,7 @@ export function registerContentHandlers(router: ActionRouter): void {
       const selector = args.selector as string | undefined;
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string | undefined) => {
@@ -87,6 +89,7 @@ export function registerContentHandlers(router: ActionRouter): void {
     [ContentActions.GET_ACCESSIBILITY_TREE]: async (args, tabId) => {
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: () => {
@@ -189,6 +192,7 @@ export function registerContentHandlers(router: ActionRouter): void {
       if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string) => {
@@ -214,6 +218,7 @@ export function registerContentHandlers(router: ActionRouter): void {
       if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       const tid = await getActiveTabId(args.tabId as number | undefined ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (sel: string, props: string[] | undefined) => {

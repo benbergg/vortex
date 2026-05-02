@@ -1,7 +1,7 @@
 import { PageActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
-import { buildExecuteTarget } from "../lib/tab-utils.js";
+import { buildExecuteTarget, ensureFrameAttached } from "../lib/tab-utils.js";
 
 async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;
@@ -74,6 +74,7 @@ export function registerPageHandlers(router: ActionRouter, debuggerMgr: Debugger
 
       if (selector) {
         const frameId = args.frameId as number | undefined;
+        if (frameId != null) await ensureFrameAttached(tid, frameId);
         const result = await chrome.scripting.executeScript({
           target: buildExecuteTarget(tid, frameId),
           func: (sel: string, ms: number) => {

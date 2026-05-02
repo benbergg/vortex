@@ -1,7 +1,7 @@
 import { DomActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
-import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
+import { getActiveTabId, buildExecuteTarget, ensureFrameAttached } from "../lib/tab-utils.js";
 import { resolveTarget, resolveTargetOptional } from "../lib/resolve-target.js";
 import { pageQuery as nativePageQuery, mapPageError } from "../adapter/native.js";
 import { loadPageSideModule } from "../adapter/page-side-loader.js";
@@ -29,6 +29,7 @@ export function registerDomHandlers(
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
         tid,
         frameId,
@@ -64,6 +65,7 @@ export function registerDomHandlers(
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
         tid,
         frameId,
@@ -100,6 +102,7 @@ export function registerDomHandlers(
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const useRealMouse = args.useRealMouse as boolean | undefined;
 
       // L2 integration: actionability + auto-wait pre-check
@@ -224,6 +227,7 @@ export function registerDomHandlers(
       if (text == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: text");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
 
       // L2 integration: actionability + auto-wait pre-check (editable required)
       await waitActionable(tid, frameId, selector, { timeout: (args.timeout as number | undefined) ?? 5000, needsEditable: true });
@@ -304,6 +308,7 @@ export function registerDomHandlers(
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
 
       // L2 integration: actionability + auto-wait pre-check (editable required)
       await waitActionable(tid, frameId, selector, { timeout: (args.timeout as number | undefined) ?? 5000, needsEditable: true });
@@ -402,6 +407,7 @@ export function registerDomHandlers(
       if (value == null) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: value");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
 
       // L2 integration: actionability + auto-wait pre-check
       await waitActionable(tid, frameId, selector, { timeout: (args.timeout as number | undefined) ?? 5000 });
@@ -479,6 +485,7 @@ export function registerDomHandlers(
       }
       const tid = await getActiveTabId(__t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
         tid,
         frameId,
@@ -550,6 +557,7 @@ export function registerDomHandlers(
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const res = await nativePageQuery<{
         result?: unknown;
         error?: string;
@@ -601,6 +609,7 @@ export function registerDomHandlers(
       if (!attribute) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: attribute");
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
         tid,
         frameId,
@@ -624,6 +633,7 @@ export function registerDomHandlers(
       const selector = __t?.selector;
       const tid = await getActiveTabId(__t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
         tid,
         frameId,
@@ -669,6 +679,7 @@ export function registerDomHandlers(
       const timeout = (args.timeout as number | undefined) ?? 10000;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
         tid,
         frameId,
@@ -718,6 +729,7 @@ export function registerDomHandlers(
         __t?.boundTabId ?? (args.tabId as number | undefined) ?? tabId,
       );
       const frameId = __t?.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const res = await nativePageQuery<{ result?: unknown; error?: string } | undefined>(
         tid,
         frameId,
@@ -811,6 +823,7 @@ export function registerDomHandlers(
       const selector = __t.selector;
       const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
       const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
 
       // daterange/datetimerange 走 CDP 真鼠标路径：dispatchMouseEvent 是 untrusted,
       // Element Plus 某些 handler 检查 isTrusted 后不同步 v-model。

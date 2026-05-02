@@ -10,6 +10,41 @@ _新工作进入此段；ship 时改为版本号 + 日期。_
 
 ---
 
+## [0.7.4] - 2026-05-02
+
+### ✨ Added
+
+- **`vortex_observe` 智能 frame fallback**（`packages/extension/src/handlers/observe.ts`）。caller 未显式传 `frames`、`filter=interactive`（默认）、main frame interactive 元素 < 20 且页面有 child iframe 时，自动用 `all-permitted` 重扫子 frame 并合并结果，meta 标 `autoFallback: true`。三重门避免误判：显式 `frames=main` / `frames=...` / `frameId=N` / `filter=all` 任一被设都跳过 fallback。  
+  **Why**：禅道（实测）等"shell+iframe content"架构后台 main frame 仅顶部 nav（10-15 link/button），业务在 iframe 里。caller 第一次 observe 拿到"近乎为空"无法引导后续动作，被迫第二次加 `frames=all-permitted`，每次 dogfood +1 round trip。`/kaizen:why` 5 Whys 定位：默认值是给 SPA 优化的，但 LLM 无页面先验知识 → Poka-Yoke 缺失。dogfood 卡点 #1（禅道周报采集场景）。  
+  **新增 7 个单测**（`packages/extension/tests/observe-auto-fallback.test.ts`）覆盖：触发 / 显式 main 不触发 / 元素够多不触发 / 无 child 不触发 / `filter=all` 不触发 / 显式 frameId 不触发 / 受限 host_permissions 跨域 frame 仍排除。
+
+### 🐛 Fixed
+
+- **frame detach 检测**（`packages/extension/src/lib/tab-utils.ts` + 全部接受 explicit `frameId` 的 handler）。新增 `ensureFrameAttached(tabId, frameId)` helper，在以下 handler 入口校验 frameId 仍在 `chrome.webNavigation.getAllFrames` 列表：
+  - `observe.snapshot`（`handlers/observe.ts`）
+  - `content.getText` / `content.getHTML` / `content.getAccessibilityTree` / `content.getElementText` / `content.getComputedStyle`（`handlers/content.ts`）
+  - `dom.click` / `dom.dblclick` / `dom.type` / `dom.fill` / `dom.select` / `dom.hover` / `dom.scroll` / `dom.commit` / `dom.press` / `dom.contextMenu` / `dom.checkVisible` / `dom.getValue` / `dom.exists`（`handlers/dom.ts`，13 处）
+  - `mouse.click` / `mouse.doubleClick` / `mouse.drag` / `mouse.move`（`handlers/mouse.ts`，仅当 `frameId !== 0`，因为 frame-coord 转换依赖 iframe offset）
+  - `capture.element`（`handlers/capture.ts`）
+  - `js.evaluate`（`handlers/js.ts`，3 处）
+  - `page.wait`（`handlers/page.ts`）
+
+  frameId 不在列表时 throw `IFRAME_NOT_READY` with `recoverable=true` + hint `"Call vortex_observe to refresh frame list"`。隐式 frame 解析（`all-permitted` / `all-same-origin`）天然枚举活跃 frames 不需校验。**reflexion 修正**：v0.7.4 第一轮误以为 `dom.*` 走 page-side runtime 不需 gate，实际 `adapter/native.ts:14` 的 `pageQuery` 就是 `chrome.scripting.executeScript + buildExecuteTarget`，frame stale 时同样不可解释；第二轮补回 13 处。  
+  **Why**：dogfood 卡点 #4 — caller 持有过期 frameId（`navigate` 后 main frame 重新加载销毁所有 iframe）调 extract，`chrome.scripting.executeScript` 在 detached frame 上行为不确定（吞错误 / fallback / 返回缓存），caller 拿到不可解释结果。  
+  **新增 6 个单测**（`packages/extension/tests/frame-detach.test.ts`）覆盖 observe / getText / getHTML stale frameId、未传 frameId 不校验、recoverable hint 正确。
+
+- **`vortex_observe` auto-fallback edge case**：main scan 失败（page=null，跨域权限拒绝 / frame 销毁等）时**不应触发 fallback**，否则 silent fallback 会掩盖 main 真正错误（reflexion 反馈：`page?.elements.length ?? 0` 在 page=null 时得 0 < 20 误触发）。改用 `mainScannedOk = mainScan?.page != null` 双重 gate，page=null 时保留 main scan failure 作顶层错误。新增对应单测覆盖此边界。
+
+### 测试结果
+
+- extension `pnpm test`：40 file 39 passed，**215/221** case 通过（dom-commit 6 fail = issue #13 pre-existing，本次改动无关）。新增 16 单测：10 auto-fallback（含 main=19/20 边界 + main scan failed 边界 + 6 触发/不触发分支）+ 6 frame-detach
+- mcp `pnpm test`：234/234 全过
+- bench：静态分析无回归（auto-fallback 三重门：含 iframe 的 case 都显式传 `frames`，其余 case fixture 不含 iframe 触发不到 fallback）
+- dogfood 实战验证：禅道 chandao.bytenew.com `vortex_observe()` 单次拿到 main + iframe 完整 333 任务列表（vs 旧版仅 16 个顶部菜单）；过期 frameId 调 `vortex_extract` 准确报 `IFRAME_NOT_READY`
+- 4 个 dogfood 卡点中 #1 + #4 闭环；卡点 #2（navigate empty detect）+ #3（snapshot ID stale 跨 observe footgun）转 v0.7.x backlog（前者阈值定义复杂，后者需 ref 协议改动）。
+
+---
+
 ## [0.7.3] - 2026-05-02
 
 ### 🐛 Fixed (post-ship reflexion correction of v0.7.2)

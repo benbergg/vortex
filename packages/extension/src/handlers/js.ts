@@ -1,6 +1,6 @@
 import { JsActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
-import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
+import { getActiveTabId, buildExecuteTarget, ensureFrameAttached } from "../lib/tab-utils.js";
 
 export function registerJsHandlers(router: ActionRouter): void {
   router.registerAll({
@@ -9,6 +9,7 @@ export function registerJsHandlers(router: ActionRouter): void {
       if (!code) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: code");
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (c: string) => {
@@ -28,6 +29,7 @@ export function registerJsHandlers(router: ActionRouter): void {
       if (!code) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: code");
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: async (c: string) => {
@@ -50,6 +52,7 @@ export function registerJsHandlers(router: ActionRouter): void {
       if (!name) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: name");
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
       const results = await chrome.scripting.executeScript({
         target: buildExecuteTarget(tid, frameId),
         func: (fnName: string, fnArgs: unknown[]) => {

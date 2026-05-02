@@ -3,7 +3,7 @@
 import { CaptureActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
-import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
+import { getActiveTabId, buildExecuteTarget, ensureFrameAttached } from "../lib/tab-utils.js";
 import { getIframeOffset } from "../lib/iframe-offset.js";
 
 // GIF 录制状态
@@ -91,6 +91,7 @@ export function registerCaptureHandlers(
       if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
 
       // 1. 在目标 frame 内取元素 rect
       const rectResults = await chrome.scripting.executeScript({

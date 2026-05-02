@@ -1,6 +1,6 @@
 import { ObserveActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
-import { getActiveTabId, buildExecuteTarget } from "../lib/tab-utils.js";
+import { getActiveTabId, buildExecuteTarget, ensureFrameAttached } from "../lib/tab-utils.js";
 import { getIframeOffset } from "../lib/iframe-offset.js";
 import {
   gcSnapshots,
@@ -16,6 +16,22 @@ type FramesParam =
   | "all-permitted"
   | "all"
   | number[];
+
+/**
+ * Auto-fallback 阈值（v0.7.4）：当 caller 未显式传 `frames` 且 main frame 的
+ * interactive 元素 < 此值，**且**页面有 child iframe，自动 retry 用 all-permitted
+ * 重扫子 frame，把结果合并到 scans。
+ *
+ * Why：禅道/JIRA Cloud/phpMyAdmin 等"shell+iframe content"老后台主 frame 只剩
+ * 顶部 nav（10-15 link/button），业务表格全在 iframe 里。caller 第一次 observe
+ * 拿到的"近乎为空"无法引导后续动作，被迫第二次 observe 加 frames=all-permitted。
+ * 5 Whys 定位：默认值是给 SPA 优化的，但 LLM 无页面先验知识 → Poka-Yoke 缺失。
+ * 此 fallback 让 caller 第一次 observe 就拿到内容（dogfood 卡点 #1）。
+ *
+ * Threshold=20：禅道顶部 nav 14-15 link，<20 触发；现代 SPA 主 frame 通常 ≥50 元素，
+ * 不触发；no-iframe 页面 child=0 也不触发，三重门避免误判。
+ */
+const FALLBACK_INTERACTIVE_THRESHOLD = 20;
 
 /**
  * 轻量 MV3 match pattern 匹配器：支持 `<all_urls>` / `scheme://host-pattern/path-pattern`。
@@ -709,6 +725,8 @@ export function registerObserveHandlers(router: ActionRouter): void {
         (args.tabId as number | undefined) ?? tabId,
       );
       const explicitFrameId = args.frameId as number | undefined;
+      if (explicitFrameId != null) await ensureFrameAttached(tid, explicitFrameId);
+      const framesParamProvided = args.frames !== undefined;
       const framesParam = (args.frames as FramesParam | undefined) ?? "main";
       const maxElements = (args.maxElements as number | undefined) ?? 200;
       const viewport =
@@ -760,6 +778,70 @@ export function registerObserveHandlers(router: ActionRouter): void {
           offset,
           page,
         });
+      }
+
+      // Auto-fallback for shell+iframe sites (Zentao/JIRA Cloud/phpMyAdmin):
+      // when caller didn't pin `frames` and main frame returns near-empty
+      // (typically 10-15 nav links), retry with all-permitted to surface
+      // iframe content. Three gates prevent false positives: (1) caller
+      // omitted `frames` arg (didn't ask for main only), (2) interactive
+      // mode (default), (3) child iframes exist on page.
+      let autoFallback = false;
+      if (
+        !framesParamProvided &&
+        explicitFrameId == null &&
+        filterMode === "interactive"
+      ) {
+        const mainScan = scans.find((s) => s.frameId === 0);
+        // 仅当 main scan 成功（page !== null）才考虑 fallback。main 扫描失败
+        // （跨域权限拒绝 / frame 已销毁 / page-side 异常）应保留为顶层错误，
+        // 而非通过 child fallback 静默掩盖（reflexion 反馈：page=null 时
+        // page?.elements.length 走 ?? 0 误触发 fallback）。
+        const mainScannedOk = mainScan?.page != null;
+        const mainElementCount = mainScannedOk ? mainScan!.page!.elements.length : Number.POSITIVE_INFINITY;
+        if (mainScannedOk && mainElementCount < FALLBACK_INTERACTIVE_THRESHOLD) {
+          // 复用一次 chrome.webNavigation.getAllFrames 调用同时做 child 检测和
+          // all-permitted 过滤，避免 resolveTargetFrames 内部再次拉取（review 反馈）
+          const allFrames = (await chrome.webNavigation.getAllFrames({ tabId: tid })) ?? [];
+          const hasChildFrames = allFrames.some((f) => f.frameId !== 0);
+          if (hasChildFrames) {
+            const newTargets = allFrames
+              .filter((f) => f.frameId !== 0 && isFrameInPermissions(f.url))
+              .filter((f) => !scans.some((s) => s.frameId === f.frameId))
+              .map((f) => ({
+                frameId: f.frameId,
+                url: f.url,
+                parentFrameId: f.parentFrameId ?? 0,
+              }));
+            if (newTargets.length > 0) {
+              autoFallback = true;
+              for (const f of newTargets) {
+                const offset = await getIframeOffset(tid, f.frameId);
+                const page = await scanOneFrame(
+                  tid,
+                  f.frameId,
+                  maxElements,
+                  viewport,
+                  includeText,
+                  includeAX,
+                  filterMode,
+                );
+                if (page === null) {
+                  console.warn(
+                    `[vortex.observe] auto-fallback scanOneFrame null fid=${f.frameId} url=${f.url}`,
+                  );
+                }
+                scans.push({
+                  frameId: f.frameId,
+                  url: f.url,
+                  parentFrameId: f.parentFrameId,
+                  offset,
+                  page,
+                });
+              }
+            }
+          }
+        }
       }
 
       // 分配跨 frame 全局 index（按 frameTargets 顺序）
@@ -898,6 +980,7 @@ export function registerObserveHandlers(router: ActionRouter): void {
           truncated: anyTruncated,
           frameCount: framesOut.length,
           scannedFrames: framesOut.filter((f) => f.scanned).length,
+          ...(autoFallback ? { autoFallback: true as const } : {}),
         },
       };
     },

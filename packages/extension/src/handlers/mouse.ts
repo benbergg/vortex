@@ -1,7 +1,7 @@
 import { MouseActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
-import { getActiveTabId } from "../lib/tab-utils.js";
+import { getActiveTabId, ensureFrameAttached } from "../lib/tab-utils.js";
 import { getIframeOffset } from "../lib/iframe-offset.js";
 
 type CoordSpace = "frame" | "viewport";
@@ -58,6 +58,7 @@ export function registerMouseHandlers(
     [MouseActions.CLICK]: async (args, tabId) => {
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null && frameId !== 0) await ensureFrameAttached(tid, frameId);
       const coordSpace = resolveCoordSpace(args.coordSpace, frameId);
       const button = (args.button as "left" | "right" | "middle") ?? "left";
       const xIn = args.x as number;
@@ -92,6 +93,7 @@ export function registerMouseHandlers(
     [MouseActions.DOUBLE_CLICK]: async (args, tabId) => {
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null && frameId !== 0) await ensureFrameAttached(tid, frameId);
       const coordSpace = resolveCoordSpace(args.coordSpace, frameId);
       const xIn = args.x as number;
       const yIn = args.y as number;
@@ -126,6 +128,7 @@ export function registerMouseHandlers(
     [MouseActions.DRAG]: async (args, tabId) => {
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null && frameId !== 0) await ensureFrameAttached(tid, frameId);
       const coordSpace = resolveCoordSpace(args.coordSpace, frameId);
       const x1In = args.fromX as number;
       const y1In = args.fromY as number;
@@ -165,6 +168,7 @@ export function registerMouseHandlers(
     [MouseActions.MOVE]: async (args, tabId) => {
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
+      if (frameId != null && frameId !== 0) await ensureFrameAttached(tid, frameId);
       const coordSpace = resolveCoordSpace(args.coordSpace, frameId);
       const xIn = args.x as number;
       const yIn = args.y as number;
