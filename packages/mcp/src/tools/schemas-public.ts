@@ -50,12 +50,13 @@ export const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "vortex_observe",
     action: "L4.observe",
-    description: "List interactive elements in scope.",
+    description: "List interactive elements; iframes: frames=all-permitted.",
     schema: {
       type: "object",
       properties: {
         scope: { type: "string", enum: ["viewport", "full"] },
         filter: { enum: ["interactive", "all"] },
+        frames: { enum: ["main", "all-same-origin", "all-permitted", "all"] },
         ...tabFields,
       },
     },
