@@ -146,6 +146,7 @@ async function scanOneFrame(
   viewport: "visible" | "full",
   includeText: boolean,
   includeAX: boolean,
+  filterMode: "interactive" | "all",
 ): Promise<FramePageResult | null> {
   try {
     const results = await chrome.scripting.executeScript({
@@ -155,7 +156,26 @@ async function scanOneFrame(
         mode: string,
         withText: boolean,
         withAX: boolean,
+        filter: "interactive" | "all",
       ) => {
+        // Per-observe rid prefix used as identity fallback when buildSelector
+        // can't produce a page-unique CSS selector (e.g. Element Plus v-for
+        // groups with identical inner DOM). Ambiguous elements are stamped
+        // with `data-vortex-rid` so the @fNeM ref system resolves them by
+        // identity instead of degrading to a path that matches multiple
+        // siblings.
+        const ridPrefix = `vtx${Date.now().toString(36)}${Math.random()
+          .toString(36)
+          .slice(2, 6)}_`;
+        let ridCounter = 0;
+        // Clear stale rids from previous observes on this frame so the
+        // attribute set never accumulates across long-lived SPA sessions
+        // and stale snapshot refs can't silently resolve to mis-rendered
+        // elements (review feedback on PR #19).
+        for (const stale of document.querySelectorAll("[data-vortex-rid]")) {
+          stale.removeAttribute("data-vortex-rid");
+        }
+
         const INTERACTIVE_SELECTORS = [
           "button",
           "a[href]",
@@ -308,7 +328,30 @@ async function scanOneFrame(
             cur = parent;
             depth++;
           }
-          return parts.join(" > ");
+          const sel = parts.join(" > ");
+          // Path may collide with sibling structures (Element Plus v-for
+          // groups, repeated table rows, etc.). When ambiguous, stamp the
+          // element with a unique data-vortex-rid attribute and return
+          // that — guarantees a 1:1 selector for downstream act/extract.
+          if (document.querySelectorAll(sel).length > 1) {
+            const rid = ridPrefix + ridCounter++;
+            try {
+              el.setAttribute("data-vortex-rid", rid);
+              return `[data-vortex-rid="${rid}"]`;
+            } catch (err) {
+              // setAttribute can throw on non-Element nodes or sandboxed
+              // shadows; fall through to the (still-ambiguous) path so
+              // the runtime gets a legible SELECTOR_AMBIGUOUS instead of
+              // crashing the scan. Surface the failure to console so it
+              // shows up in vortex_debug_read instead of disappearing.
+              try {
+                console.warn("[vortex] data-vortex-rid stamp failed", err);
+              } catch {
+                // console may itself be sandboxed; ignore.
+              }
+            }
+          }
+          return sel;
         }
 
         function describeElement(el: Element): string {
@@ -369,7 +412,99 @@ async function scanOneFrame(
           return Object.keys(s).length > 0 ? s : undefined;
         }
 
-        const nodeList = document.querySelectorAll(INTERACTIVE_SELECTORS);
+        // BUG-2: filter='all' previously was a dead parameter — server.ts
+        // forwarded it but the handler never read args.filter, so the public
+        // schema's promise of "non-interactive elements too" silently
+        // degraded to the interactive whitelist. Honor it now by appending
+        // structural roles that table-heavy pages expose (rows / cells /
+        // column headers) so LLMs can reference data grid coordinates.
+        const TABLE_EXTRA_SELECTORS =
+          "tr,td,th,[role=row],[role=cell],[role=columnheader],[role=rowheader],[role=gridcell]";
+        const ROOT_SELECTORS =
+          filter === "all"
+            ? `${INTERACTIVE_SELECTORS},${TABLE_EXTRA_SELECTORS}`
+            : INTERACTIVE_SELECTORS;
+        const nodeList = document.querySelectorAll(ROOT_SELECTORS);
+
+        // BUG-1: cursor:pointer fallback for custom interactive elements.
+        // bytenew / Element Plus / Ant Design 等中文 SaaS 框架普遍用
+        // <li/div cursor:pointer @click=...> 而非原生 button / [role=button]，
+        // 静态白名单完全捕获不到。事件挂在 Vue/React vnode 层，元素本身
+        // 没 onclick 也没 framework key，所以走 computed style 兜底。
+        const interactiveSet = new Set<Element>(Array.from(nodeList));
+        // Sweep all elements (Vue/React UI libs frequently use custom
+        // tags like <el-button> / <a-link> / <van-cell> for interactive
+        // widgets — bytenew testc 行操作 link is <el-button> not <div>),
+        // skipping svg internals + non-rendered tags for perf.
+        const fallbackPool = document.querySelectorAll(
+          "*:not(svg *):not(script):not(style):not(meta):not(link):not(head):not(head *)",
+        );
+        const FALLBACK_CAP = 5000; // hard ceiling against pathological pages
+        const docRoot = document.documentElement;
+        const docBody = document.body;
+        const cursorPointerExtras: Element[] = [];
+        for (const el of Array.from(fallbackPool)) {
+          if (cursorPointerExtras.length >= FALLBACK_CAP) break;
+          if (interactiveSet.has(el)) continue;
+          // Skip <html> / <body> — a SPA setting cursor:pointer on the root
+          // (e.g. global drag layer) would otherwise pull the entire page
+          // text in as a single candidate.
+          if (el === docRoot || el === docBody) continue;
+          // Skip wrappers that already contain a real interactive child —
+          // we don't want both the <li> and the <button> inside it.
+          // (Use INTERACTIVE_SELECTORS, not the table-extended set, so
+          // table cells with cursor:pointer still get collected when
+          // filter='all'.)
+          if (el.querySelector(INTERACTIVE_SELECTORS)) continue;
+          const htmlEl = el as HTMLElement;
+          if (htmlEl.offsetWidth === 0 || htmlEl.offsetHeight === 0) continue;
+          if (getComputedStyle(htmlEl).cursor !== "pointer") continue;
+          // Use textContent for the gate check — innerText forces layout
+          // and we only need the gate decision here. The accessible name
+          // for output goes through getAccessibleName later, which already
+          // pays the layout cost only on candidates that survive.
+          const probe = (
+            el.getAttribute("aria-label") ||
+            el.textContent ||
+            ""
+          )
+            .trim()
+            .slice(0, 100);
+          // Require a name to avoid noise from purely decorative
+          // cursor:pointer wrappers (e.g. close-button icons handled by
+          // event delegation but visually rendered as bare divs).
+          if (!probe) continue;
+          cursorPointerExtras.push(el);
+        }
+        // Leaf-only: bytenew sidebar (and many Element Plus components)
+        // nest cursor:pointer over 3-4 levels (li → div → div → div with
+        // text), and emitting every level burns the maxElements budget on
+        // duplicates. Prefer the innermost candidate — it's closest to
+        // the actual click target and downstream act will event-bubble
+        // to ancestors anyway.
+        // Walk parents once per candidate (O(N·depth)) instead of the
+        // O(N²) `el.contains(other)` cross-product the original implementation
+        // used (review feedback on PR #19).
+        const candidateSet = new Set<Element>(cursorPointerExtras);
+        const isAncestorOfCandidate = new WeakSet<Element>();
+        for (const el of cursorPointerExtras) {
+          let p: Element | null = el.parentElement;
+          while (p) {
+            if (candidateSet.has(p)) {
+              isAncestorOfCandidate.add(p);
+              break; // chain marked; deeper ancestors handled when reached
+            }
+            p = p.parentElement;
+          }
+        }
+        const cursorPointerLeaves = cursorPointerExtras.filter(
+          (el) => !isAncestorOfCandidate.has(el),
+        );
+        const allCandidates: Element[] = [
+          ...Array.from(nodeList),
+          ...cursorPointerLeaves,
+        ];
+
         const elements: Array<{
           index: number;
           tag: string;
@@ -384,7 +519,7 @@ async function scanOneFrame(
           _sel: string;
         }> = [];
 
-        for (const el of Array.from(nodeList)) {
+        for (const el of allCandidates) {
           if (elements.length >= max) break;
           const htmlEl = el as HTMLElement;
           const rect = htmlEl.getBoundingClientRect();
@@ -429,6 +564,30 @@ async function scanOneFrame(
           const role = withAX ? getRole(htmlEl) : htmlEl.tagName.toLowerCase();
           const name = withText ? getAccessibleName(htmlEl) : "";
 
+          // BUG-3: in filter='interactive' mode, drop wrappers that the
+          // selector caught structurally but carry no semantic info —
+          // typically Element Plus el-popover__reference triggers
+          // (`<div tabindex="0">` with no role / aria-label / text). On
+          // bytenew testc this produced 3 phantom `[div]` entries on the
+          // main frame that LLMs could not interpret.
+          if (filter === "interactive") {
+            const tag = htmlEl.tagName.toLowerCase();
+            // `a` only counts as form-like when it has href — the
+            // INTERACTIVE_SELECTORS whitelist also requires `a[href]`,
+            // so a bare nameless <a> from the cursor:pointer fallback
+            // shouldn't bypass the noise filter (review feedback on PR #19).
+            const formLike =
+              tag === "input" ||
+              tag === "select" ||
+              tag === "textarea" ||
+              tag === "button" ||
+              (tag === "a" && htmlEl.hasAttribute("href"));
+            const hasExplicitRole =
+              !!htmlEl.getAttribute("role") ||
+              !!htmlEl.getAttribute("aria-label");
+            if (!formLike && !hasExplicitRole && !name) continue;
+          }
+
           // 这里的 index 是 frame 内局部 id，observer handler 侧重编全局 index
           const state = getUiState(htmlEl);
           elements.push({
@@ -461,16 +620,17 @@ async function scanOneFrame(
             scrollHeight: document.documentElement.scrollHeight,
           },
           elements,
-          candidateCount: nodeList.length,
+          candidateCount: allCandidates.length,
           truncated: elements.length >= max,
         };
       },
-      args: [maxElements, viewport, includeText, includeAX],
+      args: [maxElements, viewport, includeText, includeAX, filterMode],
       world: "MAIN",
     });
     return (results[0]?.result as FramePageResult | undefined) ?? null;
-  } catch {
+  } catch (err) {
     // 跨源 iframe 无权限 / frame 已销毁：不 throw，返回 null 让上层标记为未扫
+    console.warn(`[vortex.scanOneFrame] failed fid=${frameId} err=`, err);
     return null;
   }
 }
@@ -490,6 +650,11 @@ export function registerObserveHandlers(router: ActionRouter): void {
       const includeText = (args.includeText as boolean | undefined) ?? true;
       const includeAX = (args.includeAX as boolean | undefined) ?? true;
       const format = (args.format as "compact" | "full" | undefined) ?? "full";
+      // BUG-2: filter was a dead parameter — public schema exposed
+      // ['interactive','all'] but the handler never read it. 'all' now
+      // also collects table rows / cells / column headers.
+      const filterMode =
+        (args.filter as "interactive" | "all" | undefined) ?? "interactive";
 
       const frameTargets = await resolveTargetFrames(tid, explicitFrameId, framesParam);
       if (frameTargets.length === 0) {
@@ -517,7 +682,11 @@ export function registerObserveHandlers(router: ActionRouter): void {
           viewport,
           includeText,
           includeAX,
+          filterMode,
         );
+        if (page === null) {
+          console.warn(`[vortex.observe] scanOneFrame null fid=${f.frameId} url=${f.url}`);
+        }
         scans.push({
           frameId: f.frameId,
           url: f.url,
