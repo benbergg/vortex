@@ -37,8 +37,8 @@ const def: CaseDefinition = {
     const title = extractText(await ctx.call("vortex_extract", { target: ".modal-title" }));
     ctx.assert(/商品评价/.test(title), `modal title 应含 "商品评价"，实际 ${title}`);
 
-    // close icon 应被 vortex 收（cursor:pointer + 单字符 ×）
-    ctx.assert(/×/.test(snap2), `observe 应含 close icon "×"：${snap2.slice(0, 600)}`);
+    // close icon (svg-only) 通过 P3 icon-only fallback 收为 name="closeIcon"
+    ctx.assert(/closeIcon/.test(snap2), `observe 应含 close icon name="closeIcon"：${snap2.slice(0, 600)}`);
 
     // 验证至少能识别 sort buttons（最新 / 当前商品 — 这些是 div 文本无 inner span）
     ctx.assert(/最新/.test(snap2), `observe 应含 "最新" 排序`);

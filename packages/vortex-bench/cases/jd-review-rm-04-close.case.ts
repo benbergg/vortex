@@ -17,23 +17,22 @@ const def: CaseDefinition = {
     await ctx.call("vortex_act", { target: triggerRef!, action: "click" });
     await new Promise((r) => setTimeout(r, 500));
 
-    // 弹窗已开（observe 应见 close icon ×）
+    // 弹窗已开（observe 应见 close icon name="closeIcon"）
     const sOpen = extractText(await ctx.call("vortex_observe", {}));
-    ctx.assert(/×/.test(sOpen), `弹窗未打开（observe 不含 close ×）：${sOpen.slice(0, 300)}`);
+    ctx.assert(/closeIcon/.test(sOpen), `弹窗未打开（observe 不含 closeIcon）：${sOpen.slice(0, 300)}`);
 
-    // 主路径：close icon click —— vortex 把 div+cursor:pointer "×" 收为 ref
-    // 注意 v0.7 bug：vortex_extract 不过滤 display:none 隐藏文本（修订诚实版的发现），
-    // 所以关闭验证用 observe 看是否还能拿到弹窗内 tag/close ref。
+    // P3 fix: close icon 是 div+cursor:pointer + svg-only（无文本无 aria-label），
+    // icon-only fallback 从 class 抽取 "closeIcon" 作 name → ref 可被找到
     const s2 = extractText(await ctx.call("vortex_observe", {}));
-    const closeMatch = s2.match(/(@\w+)\s+\[\w+\]\s+"×"/);
-    ctx.assert(closeMatch !== null, `应找到 close icon "×" ref：${s2.slice(0, 500)}`);
+    const closeMatch = s2.match(/(@\w+)\s+\[\w+\]\s+"closeIcon"/);
+    ctx.assert(closeMatch !== null, `P3 fix 应让 close icon (svg-only) 被收集 name="closeIcon"：${s2.slice(0, 500)}`);
     await ctx.call("vortex_act", { target: closeMatch![1], action: "click" });
     await new Promise((r) => setTimeout(r, 400));
 
     // observe 过滤 hidden 元素：关闭后 modal 内 ref 应都不再出现
     const s3 = extractText(await ctx.call("vortex_observe", {}));
     ctx.recordMetric("afterCloseObsBytes", s3.length);
-    ctx.assert(!/×/.test(s3), `observe 仍含 × close icon，弹窗未关闭：${s3.slice(0, 400)}`);
+    ctx.assert(!/closeIcon/.test(s3), `observe 仍含 closeIcon，弹窗未关闭：${s3.slice(0, 400)}`);
     ctx.assert(!/200\+/.test(s3), `observe 仍含弹窗内 tag，弹窗未关闭`);
     ctx.recordMetric("closeIconClickWorked", 1);
 
@@ -43,7 +42,7 @@ const def: CaseDefinition = {
     await ctx.call("vortex_press", { key: "Escape" });
     await new Promise((r) => setTimeout(r, 300));
     const s4 = extractText(await ctx.call("vortex_observe", {}));
-    const escapeWorked = !/×/.test(s4);
+    const escapeWorked = !/closeIcon/.test(s4);
     ctx.recordMetric("escapeKeyWorked", escapeWorked ? 1 : 0);
   },
 };

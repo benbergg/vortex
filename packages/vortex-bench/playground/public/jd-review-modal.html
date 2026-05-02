@@ -78,8 +78,14 @@
     <div class="jdc-page-overlay _rateListBox_1ygkr_1" id="modal-box">
       <div class="modal-header">
         <div class="modal-title">商品评价</div>
-        <!-- 故意：div + cursor:pointer，无 role 无 button，无 aria-label —— 测 vortex cursor:pointer fallback -->
-        <div class="_closeIcon_1ygkr_39" id="close-icon">×</div>
+        <!-- 故意：div + cursor:pointer + 仅含 svg（无文本无 aria-label）——
+             复刻 JD 真站 close icon 形态，测 cursor:pointer fallback 的
+             icon-only fallback（从 className 提取 closeIcon segment 作 name）-->
+        <div class="_closeIcon_1ygkr_39" id="close-icon">
+          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M1 1 L13 13 M13 1 L1 13" stroke="currentColor" stroke-width="2" fill="none"/>
+          </svg>
+        </div>
       </div>
 
       <!-- 关键词 tag 组（5 个） -->

@@ -13,6 +13,7 @@
 - **P0 — `vortex_extract` 不过滤 hidden 文本**（`packages/extension/src/handlers/content.ts`）。Chrome `el.innerText` 在 `display:none` 元素上仍返回 textContent，违反 schema "Extract visible text" 描述。RM-04 fixture 用 extract 验证 modal 关闭曾返回 hidden 全部内容。修：getText 显式 ancestor 链检查 `display:none` / `visibility:hidden` / `[hidden]`，hidden 时返回 `""`。
 - **P1 — observe leaf-only filter 拆碎嵌套 cursor:pointer**（`packages/extension/src/handlers/observe.ts`）。`<div>差评<span>200+</span></div>` 形态原本只输出 `[span] "200+"`，主标签"差评"丢失。修：异文本时（ancestor 文本严格大于 leaf 且包含 leaf 子串）保留 ancestor，同文本时（嵌套同名 wrapper 链）保留 leaf。testc menuitem 同名嵌套 + JD 标签 dual-pattern 双向兼容。
 - **P2 — `vortex_act(scroll)` L4 facade 屏蔽 container/position**（`packages/mcp/src/tools/dispatch.ts`）。dispatch 把 value 整体当作 `next.value` 透传，但 `dom.scroll` handler 直接读 `args.container/args.position/args.x/args.y`。修：scroll 时 value 是参数对象 → spread 到 args，且 strip `selector/target/index`（server.ts 已把 `target` 翻译成 `selector`，必须移除否则 dom.scroll 走 sel 分支 scrollIntoView 屏蔽 container/position）。fixture + 真站 fixture scrollTop 0→473 验证通过。
+- **P3 — Icon-only cursor:pointer 元素漏识别**（`packages/extension/src/handlers/observe.ts`）。`<div class="_closeIcon"><svg/></div>` 形态（JD close icon / 各种 svg button），无文本、无 aria-label，cursor:pointer fallback 的 textContent gate 直接 skip。修：当元素仅含 svg/img 子（或 `<i>` 标签）+ 无文本无 aria-label 时，从 className 提取首个 CSS Modules segment（`_closeIcon_1ygkr_39` → `closeIcon`）作为 name；`getAccessibleName` 同步加最终 fallback。
 
 ### ✨ Added
 

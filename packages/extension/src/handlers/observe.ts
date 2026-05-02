@@ -263,7 +263,23 @@ async function scanOneFrame(
             const content = el.querySelector(":scope > .el-tree-node__content") as HTMLElement | null;
             if (content) return (content.innerText || "").trim().slice(0, 80);
           }
-          return (el.innerText || "").trim().slice(0, 80);
+          const text = (el.innerText || "").trim().slice(0, 80);
+          if (text) return text;
+          // Icon-only fallback：仅 svg/img 子无文本时，从 class 提取人类可读 segment
+          // （CSS Modules 形态 `_closeIcon_1ygkr_39` → `closeIcon`）。让 LLM 至少
+          // 看到 close/menu/back 等动作含义。
+          if (el.querySelector("svg, img") || el.tagName === "I") {
+            const cls = (el.className && typeof el.className === "string") ? el.className : "";
+            for (const c of cls.split(/\s+/).filter(Boolean)) {
+              const m = c.match(/^_?([a-zA-Z][a-zA-Z0-9_-]{2,})/);
+              if (m && m[1]) {
+                const cleaned = m[1].replace(/_[a-z0-9]{4,}_\d+$/i, "")
+                                    .replace(/_[a-z0-9]{4,}$/i, "");
+                if (cleaned.length >= 3) return cleaned;
+              }
+            }
+          }
+          return "";
         }
 
         // Pre-index aria-label occurrences once per snapshot so buildSelector
@@ -463,13 +479,25 @@ async function scanOneFrame(
           // and we only need the gate decision here. The accessible name
           // for output goes through getAccessibleName later, which already
           // pays the layout cost only on candidates that survive.
-          const probe = (
-            el.getAttribute("aria-label") ||
-            el.textContent ||
-            ""
-          )
-            .trim()
-            .slice(0, 100);
+          const textProbe = (el.textContent || "").trim().slice(0, 100);
+          const ariaProbe = (el.getAttribute("aria-label") || "").trim();
+          let probe = ariaProbe || textProbe;
+          // Icon-only fallback：cursor:pointer + 仅 svg/img 子（无文本无 aria-label）
+          // —— 典型 close button / menu icon 场景。从 class 提取首个 CSS Modules
+          // segment 作为 name（如 `_closeIcon_1ygkr_39` → `closeIcon`）让 LLM 至少
+          // 看到有意义的标识符。className 拿不到时跳过（保持原行为）。
+          if (!probe && (el.querySelector("svg, img") || el.tagName === "I")) {
+            const cls = (el.className && typeof el.className === "string") ? el.className : "";
+            for (const c of cls.split(/\s+/).filter(Boolean)) {
+              const m = c.match(/^_?([a-zA-Z][a-zA-Z0-9_-]{2,})/);
+              if (m && m[1]) {
+                // 去掉末尾纯哈希（CSS Modules 后缀如 _1ygkr_39）
+                const cleaned = m[1].replace(/_[a-z0-9]{4,}_\d+$/i, "")
+                                    .replace(/_[a-z0-9]{4,}$/i, "");
+                if (cleaned.length >= 3) { probe = cleaned; break; }
+              }
+            }
+          }
           // Require a name to avoid noise from purely decorative
           // cursor:pointer wrappers (e.g. close-button icons handled by
           // event delegation but visually rendered as bare divs).
