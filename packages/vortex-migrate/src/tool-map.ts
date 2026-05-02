@@ -54,6 +54,14 @@ export interface ToolMapEntry {
   /** True when v06 is set but caller may need to revisit (semantic drift). */
   partial?: boolean;
   partialNote?: string;
+  /**
+   * Emit a warning ONLY when the original args object literal contains this
+   * key. Used for tools that change dispatch path based on a specific knob
+   * (e.g. v0.5 vortex_fill routed to dom.commit when `kind` was present, but
+   * v0.6 vortex_act+action=fill always routes to dom.fill regardless of kind).
+   * Plain calls without that key migrate cleanly and stay silent.
+   */
+  conditionalPartial?: { key: string; note: string };
 }
 
 export const TOOL_MAP: Record<string, ToolMapEntry> = {
@@ -68,7 +76,15 @@ export const TOOL_MAP: Record<string, ToolMapEntry> = {
   // ── act (5) ────────────────────────────────────────────────────
   vortex_click: { v06: "vortex_act", rewrites: [{ op: "set", key: "action", value: "click" }] },
   vortex_type: { v06: "vortex_act", rewrites: [{ op: "set", key: "action", value: "type" }] },
-  vortex_fill: { v06: "vortex_act", rewrites: [{ op: "set", key: "action", value: "fill" }] },
+  vortex_fill: {
+    v06: "vortex_act",
+    rewrites: [{ op: "set", key: "action", value: "fill" }],
+    conditionalPartial: {
+      key: "kind",
+      note:
+        "v0.5 vortex_fill with kind=X routed to dom.commit (compound widget driver). v0.6 vortex_act+action=fill always uses dom.fill, dropping kind dispatch — date/range pickers, multi-select compound widgets need manual review (no v0.6 equivalent yet)",
+    },
+  },
   vortex_select: { v06: "vortex_act", rewrites: [{ op: "set", key: "action", value: "select" }] },
   vortex_hover: { v06: "vortex_act", rewrites: [{ op: "set", key: "action", value: "hover" }] },
 

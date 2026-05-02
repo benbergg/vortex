@@ -125,6 +125,15 @@ export function transformSource(input: string, opts: TransformOptions = {}): Mig
     if (entry.partial && entry.partialNote) {
       warnings.push({ line, tool: nameVal, reason: `${nameVal} → ${entry.v06}: ${entry.partialNote}` });
     }
+    if (entry.conditionalPartial && j.ObjectExpression.check(argsValue)) {
+      const cp = entry.conditionalPartial;
+      const hasKey = (argsValue as ObjectExpression).properties.some((p) =>
+        propHasKey(p as AnyProp, cp.key),
+      );
+      if (hasKey) {
+        warnings.push({ line, tool: nameVal, reason: `${nameVal} → ${entry.v06} (with ${cp.key}=...): ${cp.note}` });
+      }
+    }
     rewrites++;
   });
 
@@ -183,6 +192,15 @@ export function transformSource(input: string, opts: TransformOptions = {}): Mig
 
     if (entry.partial && entry.partialNote) {
       warnings.push({ line, tool: nameVal, reason: `${nameVal} → ${entry.v06}: ${entry.partialNote}` });
+    }
+    if (entry.conditionalPartial && j.ObjectExpression.check(argsNode as never)) {
+      const cp = entry.conditionalPartial;
+      const hasKey = (argsNode as ObjectExpression).properties.some((p) =>
+        propHasKey(p as AnyProp, cp.key),
+      );
+      if (hasKey) {
+        warnings.push({ line, tool: nameVal, reason: `${nameVal} → ${entry.v06} (with ${cp.key}=...): ${cp.note}` });
+      }
     }
     rewrites++;
   });

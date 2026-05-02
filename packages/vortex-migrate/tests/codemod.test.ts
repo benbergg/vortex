@@ -176,6 +176,40 @@ describe("transformSource — targeted reshapes", () => {
     expect(r.changed).toBe(false);
   });
 
+  it("rewrites ctx.call with 3+ args (only first/second args touched)", () => {
+    const input = `await ctx.call("vortex_click", { target: "@e2" }, { extra: true });`;
+    const r = transformSource(input);
+    expect(r.changed).toBe(true);
+    expect(r.source).toContain('"vortex_act"');
+    expect(r.source).toContain('action: "click"');
+    // 3rd arg untouched
+    expect(r.source).toContain("{ extra: true }");
+  });
+
+  // ── conditionalPartial: vortex_fill kind dispatch loss (v0.7.3) ─────────
+  it("warns on vortex_fill with kind= about dom.commit dispatch loss", () => {
+    const input = `await ctx.call("vortex_fill", { target: ".x", kind: "daterange", value: { start: "2024-01-01", end: "2024-12-31" } });`;
+    const r = transformSource(input);
+    expect(r.changed).toBe(true);
+    expect(r.source).toContain('"vortex_act"');
+    expect(r.warnings.some((w) => w.tool === "vortex_fill" && /kind=\.\.\./.test(w.reason))).toBe(true);
+  });
+
+  it("does NOT warn on plain vortex_fill without kind", () => {
+    const input = `await ctx.call("vortex_fill", { target: ".x", value: "hello" });`;
+    const r = transformSource(input);
+    expect(r.changed).toBe(true);
+    expect(r.source).toContain('"vortex_act"');
+    expect(r.warnings.length).toBe(0);
+  });
+
+  it("warns on vortex_fill kind in ObjectExpression form (client.callTool)", () => {
+    const input = `client.callTool({ name: "vortex_fill", arguments: { kind: "select-multiple", value: ["A"] } });`;
+    const r = transformSource(input);
+    expect(r.changed).toBe(true);
+    expect(r.warnings.some((w) => w.tool === "vortex_fill")).toBe(true);
+  });
+
   it("warns on indirect tool name (variable) but does not rewrite", () => {
     const input = [
       `const tool = "vortex_click";`,
