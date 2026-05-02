@@ -167,23 +167,28 @@ describe("dispatchNewTool", () => {
   // v0.7.1 P2 fix: vortex_act(scroll) value 是参数对象而非数据值
   it("vortex_act(scroll, value={container, position}) 把 value spread 到 args", () => {
     const { action, params } = dispatchNewTool("vortex_act", {
+      target: "body",
       action: "scroll",
       value: { container: ".scroll-box", position: "bottom" },
     })!;
     expect(action).toBe("dom.scroll");
     expect(params.container).toBe(".scroll-box");
     expect(params.position).toBe("bottom");
+    // target 必须被 strip，否则底层 dom.scroll 走 scrollIntoView 屏蔽 container/position
+    expect(params).not.toHaveProperty("target");
     // value 字段不应再透传（避免底层误读）
     expect(params).not.toHaveProperty("value");
   });
 
-  it("vortex_act(scroll, value={x, y}) 同样 spread", () => {
+  it("vortex_act(scroll, value={x, y}) 同样 spread + strip target", () => {
     const { params } = dispatchNewTool("vortex_act", {
+      target: "body",
       action: "scroll",
       value: { x: 100, y: 500 },
     })!;
     expect(params.x).toBe(100);
     expect(params.y).toBe(500);
+    expect(params).not.toHaveProperty("target");
     expect(params).not.toHaveProperty("value");
   });
 
