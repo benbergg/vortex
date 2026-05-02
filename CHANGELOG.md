@@ -4,6 +4,26 @@
 
 ---
 
+## [Unreleased] - v0.7 dogfood batch
+
+### 🐛 Fixed (observe scanner overhaul, PR #19)
+
+通过 testc.bytenew.com 严谨对照 Playwright 评测发现的四个 observe scanner bug，集中在 `fix/v0.7-dogfood-batch` 一次修完。
+
+- **Bug 1** — `cursor:pointer` 自定义可点元素漏识别。`INTERACTIVE_SELECTORS` 静态白名单不含 fallback，bytenew sidebar 7 menuitem + 行操作 40 个 `<el-button>` 全漏。修：page-side scanner 加二次扫 `*:not(svg *):not(script):not(style):not(meta):not(link):not(head):not(head *)`，过滤 visible + cursor:pointer + 有 name + 排除 INTERACTIVE_SELECTORS wrapper + leaf-only（O(N·depth) ancestor walk）+ 候选数硬上限 5000。
+- **Bug 2** — `filter='all'` 是 dead parameter。公开 schema 暴露 `interactive | all` 但 handler 不读 `args.filter`，输出 byte-identical。修：handler 顶部读 args.filter（默认 `'interactive'`）→ scanOneFrame 透传 page-side；'all' 模式 selector union 加 `tr,td,th,[role=row|cell|columnheader|rowheader|gridcell]`。注意：'all' 仅扩展表格类结构语义，不是字面"任意元素"。
+- **Bug 3** — 主 frame 输出 nameless `[div]` noise。Element Plus `el-popover__reference` 命中 `[tabindex]:not([tabindex='-1'])` 但无 role / 无 aria-label / 无 innerText。修：filter='interactive' 模式后置过滤——非 form-like 元素（input / select / textarea / button / `a[href]`）必须有 role / aria-label / name 之一。
+- **Bug 4** — ref-based `vortex_act` 在重复 v-for 结构上 `SELECTOR_AMBIGUOUS`。`@fNeM` ref 翻译退化为 selector lookup，bytenew 3 个同结构 checkbox-group 让 `nth-of-type` path 必中两个元素。修：`buildSelector` path 失唯一时 `setAttribute('data-vortex-rid', '<unique>')` 返回 `[data-vortex-rid="..."]` 精确身份。**每次 observe 入口先 `removeAttribute` 旧 rid**，避免长 SPA 会话累积。
+
+### 💥 Behavior changes（不动公开 schema 但语义变化）
+
+- `vortex_observe(filter='all')` 现在真返回更多元素；调用方若依赖 `'all' === 'interactive'` 的旧行为需调整。
+- `vortex_observe(filter='interactive')` 不再输出无 role / 无 name 的 `[tabindex]` 容器；如果旧 LLM prompt 依赖 phantom `[div]` 数量校准，需重新核对。
+- `cursor:pointer` 启发式新增大量自定义元素到候选集（含 `<el-button>` 等），单次 observe 输出元素数显著增加（leaf-only filter 已尽量去重）。
+- 重复结构页面的 `ScannedElement._sel` 字段在 ambiguous 时为 `[data-vortex-rid="..."]`，**`data-vortex-rid` 是 vortex 保留的 DOM attribute（业务请勿使用）**。
+
+---
+
 ## [0.6.0] - 2026-05-01
 
 ### 💥 BREAKING CHANGES

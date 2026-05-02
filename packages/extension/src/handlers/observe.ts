@@ -160,14 +160,21 @@ async function scanOneFrame(
       ) => {
         // Per-observe rid prefix used as identity fallback when buildSelector
         // can't produce a page-unique CSS selector (e.g. Element Plus v-for
-        // groups with identical inner DOM — bytenew testc dogfood Bug 4).
-        // Ambiguous elements are stamped with `data-vortex-rid` so the @fNeM
-        // ref system resolves them by identity instead of degrading to a
-        // querySelectorAll path that matches multiple siblings.
+        // groups with identical inner DOM). Ambiguous elements are stamped
+        // with `data-vortex-rid` so the @fNeM ref system resolves them by
+        // identity instead of degrading to a path that matches multiple
+        // siblings.
         const ridPrefix = `vtx${Date.now().toString(36)}${Math.random()
           .toString(36)
           .slice(2, 6)}_`;
         let ridCounter = 0;
+        // Clear stale rids from previous observes on this frame so the
+        // attribute set never accumulates across long-lived SPA sessions
+        // and stale snapshot refs can't silently resolve to mis-rendered
+        // elements (review feedback on PR #19).
+        for (const stale of document.querySelectorAll("[data-vortex-rid]")) {
+          stale.removeAttribute("data-vortex-rid");
+        }
 
         const INTERACTIVE_SELECTORS = [
           "button",
@@ -331,11 +338,17 @@ async function scanOneFrame(
             try {
               el.setAttribute("data-vortex-rid", rid);
               return `[data-vortex-rid="${rid}"]`;
-            } catch {
+            } catch (err) {
               // setAttribute can throw on non-Element nodes or sandboxed
               // shadows; fall through to the (still-ambiguous) path so
               // the runtime gets a legible SELECTOR_AMBIGUOUS instead of
-              // crashing the scan.
+              // crashing the scan. Surface the failure to console so it
+              // shows up in vortex_debug_read instead of disappearing.
+              try {
+                console.warn("[vortex] data-vortex-rid stamp failed", err);
+              } catch {
+                // console may itself be sandboxed; ignore.
+              }
             }
           }
           return sel;
@@ -426,9 +439,17 @@ async function scanOneFrame(
         const fallbackPool = document.querySelectorAll(
           "*:not(svg *):not(script):not(style):not(meta):not(link):not(head):not(head *)",
         );
+        const FALLBACK_CAP = 5000; // hard ceiling against pathological pages
+        const docRoot = document.documentElement;
+        const docBody = document.body;
         const cursorPointerExtras: Element[] = [];
         for (const el of Array.from(fallbackPool)) {
+          if (cursorPointerExtras.length >= FALLBACK_CAP) break;
           if (interactiveSet.has(el)) continue;
+          // Skip <html> / <body> — a SPA setting cursor:pointer on the root
+          // (e.g. global drag layer) would otherwise pull the entire page
+          // text in as a single candidate.
+          if (el === docRoot || el === docBody) continue;
           // Skip wrappers that already contain a real interactive child —
           // we don't want both the <li> and the <button> inside it.
           // (Use INTERACTIVE_SELECTORS, not the table-extended set, so
@@ -438,9 +459,13 @@ async function scanOneFrame(
           const htmlEl = el as HTMLElement;
           if (htmlEl.offsetWidth === 0 || htmlEl.offsetHeight === 0) continue;
           if (getComputedStyle(htmlEl).cursor !== "pointer") continue;
-          const name = (
+          // Use textContent for the gate check — innerText forces layout
+          // and we only need the gate decision here. The accessible name
+          // for output goes through getAccessibleName later, which already
+          // pays the layout cost only on candidates that survive.
+          const probe = (
             el.getAttribute("aria-label") ||
-            htmlEl.innerText ||
+            el.textContent ||
             ""
           )
             .trim()
@@ -448,7 +473,7 @@ async function scanOneFrame(
           // Require a name to avoid noise from purely decorative
           // cursor:pointer wrappers (e.g. close-button icons handled by
           // event delegation but visually rendered as bare divs).
-          if (!name) continue;
+          if (!probe) continue;
           cursorPointerExtras.push(el);
         }
         // Leaf-only: bytenew sidebar (and many Element Plus components)
@@ -457,13 +482,24 @@ async function scanOneFrame(
         // duplicates. Prefer the innermost candidate — it's closest to
         // the actual click target and downstream act will event-bubble
         // to ancestors anyway.
-        const cursorPointerLeaves = cursorPointerExtras.filter((el) => {
-          for (const other of cursorPointerExtras) {
-            if (other === el) continue;
-            if (el.contains(other)) return false; // ancestor of a candidate
+        // Walk parents once per candidate (O(N·depth)) instead of the
+        // O(N²) `el.contains(other)` cross-product the original implementation
+        // used (review feedback on PR #19).
+        const candidateSet = new Set<Element>(cursorPointerExtras);
+        const isAncestorOfCandidate = new WeakSet<Element>();
+        for (const el of cursorPointerExtras) {
+          let p: Element | null = el.parentElement;
+          while (p) {
+            if (candidateSet.has(p)) {
+              isAncestorOfCandidate.add(p);
+              break; // chain marked; deeper ancestors handled when reached
+            }
+            p = p.parentElement;
           }
-          return true;
-        });
+        }
+        const cursorPointerLeaves = cursorPointerExtras.filter(
+          (el) => !isAncestorOfCandidate.has(el),
+        );
         const allCandidates: Element[] = [
           ...Array.from(nodeList),
           ...cursorPointerLeaves,
@@ -536,12 +572,16 @@ async function scanOneFrame(
           // main frame that LLMs could not interpret.
           if (filter === "interactive") {
             const tag = htmlEl.tagName.toLowerCase();
+            // `a` only counts as form-like when it has href — the
+            // INTERACTIVE_SELECTORS whitelist also requires `a[href]`,
+            // so a bare nameless <a> from the cursor:pointer fallback
+            // shouldn't bypass the noise filter (review feedback on PR #19).
             const formLike =
               tag === "input" ||
               tag === "select" ||
               tag === "textarea" ||
               tag === "button" ||
-              tag === "a";
+              (tag === "a" && htmlEl.hasAttribute("href"));
             const hasExplicitRole =
               !!htmlEl.getAttribute("role") ||
               !!htmlEl.getAttribute("aria-label");
