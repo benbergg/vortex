@@ -4,6 +4,26 @@
 
 ---
 
+## [0.7.2] - 2026-05-02
+
+### ✨ Added
+
+- **`vortex-migrate` codemod**：识别 positional `ctx.call(name, args)` 形态。原 codemod 只匹配 MCP SDK shape `{name, arguments}`，导致 vortex-bench / 测试 helper / 内部 callers 用的 `ctx.call("vortex_X", {...})` 被静默跳过。新增 CallExpression pass：arg[0] 字符串字面量 + arg[1] 对象字面量 + 命中 TOOL_MAP 即应用同 rewrite/warn 逻辑。5 新测试，48 个 codemod 测试全过。
+
+### 🐛 Fixed
+
+- **`packages/vortex-bench/cases/_helpers.ts`**：`readResult` 用 legacy `vortex_get_text` 调用，被 L4 PR #11 移出公开 registry 后所有 `assertResultContains` 失败用 `Unknown tool: vortex_get_text` 字符串作 actual value，掩盖底层 state bug。改 `vortex_extract` + `include:["text"]`。
+- **`packages/vortex-bench/cases/*.case.ts` + `src/runner/run-case.ts`**：跑扩展后的 codemod 自动迁移 27 case 文件 + 1 runner 文件 共 77 个 legacy 工具调用（`vortex_click`/`vortex_fill`/`vortex_type`/`vortex_select`/`vortex_hover`/`vortex_wait_idle` 等）。bench `pnpm bench run --all` 24/37 ✓（v0.7.1 后 10/37 → +14 cases unblocked）。
+
+### 📋 Known issues / v0.7.x backlog
+
+剩余 13 个 fail case 拆 2 类：
+
+- **6 个 v0.6 真缺特性**（warn-only，codemod 无法迁）：el-slider-drag (`vortex_mouse_drag`)、el-upload (`vortex_file_upload`)、el-date-picker-{daterange,datetimerange} (`dom.commit kind` 未实现)、latency-p50 (`vortex_evaluate`)、el-slider（drag 类）。需 v0.6.x 决定是否在 L4 加对应 action。
+- **7 个 case 逻辑问题**：el-cascader / el-dialog-nested / el-form-composite / el-select-{single,multiple,v2,v2-virtual} —— 重命名工具后 case 内部 observe→click 流程需调整（多步交互、虚拟列表、级联），不是 codemod 缺陷。
+
+---
+
 ## [0.7.1] - 2026-05-02
 
 ### 🐛 Fixed (dogfood batch 2 — JD modal + testc residual noise)
