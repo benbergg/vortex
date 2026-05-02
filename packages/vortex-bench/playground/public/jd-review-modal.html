@@ -46,7 +46,7 @@
 
     .sort-row { display: flex; gap: 16px; margin: 12px 0; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
     ._sort_19gj1_22, ._skuSelect_19gj1_28 { cursor: pointer; user-select: none; font-size: 13px; color: #666; }
-    ._sort_19gj1_22.active, ._skuSelect_19gj1_28.active { color: #e1251b; font-weight: 600; }
+    ._sort_19gj1_22.is-active, ._skuSelect_19gj1_28.is-active { color: #e1251b; font-weight: 600; }
 
     /* 评价列表：内部滚动 container（关键测点） */
     ._rateListContainer_1ygkr_45 {
@@ -88,7 +88,7 @@
       <div class="tag-group" id="sentiment-tags"></div>
 
       <div class="sort-row">
-        <div class="_sort_19gj1_22 active" id="sort-latest">最新</div>
+        <div class="_sort_19gj1_22 is-active" id="sort-latest">最新</div>
         <div class="_skuSelect_19gj1_28" id="sort-current-sku">当前商品</div>
       </div>
 
@@ -227,17 +227,17 @@
       document.getElementById('rateList').classList.remove('visible');
     }
 
-    document.getElementById('trigger-all-btn').addEventListener('click', () => {
-      console.log('[fixture] trigger clicked');
-      showModal();
-    });
-    document.getElementById('close-icon').addEventListener('click', (e) => {
-      console.log('[fixture] close-icon clicked, target=', e.target.id || e.target.className, 'currentTarget=', e.currentTarget.id);
-      hideModal();
-    });
-    document.getElementById('modal-mask').addEventListener('click', () => {
-      console.log('[fixture] modal-mask clicked');
-      hideModal();
+    document.getElementById('trigger-all-btn').addEventListener('click', showModal);
+    document.getElementById('close-icon').addEventListener('click', hideModal);
+    document.getElementById('modal-mask').addEventListener('click', hideModal);
+
+    // sort 切换：互斥 is-active class
+    ['sort-latest', 'sort-current-sku'].forEach(id => {
+      document.getElementById(id).addEventListener('click', () => {
+        document.getElementById('sort-latest').classList.remove('is-active');
+        document.getElementById('sort-current-sku').classList.remove('is-active');
+        document.getElementById(id).classList.add('is-active');
+      });
     });
 
     // tag click 委托
