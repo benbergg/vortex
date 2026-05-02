@@ -4,11 +4,11 @@
 
 ---
 
-## [Unreleased] - v0.7.1 dogfood batch 2 (JD 评价弹窗)
+## [0.7.1] - 2026-05-02
 
-### 🐛 Fixed
+### 🐛 Fixed (dogfood batch 2 — JD modal + testc residual noise)
 
-通过京东商品评价弹窗 dogfood（10万+评价真站 + static HTML fixture）暴露的 3 个新 bug。
+通过京东商品评价弹窗（10万+评价真站 + static HTML fixture）和 testc.bytenew.com applet/VOC 双源 dogfood 暴露的 7 个 bug，集中收敛。testc 真站累计 ref 数 v0.7.0 baseline 148 → 125（**-16%**），LLM 噪声大幅下降。
 
 - **P0 — `vortex_extract` 不过滤 hidden 文本**（`packages/extension/src/handlers/content.ts`）。Chrome `el.innerText` 在 `display:none` 元素上仍返回 textContent，违反 schema "Extract visible text" 描述。RM-04 fixture 用 extract 验证 modal 关闭曾返回 hidden 全部内容。修：getText 显式 ancestor 链检查 `display:none` / `visibility:hidden` / `[hidden]`，hidden 时返回 `""`。
 - **P1 — observe leaf-only filter 拆碎嵌套 cursor:pointer**（`packages/extension/src/handlers/observe.ts`）。`<div>差评<span>200+</span></div>` 形态原本只输出 `[span] "200+"`，主标签"差评"丢失。修：异文本时（ancestor 文本严格大于 leaf 且包含 leaf 子串）保留 ancestor，同文本时（嵌套同名 wrapper 链）保留 leaf。testc menuitem 同名嵌套 + JD 标签 dual-pattern 双向兼容。
