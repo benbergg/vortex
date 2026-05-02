@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>JD 评价弹窗 fixture</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+    .product-page { max-width: 800px; margin: 0 auto; background: white; padding: 24px; border-radius: 8px; }
+    .product-page h1 { font-size: 22px; margin-top: 0; }
+    .all-btn {
+      display: inline-block; padding: 12px 32px; border: 1px solid #ccc; border-radius: 4px;
+      cursor: pointer; user-select: none; margin-top: 24px; background: #fff;
+    }
+    .all-btn:hover { border-color: #e1251b; color: #e1251b; }
+
+    /* portal 容器：要 fixed 顶层 + display none/flex 切换 */
+    #rateList { display: none; }
+    #rateList.visible { display: block; }
+    .jdc-page-overlay {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 950px; max-width: 95vw; height: 720px;
+      background: white; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      z-index: 1000; display: flex; flex-direction: column;
+    }
+    .mask {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 999;
+    }
+    ._rateListBox { padding: 24px; padding-top: 16px; }
+
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .modal-title { font-size: 18px; font-weight: 600; }
+    /* 关闭 X：div + cursor:pointer，无 role 无 aria-label —— 故意如此 */
+    ._closeIcon_1ygkr_39 {
+      cursor: pointer; user-select: none; font-size: 22px; line-height: 1; color: #666; padding: 4px 8px;
+    }
+
+    /* tag 组：keyword + sentiment 都是同 class，模拟 JD CSS Modules 输出 */
+    .tag-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    ._tag_rgt47_12 {
+      padding: 6px 14px; border: 1px solid #e0e0e0; border-radius: 14px; cursor: pointer;
+      font-size: 13px; user-select: none; background: #fafafa;
+    }
+    ._tag_rgt47_12:hover { border-color: #e1251b; }
+    ._tag-active_rgt47_31 { background: #fff0ee; border-color: #e1251b; color: #e1251b; }
+    ._tag-comment_rgt47_35 { color: #888; margin-left: 4px; font-size: 12px; }
+
+    .sort-row { display: flex; gap: 16px; margin: 12px 0; padding-bottom: 8px; border-bottom: 1px solid #f0f0f0; }
+    ._sort_19gj1_22, ._skuSelect_19gj1_28 { cursor: pointer; user-select: none; font-size: 13px; color: #666; }
+    ._sort_19gj1_22.active, ._skuSelect_19gj1_28.active { color: #e1251b; font-weight: 600; }
+
+    /* 评价列表：内部滚动 container（关键测点） */
+    ._rateListContainer_1ygkr_45 {
+      flex: 1; overflow-y: auto; padding-right: 8px;
+    }
+    ._listItem_1ygkr_73 {
+      padding: 16px 0; border-bottom: 1px solid #f0f0f0; font-size: 13px;
+      min-height: 90px;
+    }
+    ._listItem_1ygkr_73 .meta { color: #888; font-size: 12px; margin-bottom: 6px; }
+    ._listItem_1ygkr_73 .body { line-height: 1.5; color: #333; }
+    .merchant-reply {
+      margin-top: 8px; padding: 8px 12px; background: #f7f7f7; border-radius: 4px; color: #555; font-size: 12px;
+    }
+    .empty-hint { padding: 8px 0; color: #888; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="product-page">
+    <h1 data-testid="product-title">JD 评价弹窗 fixture（vortex dogfood）</h1>
+    <p>商品页 inline 评价区下方放置「全部评价」trigger，模拟 JD <code>.all-btn</code>。</p>
+    <p>累计评价：<span id="total-count">10万+</span></p>
+    <div class="all-btn" id="trigger-all-btn" data-testid="trigger-all">全部评价</div>
+  </div>
+
+  <!-- portal 容器：永远在 body 直接子级（模拟 JD #rateList） -->
+  <div id="rateList" data-testid="modal-portal">
+    <div class="mask" id="modal-mask"></div>
+    <div class="jdc-page-overlay _rateListBox_1ygkr_1" id="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">商品评价</div>
+        <!-- 故意：div + cursor:pointer，无 role 无 button，无 aria-label —— 测 vortex cursor:pointer fallback -->
+        <div class="_closeIcon_1ygkr_39" id="close-icon">×</div>
+      </div>
+
+      <!-- 关键词 tag 组（5 个） -->
+      <div class="tag-group" id="keyword-tags"></div>
+      <!-- sentiment tab 组（3 个，class 与上方完全相同） -->
+      <div class="tag-group" id="sentiment-tags"></div>
+
+      <div class="sort-row">
+        <div class="_sort_19gj1_22 active" id="sort-latest">最新</div>
+        <div class="_skuSelect_19gj1_28" id="sort-current-sku">当前商品</div>
+      </div>
+
+      <div class="_rateListContainer_1ygkr_45" id="review-scroll-container">
+        <div id="review-list"></div>
+        <div class="empty-hint" id="empty-hint" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ----- 数据集（每 tab 一组评价） -----
+    const REVIEWS = {
+      all: Array.from({length: 30}, (_, i) => ({
+        user: `u***${String.fromCharCode(97 + i % 26)}${i}`,
+        date: `04-${String((i % 28) + 1).padStart(2, '0')}`,
+        sku: '店铺爆款金奖顶芽卡盒100g',
+        text: `好评样本 #${i+1}：茶香扑鼻、汤色清澈、口感很赞，物流飞快。`,
+      })),
+      good: Array.from({length: 20}, (_, i) => ({
+        user: `g***${i}`,
+        date: `04-${String((i % 28) + 1).padStart(2, '0')}`,
+        sku: '店铺爆款金奖顶芽卡盒100g',
+        text: `5星好评 #${i+1}：超耐泡，叶底完整，性价比超高，强烈推荐。`,
+      })),
+      mid: Array.from({length: 8}, (_, i) => ({
+        user: `m***${i}`,
+        date: `03-${String((i % 28) + 1).padStart(2, '0')}`,
+        sku: '清明嫩尖卡盒100g',
+        text: `中评 #${i+1}：味道一般，包装还行，回购看价格。`,
+      })),
+      bad: Array.from({length: 5}, (_, i) => ({
+        user: `b***${i}`,
+        date: `02-${String((i % 28) + 1).padStart(2, '0')}`,
+        sku: '店铺爆款金奖顶芽卡盒100g',
+        text: `差评 #${i+1}：茶味偏淡，性价比不如预期。`,
+        reply: '商家：您好，您的反馈我们已记录，会改进出品。',
+      })),
+      photo: Array.from({length: 10}, (_, i) => ({
+        user: `p***${i}`,
+        date: `04-${String((i % 28) + 1).padStart(2, '0')}`,
+        sku: '清明嫩尖卡盒100g',
+        text: `图/视频评价 #${i+1}：附图展示包装精美。`,
+      })),
+    };
+
+    const KEYWORD_TAGS = [
+      { id: 'all', name: '全部', count: '96%好评' },
+      { id: 'photo', name: '图/视频', count: '5000+' },
+      { id: 'taste-good', name: '口感很赞', count: '723' },
+      { id: 'tea-fresh', name: '茶叶很新鲜', count: '61' },
+      { id: 'aroma', name: '茶香扑鼻', count: '118' },
+    ];
+    const SENTIMENT_TAGS = [
+      { id: 'good', name: '好评', count: '2万+' },
+      { id: 'mid', name: '中评', count: '500+' },
+      { id: 'bad', name: '差评', count: '200+' },
+    ];
+
+    let currentTab = 'all';
+    let renderedCount = 0;
+    const PAGE_SIZE = 4;
+    const INITIAL_BATCHES = 2; // 初始渲染 2 batches = 8 items，保证 container 溢出触发滚动
+
+    // ----- 渲染 -----
+    function renderTags() {
+      const kwGroup = document.getElementById('keyword-tags');
+      kwGroup.innerHTML = KEYWORD_TAGS.map(t =>
+        `<div class="_tag_rgt47_12 ${t.id === currentTab ? '_tag-active_rgt47_31' : ''}" data-tab-id="${t.id}">
+          ${t.name}<span class="_tag-comment_rgt47_35">${t.count}</span>
+        </div>`
+      ).join('');
+      const seGroup = document.getElementById('sentiment-tags');
+      seGroup.innerHTML = SENTIMENT_TAGS.map(t =>
+        `<div class="_tag_rgt47_12 ${t.id === currentTab ? '_tag-active_rgt47_31' : ''}" data-tab-id="${t.id}">
+          ${t.name}<span class="_tag-comment_rgt47_35">${t.count}</span>
+        </div>`
+      ).join('');
+    }
+
+    function dataForTab(tabId) {
+      // photo 是关键词 tag 中映射到 photo dataset；其它关键词归入 all
+      if (tabId === 'all' || tabId === 'good' || tabId === 'mid' || tabId === 'bad' || tabId === 'photo') {
+        return REVIEWS[tabId] ?? REVIEWS.all;
+      }
+      return REVIEWS.all;
+    }
+
+    function renderInitial() {
+      renderedCount = 0;
+      const list = document.getElementById('review-list');
+      list.innerHTML = '';
+      const data = dataForTab(currentTab);
+      const empty = document.getElementById('empty-hint');
+      if (data.length === 0) {
+        empty.textContent = '此类评价较少，建议查看其他分类。';
+        empty.style.display = 'block';
+      } else {
+        empty.style.display = 'none';
+      }
+      for (let i = 0; i < INITIAL_BATCHES; i++) appendBatch();
+      // 重置滚动
+      document.getElementById('review-scroll-container').scrollTop = 0;
+    }
+
+    function appendBatch() {
+      const data = dataForTab(currentTab);
+      const list = document.getElementById('review-list');
+      const start = renderedCount;
+      const end = Math.min(start + PAGE_SIZE, data.length);
+      for (let i = start; i < end; i++) {
+        const r = data[i];
+        const div = document.createElement('div');
+        div.className = '_listItem_1ygkr_73';
+        div.dataset.testid = `review-item-${i}`;
+        div.innerHTML = `
+          <div class="meta">${r.user} | ${r.date} | ${r.sku}</div>
+          <div class="body">${r.text}</div>
+          ${r.reply ? `<div class="merchant-reply">${r.reply}</div>` : ''}
+        `;
+        list.appendChild(div);
+      }
+      renderedCount = end;
+    }
+
+    // ----- 交互 -----
+    function showModal() {
+      const portal = document.getElementById('rateList');
+      portal.classList.add('visible');
+      // 触发可点元素的 cursor:pointer fallback测试 — 强制 inline cursor:pointer
+      currentTab = 'all';
+      renderTags();
+      renderInitial();
+    }
+    function hideModal() {
+      document.getElementById('rateList').classList.remove('visible');
+    }
+
+    document.getElementById('trigger-all-btn').addEventListener('click', () => {
+      console.log('[fixture] trigger clicked');
+      showModal();
+    });
+    document.getElementById('close-icon').addEventListener('click', (e) => {
+      console.log('[fixture] close-icon clicked, target=', e.target.id || e.target.className, 'currentTarget=', e.currentTarget.id);
+      hideModal();
+    });
+    document.getElementById('modal-mask').addEventListener('click', () => {
+      console.log('[fixture] modal-mask clicked');
+      hideModal();
+    });
+
+    // tag click 委托
+    document.getElementById('rateList').addEventListener('click', (e) => {
+      const tagEl = e.target.closest('[data-tab-id]');
+      if (!tagEl) return;
+      const id = tagEl.dataset.tabId;
+      if (id === currentTab) return;
+      currentTab = id;
+      renderTags();
+      renderInitial();
+    });
+
+    // 滚动懒加载
+    document.getElementById('review-scroll-container').addEventListener('scroll', (e) => {
+      const el = e.currentTarget;
+      const data = dataForTab(currentTab);
+      if (renderedCount >= data.length) return;
+      // 接近底部 100px 触发
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 100) {
+        appendBatch();
+      }
+    });
+
+    // Escape 关闭
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && document.getElementById('rateList').classList.contains('visible')) {
+        hideModal();
+      }
+    });
+  </script>
+</body>
+</html>
