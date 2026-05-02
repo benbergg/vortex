@@ -108,8 +108,21 @@ export function dispatchNewTool(
         );
       }
       const next: Record<string, unknown> = { target, ...rest };
-      // value 仅 fill/type/select 需要
-      if (value !== undefined) next.value = value;
+      // value 语义按 action 分流：
+      // - scroll 时 value 是参数对象 {container?, position?, x?, y?} → spread 到 args，
+      //   底层 dom.scroll 直接读 args.container / args.position / args.x / args.y
+      // - fill/type/select 时 value 是要设置的数据（string/object/array），透传 next.value
+      // - hover/click 时 value 通常 undefined
+      if (
+        actionName === "scroll" &&
+        value !== null &&
+        typeof value === "object" &&
+        !Array.isArray(value)
+      ) {
+        Object.assign(next, value as Record<string, unknown>);
+      } else if (value !== undefined) {
+        next.value = value;
+      }
       // options.timeout / options.force 透传
       if (options && typeof options === "object") {
         const o = options as Record<string, unknown>;

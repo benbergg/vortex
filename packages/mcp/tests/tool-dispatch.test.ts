@@ -164,6 +164,49 @@ describe("dispatchNewTool", () => {
     expect(action).toBe("file.getDownloads");
   });
 
+  // v0.7.1 P2 fix: vortex_act(scroll) value 是参数对象而非数据值
+  it("vortex_act(scroll, value={container, position}) 把 value spread 到 args", () => {
+    const { action, params } = dispatchNewTool("vortex_act", {
+      action: "scroll",
+      value: { container: ".scroll-box", position: "bottom" },
+    })!;
+    expect(action).toBe("dom.scroll");
+    expect(params.container).toBe(".scroll-box");
+    expect(params.position).toBe("bottom");
+    // value 字段不应再透传（避免底层误读）
+    expect(params).not.toHaveProperty("value");
+  });
+
+  it("vortex_act(scroll, value={x, y}) 同样 spread", () => {
+    const { params } = dispatchNewTool("vortex_act", {
+      action: "scroll",
+      value: { x: 100, y: 500 },
+    })!;
+    expect(params.x).toBe(100);
+    expect(params.y).toBe(500);
+    expect(params).not.toHaveProperty("value");
+  });
+
+  it("vortex_act(fill, value='hello') 仍透传 value（数据值语义不变）", () => {
+    const { action, params } = dispatchNewTool("vortex_act", {
+      action: "fill",
+      target: "@e1",
+      value: "hello",
+    })!;
+    expect(action).toBe("dom.fill");
+    expect(params.value).toBe("hello");
+  });
+
+  it("vortex_act(scroll, target=...) 不传 value 时也通", () => {
+    const { action, params } = dispatchNewTool("vortex_act", {
+      action: "scroll",
+      target: "._listItem:last-child",
+    })!;
+    expect(action).toBe("dom.scroll");
+    expect(params.target).toBe("._listItem:last-child");
+    expect(params).not.toHaveProperty("value");
+  });
+
   it("未知工具名返回 null（走 toolDef.action 默认路径）", () => {
     const result = dispatchNewTool("vortex_click", {});
     expect(result).toBeNull();

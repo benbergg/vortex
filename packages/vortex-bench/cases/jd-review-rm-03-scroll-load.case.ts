@@ -25,12 +25,11 @@ const def: CaseDefinition = {
     ctx.recordMetric("itemsBefore", beforeMatches);
     ctx.assert(beforeMatches >= 6, `初始应至少 6 个 review item，实际 ${beforeMatches}`);
 
-    // v0.7 vortex_act scroll bug：L4 facade 不暴露 container/position 参数
-    // workaround：scroll 到最后一条 item（target=selector → scrollIntoView 该 item）
-    // 这触发内部 container 滚动 → 触发 lazy load handler。
+    // P2 fix: vortex_act(scroll) 现暴露 container/position via value
+    // 直接让内部 container 滚到底，触发 lazy load handler
     await ctx.call("vortex_act", {
-      target: "._listItem_1ygkr_73:last-child",
       action: "scroll",
+      value: { container: "._rateListContainer_1ygkr_45", position: "bottom" },
     });
     await new Promise((r) => setTimeout(r, 600));
 
