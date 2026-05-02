@@ -398,6 +398,43 @@ async function scanOneFrame(
         }
 
         const nodeList = document.querySelectorAll(INTERACTIVE_SELECTORS);
+
+        // BUG-1: cursor:pointer fallback for custom interactive elements.
+        // bytenew / Element Plus / Ant Design 等中文 SaaS 框架普遍用
+        // <li/div cursor:pointer @click=...> 而非原生 button / [role=button]，
+        // 静态白名单完全捕获不到。事件挂在 Vue/React vnode 层，元素本身
+        // 没 onclick 也没 framework key，所以走 computed style 兜底。
+        const interactiveSet = new Set<Element>(Array.from(nodeList));
+        const fallbackPool = document.querySelectorAll(
+          "div, li, span, a:not([href])",
+        );
+        const cursorPointerExtras: Element[] = [];
+        for (const el of Array.from(fallbackPool)) {
+          if (interactiveSet.has(el)) continue;
+          // Skip wrappers that already contain a real interactive child —
+          // we don't want both the <li> and the <button> inside it.
+          if (el.querySelector(INTERACTIVE_SELECTORS)) continue;
+          const htmlEl = el as HTMLElement;
+          if (htmlEl.offsetWidth === 0 || htmlEl.offsetHeight === 0) continue;
+          if (getComputedStyle(htmlEl).cursor !== "pointer") continue;
+          const name = (
+            el.getAttribute("aria-label") ||
+            htmlEl.innerText ||
+            ""
+          )
+            .trim()
+            .slice(0, 100);
+          // Require a name to avoid noise from purely decorative
+          // cursor:pointer wrappers (e.g. close-button icons handled by
+          // event delegation but visually rendered as bare divs).
+          if (!name) continue;
+          cursorPointerExtras.push(el);
+        }
+        const allCandidates: Element[] = [
+          ...Array.from(nodeList),
+          ...cursorPointerExtras,
+        ];
+
         const elements: Array<{
           index: number;
           tag: string;
@@ -412,7 +449,7 @@ async function scanOneFrame(
           _sel: string;
         }> = [];
 
-        for (const el of Array.from(nodeList)) {
+        for (const el of allCandidates) {
           if (elements.length >= max) break;
           const htmlEl = el as HTMLElement;
           const rect = htmlEl.getBoundingClientRect();
@@ -489,7 +526,7 @@ async function scanOneFrame(
             scrollHeight: document.documentElement.scrollHeight,
           },
           elements,
-          candidateCount: nodeList.length,
+          candidateCount: allCandidates.length,
           truncated: elements.length >= max,
         };
       },
