@@ -14,10 +14,11 @@ const def: CaseDefinition = {
     let fillOk = false;
     let fillText = "";
     try {
-      const res = await ctx.call("vortex_fill", {
+      const res = await ctx.call("vortex_act", {
+        action: "fill",
         target: "[data-testid=\"target-daterange\"] .el-date-editor.el-range-editor",
         kind: "daterange",
-        value: { start: START, end: END },
+        value: { start: START, end: END }
       });
       fillText = extractText(res);
       fillOk = !fillText.toLowerCase().includes("error") && !fillText.includes("INVALID_PARAMS");

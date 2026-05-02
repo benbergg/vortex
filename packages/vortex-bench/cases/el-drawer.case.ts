@@ -7,18 +7,25 @@ const def: CaseDefinition = {
   playgroundPath: "/#/el-drawer",
   async run(ctx) {
     // 1. 点触发按钮
-    await ctx.call("vortex_click", {
-      target: "[data-testid=\"target-drawer-trigger\"] button",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: "[data-testid=\"target-drawer-trigger\"] button"
     });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1500 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 1500
+    });
 
     // 2. 在抽屉内输入（先 click focus，避免 drawer transition 期间 type 打偏）
-    await ctx.call("vortex_click", {
-      target: "[data-testid=\"drawer-input\"] input",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: "[data-testid=\"drawer-input\"] input"
     });
-    await ctx.call("vortex_type", {
+    await ctx.call("vortex_act", {
+      action: "type",
       target: "[data-testid=\"drawer-input\"] input",
-      text: "test-content",
+      text: "test-content"
     });
 
     await assertResultContains(ctx, "drawerOpen=true");

@@ -9,22 +9,33 @@ const def: CaseDefinition = {
   playgroundPath: "/#/el-color-picker",
   async run(ctx) {
     // click color picker trigger 打开 panel
-    await ctx.call("vortex_click", {
-      target: "[data-testid=\"target-color-picker\"] .el-color-picker__trigger",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: "[data-testid=\"target-color-picker\"] .el-color-picker__trigger"
     });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1000 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 1000
+    });
 
     // 在 panel 底部 hex input 键入颜色
-    await ctx.call("vortex_click", {
-      target: ".el-color-dropdown__value input",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: ".el-color-dropdown__value input"
     });
     await ctx.call("vortex_press", { key: "Meta+a" });
-    await ctx.call("vortex_type", {
+    await ctx.call("vortex_act", {
+      action: "type",
       target: ".el-color-dropdown__value input",
-      text: HEX,
+      text: HEX
     });
     await ctx.call("vortex_press", { key: "Enter" });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 500 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 500
+    });
 
     // 点"确定"按钮
     await ctx.fallbackEvaluate({
@@ -36,7 +47,11 @@ const def: CaseDefinition = {
         return 'not-found';
       })()`,
     });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1000 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 1000
+    });
 
     await assertResultContains(ctx, "color=");
     // color 值可能是大写 hex 或小写，只要非空即可

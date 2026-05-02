@@ -13,10 +13,11 @@ const def: CaseDefinition = {
     let fillOk = false;
     let fillText = "";
     try {
-      const res = await ctx.call("vortex_fill", {
+      const res = await ctx.call("vortex_act", {
+        action: "fill",
         target: "[data-testid=\"target-select\"]",
         kind: "select",
-        value: "Option B",
+        value: "Option B"
       });
       fillText = extractText(res);
       fillOk = !fillText.toLowerCase().includes("error") && !fillText.includes("INVALID_PARAMS");
@@ -38,7 +39,11 @@ const def: CaseDefinition = {
         })()`,
       });
       const clickText = extractText(clickRes);
-      await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 2000 });
+      await ctx.call("vortex_wait_for", {
+        mode: "idle",
+        value: "dom",
+        timeout: 2000
+      });
       const pickRes = await ctx.fallbackEvaluate({
         code: `(() => {
           const items = [];

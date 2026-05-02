@@ -17,23 +17,36 @@ const def: CaseDefinition = {
   playgroundPath: "/#/el-select-v2",
   async run(ctx) {
     // 1. click trigger 打开 dropdown + focus 输入框
-    await ctx.call("vortex_click", {
-      target: "[data-testid=\"target-select-v2\"] .el-select__wrapper",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: "[data-testid=\"target-select-v2\"] .el-select__wrapper"
     });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 800 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 800
+    });
 
     // 2. type 过滤，让虚拟列表只显示匹配项
-    await ctx.call("vortex_type", {
+    await ctx.call("vortex_act", {
+      action: "type",
       target: "[data-testid=\"target-select-v2\"] input",
-      text: "500",
+      text: "500"
     });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 800 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 800
+    });
 
     // 3. observe 抓 "Option 500" ref
     const snap = extractText(await ctx.call("vortex_observe", {}));
     const ref = findRef(snap, "Option 500");
     if (ref) {
-      await ctx.call("vortex_click", { target: ref });
+      await ctx.call("vortex_act", {
+        action: "click",
+        target: ref
+      });
     } else {
       ctx.recordObserveMiss(1);
       await ctx.fallbackEvaluate({

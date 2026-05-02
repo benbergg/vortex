@@ -20,17 +20,25 @@ const def: CaseDefinition = {
     const snap1 = extractText(await ctx.call("vortex_observe", {}));
     const openBtn = findRef(snap1, "打开对话框");
     ctx.assert(openBtn !== null, `observe 看不到"打开对话框"按钮: ${snap1.slice(0, 300)}`);
-    await ctx.call("vortex_click", { target: openBtn });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1500 });
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: openBtn
+    });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 1500
+    });
 
     // 2. dialog 打开后 observe 应能看到 inside-select 区的 combobox
     //    用 fill kind=select 尝试（会触发 bug），不行就 fallback
     let ok = false;
     try {
-      const res = await ctx.call("vortex_fill", {
+      const res = await ctx.call("vortex_act", {
+        action: "fill",
         target: "[data-testid=\"inside-select\"]",
         kind: "select",
-        value: "Y",
+        value: "Y"
       });
       const t = extractText(res);
       ok = !t.toLowerCase().includes("error") && !t.includes("INVALID_PARAMS");
@@ -46,7 +54,11 @@ const def: CaseDefinition = {
           return 'ok';
         })()`,
       });
-      await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1500 });
+      await ctx.call("vortex_wait_for", {
+        mode: "idle",
+        value: "dom",
+        timeout: 1500
+      });
       await ctx.fallbackEvaluate({
         code: `(() => {
           for (const el of document.querySelectorAll('.el-select-dropdown__item')) {

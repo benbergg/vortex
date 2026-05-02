@@ -80,7 +80,11 @@ export async function runCase(def: CaseDefinition, opts: RunCaseOptions): Promis
     await ctx.call("vortex_navigate", {
       url: opts.playgroundUrl + def.playgroundPath,
     });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 5000 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 5000
+    });
 
     await def.run(ctx);
 

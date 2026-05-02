@@ -17,16 +17,24 @@ const def: CaseDefinition = {
   playgroundPath: "/#/el-message-box",
   async run(ctx) {
     // 1. 点触发按钮
-    await ctx.call("vortex_click", {
-      target: "[data-testid=\"target-msgbox-trigger\"] button",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: "[data-testid=\"target-msgbox-trigger\"] button"
     });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1500 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 1500
+    });
 
     // 2. observe，期望 "确定" 按钮 ref（message-box teleport 到 body）
     const snap = extractText(await ctx.call("vortex_observe", {}));
     const okRef = findRef(snap, "确定");
     if (okRef) {
-      await ctx.call("vortex_click", { target: okRef });
+      await ctx.call("vortex_act", {
+        action: "click",
+        target: okRef
+      });
     } else {
       ctx.recordObserveMiss(1);
       await ctx.fallbackEvaluate({

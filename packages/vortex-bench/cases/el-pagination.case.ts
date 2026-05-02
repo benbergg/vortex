@@ -19,7 +19,10 @@ const def: CaseDefinition = {
     const snap = extractText(await ctx.call("vortex_observe", {}));
     const pg3 = findRef(snap, "page 3") ?? findRef(snap, "3");
     if (pg3) {
-      await ctx.call("vortex_click", { target: pg3 });
+      await ctx.call("vortex_act", {
+        action: "click",
+        target: pg3
+      });
     } else {
       ctx.recordObserveMiss(1);
       await ctx.fallbackEvaluate({

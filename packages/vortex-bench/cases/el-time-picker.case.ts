@@ -8,10 +8,11 @@ const def: CaseDefinition = {
   name: "el-time-picker",
   playgroundPath: "/#/el-time-picker",
   async run(ctx) {
-    await ctx.call("vortex_fill", {
+    await ctx.call("vortex_act", {
+      action: "fill",
       target: "[data-testid=\"target-time-picker\"] input",
       kind: "time",
-      value: TIME,
+      value: TIME
     });
     await assertResultContains(ctx, `time=${TIME}`);
   },

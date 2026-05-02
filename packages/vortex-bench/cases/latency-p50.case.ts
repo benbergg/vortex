@@ -40,7 +40,10 @@ const def: CaseDefinition = {
     const native: number[] = [];
     for (let i = 0; i < SAMPLES; i++) {
       const t0 = Date.now();
-      await ctx.call("vortex_click", { target: triggerRef });
+      await ctx.call("vortex_act", {
+        action: "click",
+        target: triggerRef
+      });
       native.push(Date.now() - t0);
     }
 
@@ -49,7 +52,11 @@ const def: CaseDefinition = {
     // 先 navigate 到 about:blank 卸载 dropdown，再切 slider，避免 hash router 同 origin state 残留
     await ctx.call("vortex_navigate", { url: "about:blank" });
     await ctx.call("vortex_navigate", { url: "http://localhost:5173/#/el-slider" });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 5000 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 5000
+    });
 
     // 取 slider runner bbox（与 el-slider-drag.case.ts 同 selector）
     const geom = extractEvalJson<{

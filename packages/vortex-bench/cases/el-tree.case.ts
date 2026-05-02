@@ -18,7 +18,10 @@ async function clickTreeNode(ctx: Parameters<typeof run>[0], label: string): Pro
   const snap = extractText(await ctx.call("vortex_observe", {}));
   const ref = findRef(snap, label);
   if (ref) {
-    await ctx.call("vortex_click", { target: ref });
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: ref
+    });
   } else {
     ctx.recordObserveMiss(1);
     await ctx.fallbackEvaluate({
@@ -33,7 +36,11 @@ async function clickTreeNode(ctx: Parameters<typeof run>[0], label: string): Pro
       })()`,
     });
   }
-  await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1500 });
+  await ctx.call("vortex_wait_for", {
+    mode: "idle",
+    value: "dom",
+    timeout: 1500
+  });
 }
 
 const def: CaseDefinition = {

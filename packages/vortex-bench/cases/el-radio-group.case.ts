@@ -19,7 +19,10 @@ const def: CaseDefinition = {
     // observe 应给出 radio 的 ref（Element Plus el-radio 渲染含 [role=radio] 输入）
     const ref = findRef(snap, "选项 B");
     if (ref) {
-      await ctx.call("vortex_click", { target: ref });
+      await ctx.call("vortex_act", {
+        action: "click",
+        target: ref
+      });
     } else {
       ctx.recordObserveMiss(1);
       await ctx.fallbackEvaluate({

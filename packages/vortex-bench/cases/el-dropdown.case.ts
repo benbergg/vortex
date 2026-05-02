@@ -25,8 +25,15 @@ const def: CaseDefinition = {
     ctx.assert(triggerRef !== null, `observe 应给出"打开菜单"的 @eN ref，snapshot:\n${snap1.slice(0, 400)}`);
 
     // 2. 点击触发按钮
-    await ctx.call("vortex_click", { target: triggerRef });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 2000 });
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: triggerRef
+    });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 2000
+    });
 
     // 3. 下拉展开后，observe 期望给出 3 个 menuitem 的 @eN ref
     const snap2 = extractText(await ctx.call("vortex_observe", {}));
@@ -64,7 +71,10 @@ const def: CaseDefinition = {
     } else {
       // 理想路径：用 observe 给的 @eN ref 点击
       const optionB = refs.find((r) => r.name === "选项 B")!.ref!;
-      await ctx.call("vortex_click", { target: optionB });
+      await ctx.call("vortex_act", {
+        action: "click",
+        target: optionB
+      });
     }
 
     // 4. 验证

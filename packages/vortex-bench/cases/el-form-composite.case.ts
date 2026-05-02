@@ -11,18 +11,20 @@ const def: CaseDefinition = {
     // 1. name 输入
     //   注意：vortex_fill plain 对 Vue el-input 不 dispatch 'input' 事件 → v-model 不响应。
     //   用 vortex_type 逐字符键入来触发真实 input event（速度慢但有效）。
-    await ctx.call("vortex_type", {
+    await ctx.call("vortex_act", {
+      action: "type",
       target: "[data-testid=\"form-name\"] input",
-      text: "test-name",
+      text: "test-name"
     });
 
     // 2. level 选 "高"（走 el-select，driver 按 label 匹配故传中文 label）
     let levelOk = false;
     try {
-      const res = await ctx.call("vortex_fill", {
+      const res = await ctx.call("vortex_act", {
+        action: "fill",
         target: "[data-testid=\"form-level\"]",
         kind: "select",
-        value: "高",
+        value: "高"
       });
       const text = extractText(res);
       levelOk = !text.toLowerCase().includes("error") && !text.includes("INVALID_PARAMS");
@@ -38,7 +40,11 @@ const def: CaseDefinition = {
           return 'ok';
         })()`,
       });
-      await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 2000 });
+      await ctx.call("vortex_wait_for", {
+        mode: "idle",
+        value: "dom",
+        timeout: 2000
+      });
       await ctx.fallbackEvaluate({
         code: `(() => {
           for (const el of document.querySelectorAll('.el-select-dropdown__item')) {
@@ -52,17 +58,19 @@ const def: CaseDefinition = {
     }
 
     // 3. switch 开启：点 .el-switch__core（真正的交互点）
-    await ctx.call("vortex_click", {
-      target: "[data-testid=\"form-enabled\"] .el-switch__core",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: "[data-testid=\"form-enabled\"] .el-switch__core"
     });
 
     // 4. checkbox-group 选 alpha + beta
     let cbOk = false;
     try {
-      const res = await ctx.call("vortex_fill", {
+      const res = await ctx.call("vortex_act", {
+        action: "fill",
         target: "[data-testid=\"form-tags\"]",
         kind: "checkbox-group",
-        value: ["alpha", "beta"],
+        value: ["alpha", "beta"]
       });
       const text = extractText(res);
       cbOk = !text.toLowerCase().includes("error") && !text.includes("INVALID_PARAMS");
@@ -87,8 +95,9 @@ const def: CaseDefinition = {
     }
 
     // 5. submit
-    await ctx.call("vortex_click", {
-      target: "[data-testid=\"form-submit\"] button",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: "[data-testid=\"form-submit\"] button"
     });
 
     // 断言提交后 result 包含所有字段

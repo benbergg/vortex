@@ -12,10 +12,11 @@ const def: CaseDefinition = {
     let fillOk = false;
     let fillText = "";
     try {
-      const res = await ctx.call("vortex_fill", {
+      const res = await ctx.call("vortex_act", {
+        action: "fill",
         target: "[data-testid=\"target-cascader\"]",
         kind: "cascader",
-        value: PATH,
+        value: PATH
       });
       fillText = extractText(res);
       fillOk = !fillText.toLowerCase().includes("error") && !fillText.includes("INVALID_PARAMS");
@@ -34,7 +35,11 @@ const def: CaseDefinition = {
           return 'no-trigger';
         })()`,
       });
-      await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 2000 });
+      await ctx.call("vortex_wait_for", {
+        mode: "idle",
+        value: "dom",
+        timeout: 2000
+      });
       for (const label of PATH) {
         await ctx.fallbackEvaluate({
           code: `(() => {
@@ -46,7 +51,11 @@ const def: CaseDefinition = {
             return 'not-found';
           })()`,
         });
-        await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1000 });
+        await ctx.call("vortex_wait_for", {
+          mode: "idle",
+          value: "dom",
+          timeout: 1000
+        });
       }
     }
 

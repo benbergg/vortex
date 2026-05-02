@@ -20,7 +20,10 @@ const def: CaseDefinition = {
     for (const label of ["Item 1", "Item 2"]) {
       const ref = findRef(snap1, label);
       if (ref) {
-        await ctx.call("vortex_click", { target: ref });
+        await ctx.call("vortex_act", {
+          action: "click",
+          target: ref
+        });
       } else {
         ctx.recordObserveMiss(1);
         await ctx.fallbackEvaluate({
@@ -36,10 +39,15 @@ const def: CaseDefinition = {
       }
     }
     // 点"向右"按钮（第二个，第一个是"向左"移到左侧；用 :not(.is-disabled) 匹配 enabled）
-    await ctx.call("vortex_click", {
-      target: "[data-testid=\"target-transfer\"] .el-transfer__buttons button:nth-of-type(2)",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: "[data-testid=\"target-transfer\"] .el-transfer__buttons button:nth-of-type(2)"
     });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1000 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 1000
+    });
 
     await assertResultContains(ctx, "selected=[1,2]");
   },

@@ -19,13 +19,21 @@ const def: CaseDefinition = {
     const snap = extractText(await ctx.call("vortex_observe", {}));
     const tabRef = findRef(snap, "Tab 2");
     ctx.assert(tabRef !== null, `observe 应给出"Tab 2" ref: ${snap.slice(0, 300)}`);
-    await ctx.call("vortex_click", { target: tabRef });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1000 });
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: tabRef
+    });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 1000
+    });
 
     // 在 Tab 2 的 input 输入
-    await ctx.call("vortex_type", {
+    await ctx.call("vortex_act", {
+      action: "type",
       target: "[data-testid=\"tab2-input\"] input",
-      text: "hello",
+      text: "hello"
     });
 
     await assertResultContains(ctx, "active=tab2");

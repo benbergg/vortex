@@ -16,20 +16,29 @@ const def: CaseDefinition = {
   playgroundPath: "/#/el-autocomplete",
   async run(ctx) {
     // 先 focus input 再 type
-    await ctx.call("vortex_click", {
-      target: "[data-testid=\"target-autocomplete\"] input",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: "[data-testid=\"target-autocomplete\"] input"
     });
-    await ctx.call("vortex_type", {
+    await ctx.call("vortex_act", {
+      action: "type",
       target: "[data-testid=\"target-autocomplete\"] input",
-      text: "ban",
+      text: "ban"
     });
     // 异步建议 debounce ~100ms，加等
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1500 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 1500
+    });
 
     const snap = extractText(await ctx.call("vortex_observe", {}));
     const ref = findRef(snap, "banana");
     if (ref) {
-      await ctx.call("vortex_click", { target: ref });
+      await ctx.call("vortex_act", {
+        action: "click",
+        target: ref
+      });
     } else {
       ctx.recordObserveMiss(1);
       await ctx.fallbackEvaluate({

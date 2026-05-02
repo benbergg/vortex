@@ -39,7 +39,11 @@ const def: CaseDefinition = {
       toY: geom.target.cy,
       steps: 15,
     });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 500 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 500
+    });
 
     // 3. 断言 val 靠近 80（slider step=1，drag 可能 ±2，接受 78-82）
     const result = extractEvalJson<string>(

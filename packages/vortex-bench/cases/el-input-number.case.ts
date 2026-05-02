@@ -8,16 +8,22 @@ const def: CaseDefinition = {
   playgroundPath: "/#/el-input-number",
   async run(ctx) {
     // 先 click 拿 focus（el-input-number 默认空，type 前需要 focus）
-    await ctx.call("vortex_click", {
-      target: "[data-testid=\"target-input-number\"] input",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: "[data-testid=\"target-input-number\"] input"
     });
-    await ctx.call("vortex_type", {
+    await ctx.call("vortex_act", {
+      action: "type",
       target: "[data-testid=\"target-input-number\"] input",
-      text: "42",
+      text: "42"
     });
     // blur 触发 commit（el-input-number 在 blur 时 clamp + emit change）
     await ctx.call("vortex_press", { key: "Tab" });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1000 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 1000
+    });
 
     await assertResultContains(ctx, "num=42");
   },

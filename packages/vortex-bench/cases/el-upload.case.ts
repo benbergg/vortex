@@ -17,7 +17,11 @@ const def: CaseDefinition = {
       fileContent: FAKE_CONTENT_B64,
       mimeType: "text/plain",
     });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1500 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 1500
+    });
 
     await assertResultContains(ctx, FILE_NAME);
   },

@@ -16,17 +16,25 @@ const def: CaseDefinition = {
   playgroundPath: "/#/el-tree-select",
   async run(ctx) {
     // 1. click trigger 打开 panel（tree-select 基于 el-select，trigger 走 .click() 应 OK）
-    await ctx.call("vortex_click", {
-      target: "[data-testid=\"target-tree-select\"] .el-select__wrapper",
+    await ctx.call("vortex_act", {
+      action: "click",
+      target: "[data-testid=\"target-tree-select\"] .el-select__wrapper"
     });
-    await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1500 });
+    await ctx.call("vortex_wait_for", {
+      mode: "idle",
+      value: "dom",
+      timeout: 1500
+    });
 
     // 2. 逐级展开 + click 叶子
     for (const label of ["华东", "上海", "浦东"]) {
       const snap = extractText(await ctx.call("vortex_observe", {}));
       const ref = findRef(snap, label);
       if (ref) {
-        await ctx.call("vortex_click", { target: ref });
+        await ctx.call("vortex_act", {
+          action: "click",
+          target: ref
+        });
       } else {
         ctx.recordObserveMiss(1);
         await ctx.fallbackEvaluate({
@@ -40,7 +48,11 @@ const def: CaseDefinition = {
           })()`,
         });
       }
-      await ctx.call("vortex_wait_idle", { kind: "dom", timeout: 1000 });
+      await ctx.call("vortex_wait_for", {
+        mode: "idle",
+        value: "dom",
+        timeout: 1000
+      });
     }
 
     await assertResultContains(ctx, "value=浦东");
