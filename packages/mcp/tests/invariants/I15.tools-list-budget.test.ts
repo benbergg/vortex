@@ -100,9 +100,24 @@ describe("Bug F regression: vortex_observe surface must expose frames", () => {
     expect(props.frames).toBeDefined();
   });
 
-  it("frames enum covers main / all-same-origin / all-permitted / all", () => {
-    expect(props.frames.enum).toEqual(
-      expect.arrayContaining(["main", "all-same-origin", "all-permitted", "all"]),
-    );
+  // Strict equality (not arrayContaining) — guards against silent enum
+  // drift in either direction: subset (capability removed) or superset
+  // (untested value sneaked in). Order matches schemas.ts:111 internal enum.
+  it("frames enum equals exactly main / all-same-origin / all-permitted / all", () => {
+    expect(props.frames.enum).toEqual([
+      "main",
+      "all-same-origin",
+      "all-permitted",
+      "all",
+    ]);
+  });
+
+  // The whole point of the description change is to nudge LLMs to switch
+  // away from the implicit 'main' default when iframes are involved.
+  // If a future edit drops the hint (e.g. reverts to "List interactive
+  // elements in scope."), the schema-shape tests above still pass but
+  // discoverability silently regresses — Bug F all over again.
+  it("description hints frames usage for iframe contexts", () => {
+    expect(observe.description).toMatch(/frames/);
   });
 });
