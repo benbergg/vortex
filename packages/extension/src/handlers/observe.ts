@@ -230,11 +230,15 @@ async function scanOneFrame(
         }
 
         // Icon-only fallback：从 className 第一个有意义 segment 提取人类可读单词
-        // （CSS Modules 形态 `_closeIcon_1ygkr_39` → `closeIcon`）。仅当元素含
-        // svg/img 子或本身是 <i> 时调用——典型 close button / menu icon。
+        // （CSS Modules 形态 `_closeIcon_1ygkr_39` → `closeIcon`）。
+        // 触发条件：元素含 svg/img 后代（典型 svg/img 图标按钮）。
+        // **不**包含 `<i>` 标签兜底——之前 P3 设计为覆盖 icon font (`<i class="iconfont">`)
+        // 但这种空 `<i>` 多为 CSS pseudo-element 渲染的纯装饰，不是独立 click target，
+        // 收为 candidate 反而 LLM 拿到一堆 "iconfont"/"el-icon" noise（testc 实测
+        // ~16 个 ref 噪声）。`<i><svg/></i>` 形态仍触发（querySelector 找到 svg）。
         // 共用于：(1) cursor:pointer fallback gate (2) getAccessibleName 末尾兜底。
         function iconNameFromClass(el: Element): string {
-          if (!(el.querySelector("svg, img") || el.tagName === "I")) return "";
+          if (!el.querySelector("svg, img")) return "";
           const cls =
             el.className && typeof el.className === "string" ? el.className : "";
           for (const c of cls.split(/\s+/).filter(Boolean)) {
