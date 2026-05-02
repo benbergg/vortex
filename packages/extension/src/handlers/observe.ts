@@ -156,6 +156,17 @@ async function scanOneFrame(
         withText: boolean,
         withAX: boolean,
       ) => {
+        // Per-observe rid prefix used as identity fallback when buildSelector
+        // can't produce a page-unique CSS selector (e.g. Element Plus v-for
+        // groups with identical inner DOM — bytenew testc dogfood Bug 4).
+        // Ambiguous elements are stamped with `data-vortex-rid` so the @fNeM
+        // ref system resolves them by identity instead of degrading to a
+        // querySelectorAll path that matches multiple siblings.
+        const ridPrefix = `vtx${Date.now().toString(36)}${Math.random()
+          .toString(36)
+          .slice(2, 6)}_`;
+        let ridCounter = 0;
+
         const INTERACTIVE_SELECTORS = [
           "button",
           "a[href]",
@@ -308,7 +319,24 @@ async function scanOneFrame(
             cur = parent;
             depth++;
           }
-          return parts.join(" > ");
+          const sel = parts.join(" > ");
+          // Path may collide with sibling structures (Element Plus v-for
+          // groups, repeated table rows, etc.). When ambiguous, stamp the
+          // element with a unique data-vortex-rid attribute and return
+          // that — guarantees a 1:1 selector for downstream act/extract.
+          if (document.querySelectorAll(sel).length > 1) {
+            const rid = ridPrefix + ridCounter++;
+            try {
+              el.setAttribute("data-vortex-rid", rid);
+              return `[data-vortex-rid="${rid}"]`;
+            } catch {
+              // setAttribute can throw on non-Element nodes or sandboxed
+              // shadows; fall through to the (still-ambiguous) path so
+              // the runtime gets a legible SELECTOR_AMBIGUOUS instead of
+              // crashing the scan.
+            }
+          }
+          return sel;
         }
 
         function describeElement(el: Element): string {
