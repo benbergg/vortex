@@ -56,6 +56,55 @@ describe("parseRef", () => {
   });
 });
 
+describe("parseRef — hashed dual-format (v0.8)", () => {
+  it("parses bare ref @eN (legacy)", () => {
+    expect(parseRef("@e12")).toEqual({ kind: "ref", index: 12, frameId: 0 });
+  });
+
+  it("parses bare ref with frame @fNeM (legacy)", () => {
+    expect(parseRef("@f3e12")).toEqual({ kind: "ref", index: 12, frameId: 3 });
+  });
+
+  it("parses hashed ref @<hash>:eN", () => {
+    expect(parseRef("@a3f7:e12")).toEqual({
+      kind: "ref",
+      index: 12,
+      frameId: 0,
+      hash: "a3f7",
+    });
+  });
+
+  it("parses hashed ref with frame @<hash>:fNeM", () => {
+    expect(parseRef("@a3f7:f3e12")).toEqual({
+      kind: "ref",
+      index: 12,
+      frameId: 3,
+      hash: "a3f7",
+    });
+  });
+
+  it("lowercases an uppercase hash prefix", () => {
+    expect(parseRef("@A3F7:e12")).toEqual({
+      kind: "ref",
+      index: 12,
+      frameId: 0,
+      hash: "a3f7",
+    });
+  });
+
+  it("rejects a hash of the wrong length (3 hex)", () => {
+    expect(() => parseRef("@abc:e12")).toThrow(/invalid ref format/);
+  });
+
+  it("rejects a hash with non-hex chars", () => {
+    expect(() => parseRef("@xy12:e12")).toThrow(/invalid ref format/);
+  });
+
+  it("rejects a hashed ref missing the colon (`@a3f7e12`)", () => {
+    expect(() => parseRef("@a3f7e12")).toThrow(/invalid ref format/);
+  });
+});
+
 describe("resolveTargetParam", () => {
   it("ref → { index, snapshotId, frameId }", () => {
     const out = resolveTargetParam("@e5", "s_abc");

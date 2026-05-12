@@ -3,10 +3,13 @@
 import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 
 export type ParsedRef =
-  | { kind: "ref"; index: number; frameId: number }
+  | { kind: "ref"; index: number; frameId: number; hash?: string }
   | { kind: "selector"; selector: string };
 
-const REF_RE = /^@(?:f(\d+))?e(\d+)$/;
+// v0.8: dual-format. Hash prefix `<hex>:` is OPTIONAL and always outermost;
+// frame prefix `fN` is OPTIONAL and immediately before `eN`. Bare `@eN` and
+// `@fNeM` remain accepted (deprecated in v0.9).
+const REF_RE = /^@(?:([a-fA-F0-9]{4}):)?(?:f(\d+))?e(\d+)$/;
 
 // v0.5 snapshot-ref shapes that LLMs sometimes emit when guessing at v0.6
 // target syntax (e.g. carrying habits from v0.5 vortex_dom_click({index, snapshotId})).
@@ -34,12 +37,15 @@ export function parseRef(input: string): ParsedRef {
     if (!m) {
       throw vtxError(
         VtxErrorCode.INVALID_PARAMS,
-        `invalid ref format: ${input} (expected @eN or @fNeM)`,
+        `invalid ref format: ${input} (expected @eN, @fNeM, @<hash>:eN, or @<hash>:fNeM where hash is 4 hex chars)`,
       );
     }
-    const frameId = m[1] != null ? parseInt(m[1], 10) : 0;
-    const index = parseInt(m[2], 10);
-    return { kind: "ref", index, frameId };
+    const hash = m[1] != null ? m[1].toLowerCase() : undefined;
+    const frameId = m[2] != null ? parseInt(m[2], 10) : 0;
+    const index = parseInt(m[3], 10);
+    return hash !== undefined
+      ? { kind: "ref", index, frameId, hash }
+      : { kind: "ref", index, frameId };
   }
   for (const { re, example } of V05_REF_PATTERNS) {
     if (re.test(input)) {
