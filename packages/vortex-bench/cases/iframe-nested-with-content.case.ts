@@ -21,7 +21,8 @@ const def: CaseDefinition = {
 
     const snap = extractText(await ctx.call("vortex_observe", { frames: "all" }));
     ctx.recordMetric("observeAllLen", snap.length);
-    const subFrameRefs = (snap.match(/@f\d+e\d+/g) ?? []);
+    // v0.8 hashed ref support: matches @fNeM and @<hash>:fNeM
+    const subFrameRefs = (snap.match(/@(?:[a-f0-9]{4}:)?f\d+e\d+/g) ?? []);
     ctx.recordMetric("subFrameRefCount", subFrameRefs.length);
 
     ctx.assert(snap.includes("深层按钮"),

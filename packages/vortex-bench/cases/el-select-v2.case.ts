@@ -4,7 +4,8 @@ import type { CaseDefinition } from "../src/types.js";
 import { assertResultContains, extractText } from "./_helpers.js";
 
 function findRef(snapshot: string, name: string): string | null {
-  const re = new RegExp(`(@[ef]?\\d+(?:e\\d+)?)\\s+\\[[^\\]]+\\]\\s+"([^"]*?)"`, "g");
+  // v0.8 hashed ref support: matches @eN / @fNeM / @<hash>:eN / @<hash>:fNeM
+  const re = new RegExp(`(@(?:[a-f0-9]{4}:)?(?:f\\d+)?e\\d+)\\s+\\[[^\\]]+\\]\\s+"([^"]*?)"`, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(snapshot)) !== null) {
     if (m[2].trim() === name) return m[1];
