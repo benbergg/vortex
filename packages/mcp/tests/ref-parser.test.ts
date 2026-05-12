@@ -122,3 +122,41 @@ describe("resolveTargetParam", () => {
     expect(() => resolveTargetParam("@e1", null)).toThrow(/no active snapshot/i);
   });
 });
+
+describe("resolveTargetParam — hash strict check (v0.8)", () => {
+  it("matches a hashed ref against activeSnapshotHash", () => {
+    expect(resolveTargetParam("@a3f7:e1", "s_xyz", "a3f7")).toEqual({
+      index: 1,
+      snapshotId: "s_xyz",
+      frameId: 0,
+    });
+  });
+
+  it("rejects a hashed ref when hash mismatches", () => {
+    expect(() => resolveTargetParam("@a3f7:e1", "s_xyz", "b2c8")).toThrow(
+      /Ref bound to expired snapshot/,
+    );
+  });
+
+  it("passes a bare ref through unchanged (legacy compat)", () => {
+    expect(resolveTargetParam("@e1", "s_xyz", "b2c8")).toEqual({
+      index: 1,
+      snapshotId: "s_xyz",
+      frameId: 0,
+    });
+  });
+
+  it("hashed ref + no activeSnapshotId throws STALE_SNAPSHOT", () => {
+    expect(() => resolveTargetParam("@a3f7:e1", null, null)).toThrow(
+      /no active snapshot/,
+    );
+  });
+
+  it("matches a hashed ref with frame prefix", () => {
+    expect(resolveTargetParam("@a3f7:f3e1", "s_xyz", "a3f7")).toEqual({
+      index: 1,
+      snapshotId: "s_xyz",
+      frameId: 3,
+    });
+  });
+});

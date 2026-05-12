@@ -354,7 +354,7 @@ export async function handleCallTool(
         if (f.target.startsWith("@")) {
           try {
             const { resolveTargetParam } = await import("./lib/ref-parser.js");
-            const resolved = resolveTargetParam(f.target, activeSnapshotId);
+            const resolved = resolveTargetParam(f.target, activeSnapshotId, null);
             if (resolved.selector) fieldParams.selector = resolved.selector;
             if (resolved.index != null) {
               fieldParams.index = resolved.index;
@@ -396,7 +396,7 @@ export async function handleCallTool(
   if (target) {
     try {
       const { resolveTargetParam } = await import("./lib/ref-parser.js");
-      const resolved = resolveTargetParam(target, activeSnapshotId);
+      const resolved = resolveTargetParam(target, activeSnapshotId, null);
       delete params.target;
       if (resolved.selector) params.selector = resolved.selector;
       if (resolved.index != null) {

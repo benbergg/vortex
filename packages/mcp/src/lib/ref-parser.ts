@@ -69,6 +69,7 @@ export interface ResolvedTargetParam {
 export function resolveTargetParam(
   target: string,
   activeSnapshotId: string | null,
+  activeSnapshotHash: string | null,
 ): ResolvedTargetParam {
   const r = parseRef(target);
   if (r.kind === "selector") return { selector: r.selector };
@@ -76,6 +77,15 @@ export function resolveTargetParam(
     throw vtxError(
       VtxErrorCode.STALE_SNAPSHOT,
       "no active snapshot — call vortex_observe first",
+    );
+  }
+  // v0.8 strict check: only when caller supplied a hash (dual-format).
+  // Reuses STALE_SNAPSHOT — existing hint in errors.hints.ts already
+  // tells the caller to call vortex_observe to refresh.
+  if (r.hash !== undefined && r.hash !== activeSnapshotHash) {
+    throw vtxError(
+      VtxErrorCode.STALE_SNAPSHOT,
+      "Ref bound to expired snapshot (hash mismatch)",
     );
   }
   return { index: r.index, snapshotId: activeSnapshotId, frameId: r.frameId };
