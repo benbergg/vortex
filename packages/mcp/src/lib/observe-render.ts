@@ -31,7 +31,7 @@ interface CompactObserve {
 export function refOf(e: CompactElement, snapshotHash: string | null): string {
   const frame = e.frameId === 0 ? "" : `f${e.frameId}`;
   const tail = `${frame}e${e.index}`;
-  return snapshotHash ? `@${snapshotHash}:${tail}` : `@${tail}`;
+  return snapshotHash !== null ? `@${snapshotHash}:${tail}` : `@${tail}`;
 }
 
 function stateFlags(state?: CompactElement["state"]): string {
