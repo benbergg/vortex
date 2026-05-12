@@ -8,6 +8,26 @@
 
 _新工作进入此段；ship 时改为版本号 + 日期。_
 
+### ✨ Added
+
+- **Snapshot ref hash binding** (`packages/mcp/src/lib/ref-parser.ts`, `packages/mcp/src/lib/observe-render.ts`, `packages/mcp/src/server.ts`). `vortex_observe` now emits refs as `@<hash>:eN` (or `@<hash>:fNeM` with frame prefix), where `<hash>` is a 4-char lowercase hex prefix of `sha256(snapshotId)`. Callers that reuse a ref from a prior observe in a later `vortex_act` / `vortex_extract` / `vortex_wait_for` call get a structured `STALE_SNAPSHOT` error with the existing recovery hint ("Page has changed since the snapshot. Call vortex_observe to capture a fresh snapshot, then retry with the new ref") instead of silently rebinding to a different element.
+  **Why**: closes the cross-observe ref footgun documented in v0.7.x backlog. SOTA browser-automation tooling (MS playwright-mcp etc.) avoids the same class of bug by issuing a fresh snapshot per tool call; vortex keeps the 60s-TTL pattern but now binds refs to their originating snapshot. dogfood agent flow is unchanged because LLM habit is already "observe then act immediately"; the safety net catches multi-agent / long-context / replay patterns.
+
+### 🔄 Backward compatibility
+
+- Bare refs `@eN` and `@fNeM` (v0.7.x format) **still resolve** through `activeSnapshotId`. The strict hash check only fires when the caller-supplied ref carries a hash prefix. This dual-format window is intentional for v0.8.x; bare refs are deprecated and will be rejected with `INVALID_PARAMS` in v0.9.
+
+### 🐛 Fixed
+
+- `vortex_act` / `vortex_extract` / `vortex_wait_for` no longer silently rebind a ref captured in observe-1 to an element in observe-2 when both observes happen before the action. The mis-binding window is closed for all callers that adopt the new ref format.
+
+### 🧪 Tests
+
+- `packages/mcp/tests/ref-parser.test.ts`: 14 new cases covering hashed and bare formats, hash strict check (match / mismatch / bare-ref legacy / no-active-snapshot / hashed-with-frame / null-hash mismatch), case-insensitive hash, invalid hash forms.
+- `packages/mcp/tests/observe-render.test.ts`: 6 new cases covering `refOf` and `renderObserveCompact` hash propagation.
+- `packages/mcp/tests/server-snapshot-hash.test.ts` (new file): 5 cases for `computeSnapshotHash` (sha256[0:4] lowercase hex, deterministic, null-safe).
+- `packages/vortex-bench/cases/cross-observe-ref-stale.case.ts` (new file): end-to-end assertion that ref reuse across observes throws `STALE_SNAPSHOT`. 20 existing bench cases had their ref-extraction regex broadened to admit hashed refs.
+
 ---
 
 ## [0.7.4] - 2026-05-02
