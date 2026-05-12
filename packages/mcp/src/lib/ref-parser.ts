@@ -79,9 +79,10 @@ export function resolveTargetParam(
       "no active snapshot — call vortex_observe first",
     );
   }
-  // v0.8 strict check: only when caller supplied a hash (dual-format).
-  // Reuses STALE_SNAPSHOT — existing hint in errors.hints.ts already
-  // tells the caller to call vortex_observe to refresh.
+  // v0.8 strict check: only when the ref *itself* carries a hash prefix.
+  // Bare refs (@eN / @fNeM) skip this check for backward compat
+  // (v0.9 deprecates bare refs). Reuses STALE_SNAPSHOT — existing hint
+  // in errors.hints.ts already tells the caller to call vortex_observe.
   if (r.hash !== undefined && r.hash !== activeSnapshotHash) {
     throw vtxError(
       VtxErrorCode.STALE_SNAPSHOT,

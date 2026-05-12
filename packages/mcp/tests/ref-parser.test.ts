@@ -107,19 +107,19 @@ describe("parseRef — hashed dual-format (v0.8)", () => {
 
 describe("resolveTargetParam", () => {
   it("ref → { index, snapshotId, frameId }", () => {
-    const out = resolveTargetParam("@e5", "s_abc");
+    const out = resolveTargetParam("@e5", "s_abc", null);
     expect(out).toEqual({ index: 5, snapshotId: "s_abc", frameId: 0 });
   });
   it("跨 frame ref 携带 frameId", () => {
-    const out = resolveTargetParam("@f2e7", "s_xyz");
+    const out = resolveTargetParam("@f2e7", "s_xyz", null);
     expect(out).toEqual({ index: 7, snapshotId: "s_xyz", frameId: 2 });
   });
   it("selector → { selector }", () => {
-    const out = resolveTargetParam(".foo", "s_xyz");
+    const out = resolveTargetParam(".foo", "s_xyz", null);
     expect(out).toEqual({ selector: ".foo" });
   });
   it("ref 但无活跃 snapshot → 抛 StaleRef", () => {
-    expect(() => resolveTargetParam("@e1", null)).toThrow(/no active snapshot/i);
+    expect(() => resolveTargetParam("@e1", null, null)).toThrow(/no active snapshot/i);
   });
 });
 
@@ -149,6 +149,15 @@ describe("resolveTargetParam — hash strict check (v0.8)", () => {
   it("hashed ref + no activeSnapshotId throws STALE_SNAPSHOT", () => {
     expect(() => resolveTargetParam("@a3f7:e1", null, null)).toThrow(
       /no active snapshot/,
+    );
+  });
+
+  it("hashed ref against null activeSnapshotHash → mismatch", () => {
+    // Theoretically impossible once Task 4 wires id+hash together, but the
+    // function contract today allows the caller to pass (snapshotId, null);
+    // lock in the strict-check behavior in that state.
+    expect(() => resolveTargetParam("@a3f7:e1", "s_xyz", null)).toThrow(
+      /Ref bound to expired snapshot/,
     );
   });
 
