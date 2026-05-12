@@ -69,7 +69,7 @@ All changes are confined to `packages/mcp/` plus error code/hint additions in `p
 |---|---|---|---|
 | 1 | `activeSnapshotHash` state | `mcp/src/server.ts` | Module-level `string \| null` alongside existing `activeSnapshotId`; updated after every successful observe via `sha256(snapshotId).slice(0,4)`. Failed observe does not update. |
 | 2 | `refOf` hash prefix | `mcp/src/lib/observe-render.ts` | Signature gains `snapshotHash: string \| null` param. Emits `@<hash>:eN` when hash is non-null; emits bare `@eN` only for unit-test fixtures (`hash === null`). |
-| 3 | `parseRef` dual-format | `mcp/src/lib/ref-parser.ts` | `REF_RE` updated to `^@(?:([a-fA-F0-9]{4}):)?(e\d+)(?:\.f(\d+))?$`. Returns `{ hash?: string, index: number, frameId?: number }`. Hash is lowercased before return for case-insensitive comparison. |
+| 3 | `parseRef` dual-format | `mcp/src/lib/ref-parser.ts` | `REF_RE` updated from `^@(?:f(\d+))?e(\d+)$` to `^@(?:([a-fA-F0-9]{4}):)?(?:f(\d+))?e(\d+)$` (hash prefix is optional and outermost; frame prefix `fN` retained). Returns `{ hash?: string, frameId?: number, index: number }`. Hash is lowercased before return for case-insensitive comparison. |
 | 4 | `resolveTargetParam` strict check | `mcp/src/lib/ref-parser.ts` | New signature: `(target, activeSnapshotId, activeSnapshotHash) → ResolvedTargetParam`. Hash mismatch throws `STALE_REF`. Bare ref bypasses strict check. |
 | 5 | `STALE_REF` error code + hint | `shared/src/errors.ts` + `errors.hints.ts` | Reuse existing `STALE_REF` code (introduced in v0.6 for frame-stale). Add a snapshot-stale hint variant; mark `recoverable: true`. |
 
@@ -196,7 +196,7 @@ function resolveTargetParam(
 | `@A3F7:e12` (uppercase) | parser lowercases, compare matches | OK |
 | `@e12` (bare ref) | bypass strict check | OK (legacy path) |
 | `activeSnapshotId == null` | request observe first | `INVALID_PARAMS` |
-| `@a3f7:e12.f3` (hash + frame) | strict check on hash, frame passes through | depends on hash match |
+| `@a3f7:f3e12` (hash + frame) | strict check on hash, frame passes through | depends on hash match |
 
 ### Hash normalization
 
@@ -219,7 +219,7 @@ The `hint` field gives only step 1 — explicit and atomic. Steps 2-3 are LLM ag
 
 | File | Cases | # |
 |---|---|---|
-| `mcp/tests/ref-parser.test.ts` (extend) | `parseRef`: `@e12` / `@a3f7:e12` / `@e12.f3` / `@a3f7:e12.f3` / wrong hash length / non-hex / case-insensitive | 6-8 |
+| `mcp/tests/ref-parser.test.ts` (extend) | `parseRef`: `@e12` / `@a3f7:e12` / `@f3e12` / `@a3f7:f3e12` / wrong hash length / non-hex / case-insensitive | 6-8 |
 | same | `resolveTargetParam`: hash match / hash mismatch → STALE_REF / bare ref legacy / no activeSnapshot → INVALID_PARAMS | 4 |
 | `mcp/tests/observe-render.test.ts` (extend) | `refOf` output: hash="a3f7" emits `@a3f7:eN` / hash=null emits `@eN` (unit fixture) | 2 |
 | `mcp/tests/server-snapshot-hash.test.ts` (new) | `activeSnapshotHash` state: updates on observe success / unchanged on observe failure / repeat observe overwrites | 3 |
