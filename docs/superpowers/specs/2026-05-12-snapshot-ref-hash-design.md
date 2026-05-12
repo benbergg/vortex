@@ -25,7 +25,7 @@ SOTA reference: MS playwright-mcp avoids this entirely by issuing a fresh snapsh
 
 ## 2. Goal
 
-Refs carry a short snapshot-bound hash. Caller reusing a ref from a prior observe gets a **structured `STALE_REF` error with a recoverable hint**, not silent misbinding.
+Refs carry a short snapshot-bound hash. Caller reusing a ref from a prior observe gets a **structured `STALE_SNAPSHOT` error with a recoverable hint**, not silent misbinding.
 
 Non-goals:
 - Multi-snapshot LRU store (store-backed validation rejected in brainstorm).
@@ -54,7 +54,7 @@ later:
 vortex_act({target:"@a3f7:e12"}) ──> resolveTargetParam(target, activeSnapshotId, activeSnapshotHash)
                                      parseRef → {hash:"a3f7", e:12}
                                      ┌── hash present && hash != activeSnapshotHash
-                                     │     → VtxError(STALE_REF, recoverable=true)
+                                     │     → VtxError(STALE_SNAPSHOT, recoverable=true)
                                      ├── legacy bare (no hash):
                                      │     → resolve via activeSnapshotId (compat)
                                      └── else (hash matches):
@@ -70,8 +70,8 @@ All changes are confined to `packages/mcp/` plus error code/hint additions in `p
 | 1 | `activeSnapshotHash` state | `mcp/src/server.ts` | Module-level `string \| null` alongside existing `activeSnapshotId`; updated after every successful observe via `sha256(snapshotId).slice(0,4)`. Failed observe does not update. |
 | 2 | `refOf` hash prefix | `mcp/src/lib/observe-render.ts` | Signature gains `snapshotHash: string \| null` param. Emits `@<hash>:eN` when hash is non-null; emits bare `@eN` only for unit-test fixtures (`hash === null`). |
 | 3 | `parseRef` dual-format | `mcp/src/lib/ref-parser.ts` | `REF_RE` updated from `^@(?:f(\d+))?e(\d+)$` to `^@(?:([a-fA-F0-9]{4}):)?(?:f(\d+))?e(\d+)$` (hash prefix is optional and outermost; frame prefix `fN` retained). Returns `{ hash?: string, frameId?: number, index: number }`. Hash is lowercased before return for case-insensitive comparison. |
-| 4 | `resolveTargetParam` strict check | `mcp/src/lib/ref-parser.ts` | New signature: `(target, activeSnapshotId, activeSnapshotHash) → ResolvedTargetParam`. Hash mismatch throws `STALE_REF`. Bare ref bypasses strict check. |
-| 5 | `STALE_REF` error code + hint | `shared/src/errors.ts` + `errors.hints.ts` | Reuse existing `STALE_REF` code (introduced in v0.6 for frame-stale). Add a snapshot-stale hint variant; mark `recoverable: true`. |
+| 4 | `resolveTargetParam` strict check | `mcp/src/lib/ref-parser.ts` | New signature: `(target, activeSnapshotId, activeSnapshotHash) → ResolvedTargetParam`. Hash mismatch throws `STALE_SNAPSHOT`. Bare ref bypasses strict check. |
+| 5 | `STALE_SNAPSHOT` error reuse | `shared/src/errors.ts` + `errors.hints.ts` | No code changes — `STALE_SNAPSHOT` enum and hint already exist (used today for "no active snapshot" path). Existing hint text — *"Page has changed since the snapshot. Call vortex_observe to capture a fresh snapshot, then retry with the new ref."* — directly applies to hash mismatch. `recoverable: true` already set. |
 
 **Dependency direction**:
 ```
@@ -108,7 +108,7 @@ observe-render.ts ──reads hash from──> server.ts
 5. MCP: resolveTargetParam("@a3f7:e0", "s_9z8y7x6w", "b2c8")
         parseRef → {hash:"a3f7", index:0}
         "a3f7" ≠ "b2c8"
-6. throw VtxError(STALE_REF, "Ref bound to expired snapshot",
+6. throw VtxError(STALE_SNAPSHOT, "Ref bound to expired snapshot",
                   { tabId: ... },
                   { recoverable: true,
                     hint: "Call vortex_observe to refresh the element ref list" })
@@ -134,15 +134,17 @@ observe-render.ts ──reads hash from──> server.ts
 
 ## 6. Error handling
 
-### `STALE_REF` payload
+### `STALE_SNAPSHOT` payload
 
 ```ts
 VtxError {
-  code: VtxErrorCode.STALE_REF,
-  message: "Ref bound to expired snapshot",
+  code: VtxErrorCode.STALE_SNAPSHOT,
+  message: "Ref bound to expired snapshot (hash mismatch)",
   context: { tabId, frameId? },
-  hint: "Call vortex_observe to refresh the element ref list",
-  recoverable: true,
+  // hint comes from errors.hints.ts (already exists, no change):
+  // "Page has changed since the snapshot. Call vortex_observe to capture a fresh
+  //  snapshot, then retry with the new ref."
+  // recoverable: true (already set in hints map)
 }
 ```
 
@@ -168,14 +170,13 @@ function resolveTargetParam(
     throw vtxError(VtxErrorCode.INVALID_PARAMS, `Invalid ref format: ${target}`);
   }
   if (parsed.hash !== undefined && parsed.hash !== activeSnapshotHash) {
+    // Reuse STALE_SNAPSHOT: existing hint already says "Page has changed
+    // since the snapshot. Call vortex_observe to capture a fresh snapshot...".
+    // No 4th arg → vtxError uses the hint/recoverable defaults from errors.hints.ts.
     throw vtxError(
-      VtxErrorCode.STALE_REF,
-      "Ref bound to expired snapshot",
+      VtxErrorCode.STALE_SNAPSHOT,
+      "Ref bound to expired snapshot (hash mismatch)",
       ctx, // VtxErrorContext: { tabId, frameId? } passed from dispatch caller
-      {
-        hint: "Call vortex_observe to refresh the element ref list",
-        recoverable: true,
-      },
     );
   }
   return {
@@ -190,7 +191,7 @@ function resolveTargetParam(
 
 | Input | Behavior | Code |
 |---|---|---|
-| `@a3f7:e12` hash mismatch | strict reject | `STALE_REF` |
+| `@a3f7:e12` hash mismatch | strict reject | `STALE_SNAPSHOT` |
 | `@a3f7e12` (no colon) | regex fail | `INVALID_PARAMS` |
 | `@xy12:e12` (non-hex) | regex fail | `INVALID_PARAMS` |
 | `@A3F7:e12` (uppercase) | parser lowercases, compare matches | OK |
@@ -220,7 +221,7 @@ The `hint` field gives only step 1 — explicit and atomic. Steps 2-3 are LLM ag
 | File | Cases | # |
 |---|---|---|
 | `mcp/tests/ref-parser.test.ts` (extend) | `parseRef`: `@e12` / `@a3f7:e12` / `@f3e12` / `@a3f7:f3e12` / wrong hash length / non-hex / case-insensitive | 6-8 |
-| same | `resolveTargetParam`: hash match / hash mismatch → STALE_REF / bare ref legacy / no activeSnapshot → INVALID_PARAMS | 4 |
+| same | `resolveTargetParam`: hash match / hash mismatch → STALE_SNAPSHOT / bare ref legacy / no activeSnapshot → INVALID_PARAMS | 4 |
 | `mcp/tests/observe-render.test.ts` (extend) | `refOf` output: hash="a3f7" emits `@a3f7:eN` / hash=null emits `@eN` (unit fixture) | 2 |
 | `mcp/tests/server-snapshot-hash.test.ts` (new) | `activeSnapshotHash` state: updates on observe success / unchanged on observe failure / repeat observe overwrites | 3 |
 
@@ -230,7 +231,7 @@ Total ~15 new unit tests. Current mcp suite is 234/234 pass; target maintains 10
 
 | File | Content |
 |---|---|
-| `vortex-bench/cases/cross-observe-ref-stale.case.ts` (new) | Playground fixture (any page with interactive elements). Sequence: observe1 → capture ref1 → observe2 (trigger via scroll or DOM mutation to force new snapshot) → act with ref1 → assert `error.code === "STALE_REF"`. |
+| `vortex-bench/cases/cross-observe-ref-stale.case.ts` (new) | Playground fixture (any page with interactive elements). Sequence: observe1 → capture ref1 → observe2 (trigger via scroll or DOM mutation to force new snapshot) → act with ref1 → assert `error.code === "STALE_SNAPSHOT"`. |
 
 ### Ship-preflight self-check
 
@@ -242,10 +243,10 @@ Run `pnpm ship:preflight --from v0.7.4` after the work lands. Expected:
 
 ### Acceptance criteria (issue #20 verbatim + supplements)
 
-- [x] Unit test: cross-observe ref reuse returns `STALE_REF`, never silently rebinds (ref-parser.test.ts)
+- [x] Unit test: cross-observe ref reuse returns `STALE_SNAPSHOT`, never silently rebinds (ref-parser.test.ts)
 - [x] Bench case: two-observe sequence with deliberate ref reuse asserts the error (`cross-observe-ref-stale.case.ts`)
 - [x] Supplement 1: Legacy bare ref still works (dual-format compat) — ref-parser.test.ts "legacy" case
-- [x] Supplement 2: `STALE_REF` hint literally contains "Call vortex_observe" — hint test
+- [x] Supplement 2: `STALE_SNAPSHOT` hint (already in errors.hints.ts) contains "Call vortex_observe" — existing hint test still covers this
 - [x] Supplement 3: mcp suite 234+/234+ pass, no regression
 
 ## 8. Out of scope (for #20)
@@ -259,7 +260,7 @@ Run `pnpm ship:preflight --from v0.7.4` after the work lands. Expected:
 ## 9. Migration / rollout
 
 - **v0.8.0 ship**: dual-format active. CHANGELOG entry highlights new ref format with example and notes bare-ref is legacy.
-- **v0.8.x**: monitor dogfood + downstream caller (OpenClaw plugin) for STALE_REF events. If LLM-side hint chain (STALE_REF → re-observe → retry) works smoothly, proceed to v0.9 hard switch with confidence.
+- **v0.8.x**: monitor dogfood + downstream caller (OpenClaw plugin) for STALE_SNAPSHOT events. If LLM-side hint chain (STALE_SNAPSHOT → re-observe → retry) works smoothly, proceed to v0.9 hard switch with confidence.
 - **v0.9**: bare-ref `@eN` rejected with `INVALID_PARAMS` "ref format deprecated, use @hash:eN from observe". Closes Scenario C footgun.
 - **OpenClaw plugin**: needs no immediate change (legacy path still works). When the plugin's user prompts get updated, they naturally adopt the new format via observe output. Optional plugin-side migration helper can be added later if needed.
 
@@ -267,11 +268,11 @@ Run `pnpm ship:preflight --from v0.7.4` after the work lands. Expected:
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| LLM ignores STALE_REF hint and loops | Medium | Hint text is explicit single-step ("Call vortex_observe to refresh"). If looping observed in dogfood, tighten hint or add structured `recoverable_action: "vortex_observe"` field. |
+| LLM ignores STALE_SNAPSHOT hint and loops | Medium | Hint text is explicit single-step ("Call vortex_observe to refresh"). If looping observed in dogfood, tighten hint or add structured `recoverable_action: "vortex_observe"` field. |
 | Hash collision in 60s TTL | Negligible | 4-char hex = 65536 keyspace. Realistic snapshot rate ≤ 10/min → collision probability ~10⁻⁴/window. If ever hit, mitigation is to bump to 6-char hex (no API change for callers, parser regex widens). |
 | Performance — sha256 per observe | Negligible | sha256 on ~20-char snapshotId ~µs scale; one call per observe. |
 | External tests / scripts hard-code `@eN` | Low | Dual-format means existing scripts keep working in v0.8.x. v0.9 deprecation gives a release cycle of warning before reject. |
-| Frame-stale STALE_REF (existing) confused with snapshot-stale STALE_REF (new) | Low | Same code, different `message` strings ("iframe detached" vs "Ref bound to expired snapshot") — disambiguated at message level; both are `recoverable: true`. |
+| `STALE_SNAPSHOT` now fires for two reasons (no active snapshot vs hash mismatch) | Low | Disambiguated at `message` level: "no active snapshot — call vortex_observe first" vs "Ref bound to expired snapshot (hash mismatch)". Both `recoverable: true`. LLM responds identically (call observe), so the conflation is harmless. |
 
 ## 11. References
 
