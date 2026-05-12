@@ -332,7 +332,8 @@ export async function handleCallTool(
     if (snapshotResult?.snapshotId) activeSnapshotId = snapshotResult.snapshotId;
     if (detail === "compact") {
       const { renderObserveCompact } = await import("./lib/observe-render.js");
-      const text = renderObserveCompact(resp.result as any);
+      // TODO(v0.8 Task 4): replace null with activeSnapshotHash once snapshot state is wired
+      const text = renderObserveCompact(resp.result as any, null);
       return withEvents([{ type: "text" as const, text }]);
     }
     // detail=full：原 JSON pretty（与 v0.4 行为一致）

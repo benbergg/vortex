@@ -1,6 +1,6 @@
 // packages/mcp/src/lib/observe-render.ts
 
-interface CompactElement {
+export interface CompactElement {
   index: number;
   tag: string;
   role: string;
@@ -28,8 +28,10 @@ interface CompactObserve {
   elements: CompactElement[];
 }
 
-function refOf(e: CompactElement): string {
-  return e.frameId === 0 ? `@e${e.index}` : `@f${e.frameId}e${e.index}`;
+export function refOf(e: CompactElement, snapshotHash: string | null): string {
+  const frame = e.frameId === 0 ? "" : `f${e.frameId}`;
+  const tail = `${frame}e${e.index}`;
+  return snapshotHash ? `@${snapshotHash}:${tail}` : `@${tail}`;
 }
 
 function stateFlags(state?: CompactElement["state"]): string {
@@ -47,7 +49,7 @@ function escapeName(s: string): string {
   return s.replace(/\r?\n/g, " ").replace(/"/g, '\\"').slice(0, 80);
 }
 
-export function renderObserveCompact(data: CompactObserve): string {
+export function renderObserveCompact(data: CompactObserve, snapshotHash: string | null): string {
   const lines: string[] = [];
   lines.push(`SnapshotId: ${data.snapshotId}`);
   lines.push(`URL: ${data.url}`);
@@ -59,7 +61,7 @@ export function renderObserveCompact(data: CompactObserve): string {
   lines.push("");
   for (const el of data.elements) {
     const name = el.name ? ` "${escapeName(el.name)}"` : "";
-    lines.push(`${refOf(el)} [${el.role}]${name}${stateFlags(el.state)}`);
+    lines.push(`${refOf(el, snapshotHash)} [${el.role}]${name}${stateFlags(el.state)}`);
   }
   // Frame 状态提示：1) 未扫的（cross-origin/destroyed）2) 扫描成功但 0 元素的
   // sub-frame。后者之前沉默 → 多 frame 场景下 LLM 看不到子 frame 存在就会
