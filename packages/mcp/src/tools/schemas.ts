@@ -26,7 +26,8 @@ const optionalFrameId = {
 const targetRef = {
   target: {
     type: "string" as const,
-    description: "`@eN`/`@fNeM` ref or CSS selector.",
+    description:
+      "`@<hash>:eN` / `@<hash>:fNeM` ref or CSS selector (bare `@eN` / `@fNeM` accepted in v0.8.x; deprecated in v0.9).",
   },
 };
 
@@ -86,7 +87,7 @@ function observeTools(): ToolDef[] {
     {
       name: "vortex_observe",
       action: "observe.snapshot",
-      description: "Get interactive elements (@eN/@fNeM refs, role, name). If too few results (e.g. iframes or below-fold), try frames='all-same-origin' or viewport='full' before falling back to get_html.",
+      description: "Get interactive elements (@<hash>:eN / @<hash>:fNeM refs — 4-hex snapshot hash binds the ref to its originating snapshot; bare @eN / @fNeM still resolve in v0.8.x). If too few results (e.g. iframes or below-fold), try frames='all-same-origin' or viewport='full' before falling back to get_html.",
       schema: {
         type: "object",
         properties: {
@@ -208,7 +209,7 @@ function pageTools(): ToolDef[] {
       schema: {
         type: "object",
         properties: {
-          target: { type: "string", description: "CSS selector or @eN ref." },
+          target: { type: "string", description: "CSS selector or @<hash>:eN ref (bare @eN accepted in v0.8.x; deprecated in v0.9)." },
           timeout: { type: "number", default: 10000 },
           ...optionalTabId,
           ...optionalFrameId,
@@ -248,7 +249,7 @@ function domTools(): ToolDef[] {
     {
       name: "vortex_click",
       action: "dom.click",
-      description: "Click element by @eN ref or selector. Scrolls into view.",
+      description: "Click element by @<hash>:eN ref or selector (bare @eN accepted in v0.8.x; deprecated in v0.9). Scrolls into view.",
       schema: {
         type: "object",
         properties: {
@@ -340,7 +341,7 @@ function domTools(): ToolDef[] {
               type: "object",
               properties: {
                 op: { type: "string", enum: ["click", "fill", "type", "select", "scroll", "hover"] },
-                target: { type: "string", description: "@eN ref or CSS selector." },
+                target: { type: "string", description: "@<hash>:eN ref or CSS selector (bare @eN accepted in v0.8.x; deprecated in v0.9)." },
                 value: { type: "string" },
                 delay: { type: "number" },
                 position: { type: "string" },
@@ -367,7 +368,7 @@ function domTools(): ToolDef[] {
             items: {
               type: "object",
               properties: {
-                target: { type: "string", description: "@eN ref or CSS selector." },
+                target: { type: "string", description: "@<hash>:eN ref or CSS selector (bare @eN accepted in v0.8.x; deprecated in v0.9)." },
                 value: {},
                 kind: {
                   type: "string",

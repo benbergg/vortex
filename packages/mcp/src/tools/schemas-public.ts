@@ -11,6 +11,11 @@
 // v0.6 scope: target accepts ref string only (`@e3` / `@f1e2`) or null
 // (whole page where applicable). Descriptor object form arrives in v0.6.x
 // alongside L3 reasoning resolver — keeping schema honest with runtime.
+//
+// v0.8.x: hashed ref form `@<hash>:eN` / `@<hash>:fNeM` is preferred; bare
+// `@eN` / `@fNeM` legacy refs remain accepted but deprecated in v0.9. The
+// public description strings stay terse (≤ 60 char per I15) so ref-syntax
+// guidance is carried by the internal `schemas.ts` tool descriptions.
 
 import type { ToolDef } from "./schemas.js";
 
@@ -19,8 +24,9 @@ const tabFields = {
   frameId: { type: "number" as const },
 };
 
-// target: ref string only in v0.6. null variant lets extract/screenshot
-// target the whole page; act/wait_for require a concrete element.
+// target: ref string only in v0.6 (`@e3` / `@f1e2` legacy + `@<hash>:eN`
+// hashed form in v0.8.x). null variant lets extract/screenshot target the
+// whole page; act/wait_for require a concrete element.
 const TargetRequired = { type: "string" as const };
 const TargetOptional = { oneOf: [{ type: "string" as const }, { type: "null" as const }] };
 
