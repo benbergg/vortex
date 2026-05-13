@@ -341,7 +341,12 @@ export async function handleCallTool(
     }
     if (detail === "compact") {
       const { renderObserveCompact } = await import("./lib/observe-render.js");
-      const text = renderObserveCompact(resp.result as any, activeSnapshotHash);
+      // Issue #21 — thread caller's includeBoxes through to the renderer.
+      // The flag is also already inside `next` (spread `...rest`) so the
+      // extension handler sees it on its own; render needs the bool too
+      // to decide whether to emit `bbox=` segments and frame offset lines.
+      const includeBoxes = params.includeBoxes === true;
+      const text = renderObserveCompact(resp.result as any, activeSnapshotHash, includeBoxes);
       return withEvents([{ type: "text" as const, text }]);
     }
     // detail=full：原 JSON pretty（与 v0.4 行为一致）

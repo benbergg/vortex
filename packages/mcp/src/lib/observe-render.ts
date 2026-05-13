@@ -54,7 +54,11 @@ function escapeName(s: string): string {
   return s.replace(/\r?\n/g, " ").replace(/"/g, '\\"').slice(0, 80);
 }
 
-export function renderObserveCompact(data: CompactObserve, snapshotHash: string | null): string {
+export function renderObserveCompact(
+  data: CompactObserve,
+  snapshotHash: string | null,
+  includeBoxes = false,
+): string {
   const lines: string[] = [];
   lines.push(`SnapshotId: ${data.snapshotId}`);
   lines.push(`URL: ${data.url}`);
@@ -66,7 +70,15 @@ export function renderObserveCompact(data: CompactObserve, snapshotHash: string 
   lines.push("");
   for (const el of data.elements) {
     const name = el.name ? ` "${escapeName(el.name)}"` : "";
-    lines.push(`${refOf(el, snapshotHash)} [${el.role}]${name}${stateFlags(el.state)}`);
+    // Issue #21 — bbox segment is opt-in AND only present when the
+    // handler already attached el.bbox (i.e. element passed the
+    // in-viewport / non-zero-area gate in T4). Drop the segment silently
+    // when either condition is missing — element line stays intact.
+    const bboxSeg =
+      includeBoxes && el.bbox !== undefined ? ` bbox=[${el.bbox.join(",")}]` : "";
+    lines.push(
+      `${refOf(el, snapshotHash)} [${el.role}]${name}${stateFlags(el.state)}${bboxSeg}`,
+    );
   }
   // Frame 状态提示：1) 未扫的（cross-origin/destroyed）2) 扫描成功但 0 元素的
   // sub-frame。后者之前沉默 → 多 frame 场景下 LLM 看不到子 frame 存在就会
@@ -77,6 +89,18 @@ export function renderObserveCompact(data: CompactObserve, snapshotHash: string 
       scanNotes.push(`# frame ${f.frameId} not scanned (url=${f.url})`);
     } else if (f.elementCount === 0 && f.frameId !== 0) {
       scanNotes.push(`# frame ${f.frameId} scanned, 0 interactive elements (url=${f.url})`);
+    }
+  }
+  // Issue #21 — when includeBoxes=true, emit one '# frame N offset=[x,y]'
+  // line per scanned non-main frame. Element bboxes are frame-local; the
+  // offset line lets callers compose top-page coords via
+  //   (el.bbox.x + frame.offset.x, el.bbox.y + frame.offset.y).
+  // Emitted even when elementCount === 0 so callers know the frame exists.
+  if (includeBoxes) {
+    for (const f of data.frames ?? []) {
+      if (f.scanned && f.frameId !== 0) {
+        scanNotes.push(`# frame ${f.frameId} offset=[${f.offset.x},${f.offset.y}]`);
+      }
     }
   }
   if (scanNotes.length > 0) {
