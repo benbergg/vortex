@@ -7,6 +7,11 @@ export interface CompactElement {
   name: string;
   state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; required?: boolean };
   frameId: number;
+  // Issue #21 — visual-grounding. Optional tuple [x, y, w, h] in integer px,
+  // frame-local viewport coordinates. Present only when caller passes
+  // includeBoxes:true AND the element intersects the frame viewport.
+  // Tuple form (not object) saves ~6 tokens/element vs `{x,y,w,h}`.
+  bbox?: [number, number, number, number];
 }
 
 interface CompactFrame {

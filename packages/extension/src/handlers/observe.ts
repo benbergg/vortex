@@ -853,6 +853,8 @@ export function registerObserveHandlers(router: ActionRouter): void {
         name: string;
         state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean };
         frameId: number;
+        // Issue #21 — populated only when input.includeBoxes && e.inViewport (T4).
+        bbox?: [number, number, number, number];
       };
       type FullElementOut = Omit<ScannedElement, "_sel"> & {
         frameId: number;
