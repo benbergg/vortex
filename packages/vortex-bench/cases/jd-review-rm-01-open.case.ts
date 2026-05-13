@@ -22,7 +22,8 @@ const def: CaseDefinition = {
     );
 
     // 取 ref 并 click
-    const matchTrigger = snap1.match(/(@\w+)\s+\[\w+\]\s+"全部评价"/);
+    // v0.8 hashed ref support: @\w+ doesn't match the ':' in @<hash>:eN, so widen to [\w:]+
+    const matchTrigger = snap1.match(/(@[\w:]+)\s+\[\w+\]\s+"全部评价"/);
     ctx.assert(matchTrigger !== null, `应找到 "全部评价" 的 ref：${snap1.slice(0, 400)}`);
     const triggerRef = matchTrigger![1];
 

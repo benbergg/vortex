@@ -74,7 +74,13 @@ function withEvents(content: ContentItem[]): { content: ContentItem[] } {
   return { content };
 }
 
+export function computeSnapshotHash(id: string | null): string | null {
+  if (!id) return null;
+  return createHash("sha256").update(id).digest("hex").slice(0, 4);
+}
+
 let activeSnapshotId: string | null = null;
+let activeSnapshotHash: string | null = null;
 
 const PORT = parseInt(process.env.VORTEX_PORT ?? "6800");
 const DEFAULT_TIMEOUT = parseInt(process.env.VORTEX_TIMEOUT_MS ?? "30000");
@@ -329,10 +335,13 @@ export async function handleCallTool(
     }
     // 追踪活跃 snapshotId，供后续动作工具 target 翻译使用
     const snapshotResult = resp.result as { snapshotId?: string };
-    if (snapshotResult?.snapshotId) activeSnapshotId = snapshotResult.snapshotId;
+    if (snapshotResult?.snapshotId) {
+      activeSnapshotId = snapshotResult.snapshotId;
+      activeSnapshotHash = computeSnapshotHash(snapshotResult.snapshotId);
+    }
     if (detail === "compact") {
       const { renderObserveCompact } = await import("./lib/observe-render.js");
-      const text = renderObserveCompact(resp.result as any);
+      const text = renderObserveCompact(resp.result as any, activeSnapshotHash);
       return withEvents([{ type: "text" as const, text }]);
     }
     // detail=full：原 JSON pretty（与 v0.4 行为一致）
@@ -354,7 +363,7 @@ export async function handleCallTool(
         if (f.target.startsWith("@")) {
           try {
             const { resolveTargetParam } = await import("./lib/ref-parser.js");
-            const resolved = resolveTargetParam(f.target, activeSnapshotId);
+            const resolved = resolveTargetParam(f.target, activeSnapshotId, activeSnapshotHash);
             if (resolved.selector) fieldParams.selector = resolved.selector;
             if (resolved.index != null) {
               fieldParams.index = resolved.index;
@@ -396,7 +405,7 @@ export async function handleCallTool(
   if (target) {
     try {
       const { resolveTargetParam } = await import("./lib/ref-parser.js");
-      const resolved = resolveTargetParam(target, activeSnapshotId);
+      const resolved = resolveTargetParam(target, activeSnapshotId, activeSnapshotHash);
       delete params.target;
       if (resolved.selector) params.selector = resolved.selector;
       if (resolved.index != null) {

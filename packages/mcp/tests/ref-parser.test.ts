@@ -56,20 +56,116 @@ describe("parseRef", () => {
   });
 });
 
+describe("parseRef — hashed dual-format (v0.8)", () => {
+  it("parses bare ref @eN (legacy)", () => {
+    expect(parseRef("@e12")).toEqual({ kind: "ref", index: 12, frameId: 0 });
+  });
+
+  it("parses bare ref with frame @fNeM (legacy)", () => {
+    expect(parseRef("@f3e12")).toEqual({ kind: "ref", index: 12, frameId: 3 });
+  });
+
+  it("parses hashed ref @<hash>:eN", () => {
+    expect(parseRef("@a3f7:e12")).toEqual({
+      kind: "ref",
+      index: 12,
+      frameId: 0,
+      hash: "a3f7",
+    });
+  });
+
+  it("parses hashed ref with frame @<hash>:fNeM", () => {
+    expect(parseRef("@a3f7:f3e12")).toEqual({
+      kind: "ref",
+      index: 12,
+      frameId: 3,
+      hash: "a3f7",
+    });
+  });
+
+  it("lowercases an uppercase hash prefix", () => {
+    expect(parseRef("@A3F7:e12")).toEqual({
+      kind: "ref",
+      index: 12,
+      frameId: 0,
+      hash: "a3f7",
+    });
+  });
+
+  it("rejects a hash of the wrong length (3 hex)", () => {
+    expect(() => parseRef("@abc:e12")).toThrow(/invalid ref format/);
+  });
+
+  it("rejects a hash with non-hex chars", () => {
+    expect(() => parseRef("@xy12:e12")).toThrow(/invalid ref format/);
+  });
+
+  it("rejects a hashed ref missing the colon (`@a3f7e12`)", () => {
+    expect(() => parseRef("@a3f7e12")).toThrow(/invalid ref format/);
+  });
+});
+
 describe("resolveTargetParam", () => {
   it("ref → { index, snapshotId, frameId }", () => {
-    const out = resolveTargetParam("@e5", "s_abc");
+    const out = resolveTargetParam("@e5", "s_abc", null);
     expect(out).toEqual({ index: 5, snapshotId: "s_abc", frameId: 0 });
   });
   it("跨 frame ref 携带 frameId", () => {
-    const out = resolveTargetParam("@f2e7", "s_xyz");
+    const out = resolveTargetParam("@f2e7", "s_xyz", null);
     expect(out).toEqual({ index: 7, snapshotId: "s_xyz", frameId: 2 });
   });
   it("selector → { selector }", () => {
-    const out = resolveTargetParam(".foo", "s_xyz");
+    const out = resolveTargetParam(".foo", "s_xyz", null);
     expect(out).toEqual({ selector: ".foo" });
   });
   it("ref 但无活跃 snapshot → 抛 StaleRef", () => {
-    expect(() => resolveTargetParam("@e1", null)).toThrow(/no active snapshot/i);
+    expect(() => resolveTargetParam("@e1", null, null)).toThrow(/no active snapshot/i);
+  });
+});
+
+describe("resolveTargetParam — hash strict check (v0.8)", () => {
+  it("matches a hashed ref against activeSnapshotHash", () => {
+    expect(resolveTargetParam("@a3f7:e1", "s_xyz", "a3f7")).toEqual({
+      index: 1,
+      snapshotId: "s_xyz",
+      frameId: 0,
+    });
+  });
+
+  it("rejects a hashed ref when hash mismatches", () => {
+    expect(() => resolveTargetParam("@a3f7:e1", "s_xyz", "b2c8")).toThrow(
+      /Ref bound to expired snapshot/,
+    );
+  });
+
+  it("passes a bare ref through unchanged (legacy compat)", () => {
+    expect(resolveTargetParam("@e1", "s_xyz", "b2c8")).toEqual({
+      index: 1,
+      snapshotId: "s_xyz",
+      frameId: 0,
+    });
+  });
+
+  it("hashed ref + no activeSnapshotId throws STALE_SNAPSHOT", () => {
+    expect(() => resolveTargetParam("@a3f7:e1", null, null)).toThrow(
+      /no active snapshot/,
+    );
+  });
+
+  it("hashed ref against null activeSnapshotHash → mismatch", () => {
+    // Theoretically impossible once Task 4 wires id+hash together, but the
+    // function contract today allows the caller to pass (snapshotId, null);
+    // lock in the strict-check behavior in that state.
+    expect(() => resolveTargetParam("@a3f7:e1", "s_xyz", null)).toThrow(
+      /Ref bound to expired snapshot/,
+    );
+  });
+
+  it("matches a hashed ref with frame prefix", () => {
+    expect(resolveTargetParam("@a3f7:f3e1", "s_xyz", "a3f7")).toEqual({
+      index: 1,
+      snapshotId: "s_xyz",
+      frameId: 3,
+    });
   });
 });

@@ -9,7 +9,8 @@ const SAMPLES = 100;
 
 /** 从 observe snapshot 里按 accessible name 精确匹配提取 @eN ref（与 el-dropdown.case.ts 同 regex） */
 function findRef(snapshot: string, name: string): string | null {
-  const re = new RegExp(`(@[ef]?\\d+(?:e\\d+)?)\\s+\\[[^\\]]+\\]\\s+"([^"]*?)"`, "g");
+  // v0.8 hashed ref support: matches @eN / @fNeM / @<hash>:eN / @<hash>:fNeM
+  const re = new RegExp(`(@(?:[a-f0-9]{4}:)?(?:f\\d+)?e\\d+)\\s+\\[[^\\]]+\\]\\s+"([^"]*?)"`, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(snapshot)) !== null) {
     if (m[2].trim() === name) return m[1];

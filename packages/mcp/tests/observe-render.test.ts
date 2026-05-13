@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { renderObserveCompact } from "../src/lib/observe-render.js";
+import { renderObserveCompact, refOf } from "../src/lib/observe-render.js";
+import type { CompactElement } from "../src/lib/observe-render.js";
 
 const sample = {
   snapshotId: "s_abc123",
@@ -20,25 +21,25 @@ const sample = {
 
 describe("renderObserveCompact", () => {
   it("输出 SnapshotId + URL + Viewport 头", () => {
-    const out = renderObserveCompact(sample);
+    const out = renderObserveCompact(sample, null);
     expect(out).toMatch(/^SnapshotId: s_abc123/m);
     expect(out).toMatch(/URL: https:\/\/erp\.example\.com\/goods/);
     expect(out).toMatch(/Viewport: 1440x900, scrollY=320\/4800/);
   });
 
   it("主 frame 元素渲染为 @eN [role] \"name\"", () => {
-    const out = renderObserveCompact(sample);
+    const out = renderObserveCompact(sample, null);
     expect(out).toContain(`@e0 [button] "新增商品"`);
     expect(out).toContain(`@e1 [textbox] "SKU 搜索"`);
   });
 
   it("state flag 只打 true 值", () => {
-    const out = renderObserveCompact(sample);
+    const out = renderObserveCompact(sample, null);
     expect(out).toContain(`@e2 [button] "提交" [disabled]`);
   });
 
   it("子 frame 用 @fNeM 前缀", () => {
-    const out = renderObserveCompact(sample);
+    const out = renderObserveCompact(sample, null);
     expect(out).toContain(`@f1e3 [textbox] "卡号"`);
   });
 
@@ -52,7 +53,7 @@ describe("renderObserveCompact", () => {
     }));
     // 用完整头部模拟真实 observe 返回
     const big = { ...sample, elements: manyElements };
-    const out = renderObserveCompact(big);
+    const out = renderObserveCompact(big, null);
     const bytes = Buffer.byteLength(out, "utf-8");
     console.log(`100 中文元素 compact = ${bytes} bytes`);
     // 中文 name 每字符 3B UTF-8，3KB 允许 name 均值 ~6 字符；仍比 v0.4 的 ~100KB 降低 97%+
@@ -68,7 +69,7 @@ describe("renderObserveCompact", () => {
       frameId: 0,
     }));
     const big = { ...sample, elements: manyElements };
-    const out = renderObserveCompact(big);
+    const out = renderObserveCompact(big, null);
     const bytes = Buffer.byteLength(out, "utf-8");
     console.log(`100 ASCII 元素 compact = ${bytes} bytes`);
     // 含完整头部（title/viewport/frames）约 200B，元素列表 ~2KB；整体 ≤ 2.5KB
@@ -86,7 +87,7 @@ describe("renderObserveCompact", () => {
       ],
       elements: [{ index: 0, tag: "button", role: "button", name: "ok", frameId: 0 }],
     };
-    const out = renderObserveCompact(data);
+    const out = renderObserveCompact(data, null);
     expect(out).toContain("# frame 22 scanned, 0 interactive elements");
   });
 
@@ -98,7 +99,7 @@ describe("renderObserveCompact", () => {
       ],
       elements: [],
     };
-    const out = renderObserveCompact(data);
+    const out = renderObserveCompact(data, null);
     expect(out).not.toContain("# frame 0");
   });
 
@@ -111,8 +112,64 @@ describe("renderObserveCompact", () => {
       ],
       elements: [{ index: 0, tag: "button", role: "button", name: "ok", frameId: 0 }],
     };
-    const out = renderObserveCompact(data);
+    const out = renderObserveCompact(data, null);
     expect(out).toContain("# frame 5 not scanned");
     expect(out).not.toContain("# frame 5 scanned");
+  });
+});
+
+describe("refOf — hash prefix (v0.8)", () => {
+  const baseEl = (overrides: Partial<CompactElement> = {}): CompactElement => ({
+    index: 5,
+    tag: "button",
+    role: "button",
+    name: "Click me",
+    frameId: 0,
+    ...overrides,
+  });
+
+  it("emits @<hash>:eN when hash is provided and frame is 0", () => {
+    expect(refOf(baseEl(), "a3f7")).toBe("@a3f7:e5");
+  });
+
+  it("emits @eN when hash is null (legacy fixture path)", () => {
+    expect(refOf(baseEl(), null)).toBe("@e5");
+  });
+
+  it("preserves frame prefix in hashed form: @<hash>:fNeM", () => {
+    expect(refOf(baseEl({ frameId: 3 }), "a3f7")).toBe("@a3f7:f3e5");
+  });
+
+  it("preserves frame prefix in bare form: @fNeM", () => {
+    expect(refOf(baseEl({ frameId: 3 }), null)).toBe("@f3e5");
+  });
+});
+
+describe("renderObserveCompact — propagates hash to every ref (v0.8)", () => {
+  it("emits hashed refs across all elements when given a hash", () => {
+    const input = {
+      snapshotId: "s_test",
+      url: "https://example.com/",
+      elements: [
+        { index: 0, tag: "button", role: "button", name: "A", frameId: 0 },
+        { index: 1, tag: "a", role: "link", name: "B", frameId: 0 },
+      ],
+    };
+    const out = renderObserveCompact(input, "a3f7");
+    expect(out).toContain("@a3f7:e0");
+    expect(out).toContain("@a3f7:e1");
+    expect(out).not.toContain("@e0 ");
+    expect(out).not.toContain("@e1 ");
+  });
+
+  it("emits bare refs when hash is null (legacy)", () => {
+    const input = {
+      snapshotId: "s_test",
+      url: "https://example.com/",
+      elements: [{ index: 0, tag: "button", role: "button", name: "A", frameId: 0 }],
+    };
+    const out = renderObserveCompact(input, null);
+    expect(out).toContain("@e0");
+    expect(out).not.toContain("@a3f7");
   });
 });
