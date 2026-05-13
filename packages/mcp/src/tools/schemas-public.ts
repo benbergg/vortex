@@ -63,6 +63,7 @@ export const PUBLIC_TOOLS: ToolDef[] = [
         scope: { type: "string", enum: ["viewport", "full"] },
         filter: { enum: ["interactive", "all"] },
         frames: { enum: ["main", "all-same-origin", "all-permitted", "all"] },
+        includeBoxes: { type: "boolean" },
         ...tabFields,
       },
     },
