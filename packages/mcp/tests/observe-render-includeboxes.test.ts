@@ -180,4 +180,37 @@ describe("renderObserveCompact — includeBoxes opt-in (Issue #21)", () => {
     // Order: ref [role] "name" [state-flags...] bbox=...
     expect(out).toContain('@e0 [button] "Click me" [disabled] bbox=[5,6,7,8]');
   });
+
+  it("C-R12: frame offset components are Math.round'd at emission ('integer px' contract)", () => {
+    // iframe-offset.ts sources raw getBoundingClientRect floats; SPEC R3
+    // and the schema description both promise integer px in the meta
+    // line. Round at the contract boundary so vision callers parsing
+    // /offset=\[(\d+),(\d+)\]/ never see fractional coords.
+    const data = {
+      snapshotId: "s_iframe",
+      url: "https://top.example/",
+      frames: [
+        mkFrame({ frameId: 0 }),
+        mkFrame({
+          frameId: 13,
+          parentFrameId: 0,
+          url: "https://child.example/",
+          offset: { x: 300.7, y: 150.3 },
+        }),
+        mkFrame({
+          frameId: 14,
+          parentFrameId: 0,
+          url: "https://other-child.example/",
+          // Math.round rounds half-away-from-zero in JS: 100.5 → 101.
+          offset: { x: 100.5, y: -0.4 },
+        }),
+      ],
+      elements: [mkEl()],
+    };
+    const out = renderObserveCompact(data, null, true);
+    expect(out).toContain("# frame 13 offset=[301,150]");
+    expect(out).toContain("# frame 14 offset=[101,0]");
+    // Negative assertion: no fractional component leaks into the meta line.
+    expect(out).not.toMatch(/offset=\[[^\]]*\./);
+  });
 });

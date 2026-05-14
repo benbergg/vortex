@@ -96,10 +96,20 @@ export function renderObserveCompact(
   // offset line lets callers compose top-page coords via
   //   (el.bbox.x + frame.offset.x, el.bbox.y + frame.offset.y).
   // Emitted even when elementCount === 0 so callers know the frame exists.
+  //
+  // Math.round on offset components is the contract boundary: element
+  // bboxes are already integer at this point (rounded twice — page-side
+  // observe.ts:680-685 and handler observe.ts:917-922), but iframe-offset
+  // sources its values raw from getBoundingClientRect (floats on retina
+  // / sub-pixel transforms). Rounding here keeps the documented
+  // "integer px, frame-local viewport coords" contract honest and lets
+  // simple regex parsers like /offset=\[(\d+),(\d+)\]/ work uniformly.
   if (includeBoxes) {
     for (const f of data.frames ?? []) {
       if (f.scanned && f.frameId !== 0) {
-        scanNotes.push(`# frame ${f.frameId} offset=[${f.offset.x},${f.offset.y}]`);
+        scanNotes.push(
+          `# frame ${f.frameId} offset=[${Math.round(f.offset.x)},${Math.round(f.offset.y)}]`,
+        );
       }
     }
   }
