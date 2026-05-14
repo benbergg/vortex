@@ -7,6 +7,14 @@ import type { CaseContext, CaseDefinition, CaseMetrics } from "../types.js";
 export interface RunCaseOptions {
   mcpBin: string;
   playgroundUrl: string;
+  /**
+   * Issue #21 — runner-level arg injection for sweep mode. Merged
+   * (shallow, override-wins) into the args of every `ctx.call(name, ...)`
+   * whose tool name matches a key. Lets us A/B-compare bench cases under
+   * different observe options without mutating per-case fixture files
+   * (which would break pass-1 byte parity vs the v0.6 baseline lockdown).
+   */
+  argOverrides?: Record<string, Record<string, unknown>>;
 }
 
 class AssertionError extends Error {
@@ -33,8 +41,10 @@ export async function runCase(def: CaseDefinition, opts: RunCaseOptions): Promis
 
   async function callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     callCount++;
-    trace.push({ kind: "tool_call", name, args, at: trace.now() });
-    const res = await mcp.client.callTool({ name, arguments: args });
+    const overrides = opts.argOverrides?.[name];
+    const finalArgs = overrides ? { ...args, ...overrides } : args;
+    trace.push({ kind: "tool_call", name, args: finalArgs, at: trace.now() });
+    const res = await mcp.client.callTool({ name, arguments: finalArgs });
     const text = extractText(res);
     const errorCodes = extractErrorCodes(text);
     // v0.7.1 instrument: 累加 utf-8 字节数（Buffer.byteLength 比 .length 准——
