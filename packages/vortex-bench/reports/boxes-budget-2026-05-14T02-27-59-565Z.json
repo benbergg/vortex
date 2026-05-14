@@ -1,11 +1,15 @@
 {
   "generatedAt": "2026-05-14T02:27:59.565Z",
+  "ceiling": 1.6,
+  "outlierFlag": 1.8,
   "observedCount": 24,
   "median": 1.5027122434561924,
   "p95": 1.5902944538945005,
   "max": 1.5991390906645144,
   "casesOver1_20": 22,
   "casesOver1_40": 18,
+  "casesOverCeiling": 0,
+  "casesOverOutlierFlag": 0,
   "entries": [
     {
       "case": "aria-cursor-nested-no-dup",

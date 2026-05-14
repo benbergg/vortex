@@ -3,13 +3,32 @@
 // Compares per-case `outputBytesByTool.vortex_observe` between two passes
 // of the same bench cases: pass A (baseline, no includeBoxes) vs pass B
 // (`includeBoxes: true` injected at the runner). Emits per-case ratios
-// and cohort median / p95 / max so we can verify SPEC R6's ≤ +20%
-// ceiling for the visual-grounding rollout.
+// and cohort median / p95 / max so we can verify SPEC R6's ceiling for
+// the visual-grounding rollout.
 //
 // All functions are pure — no I/O, no clock — so they're trivially
 // testable. The CLI in src/index.ts performs the I/O wrapping.
 
 import type { CaseMetrics } from "../types.js";
+
+/**
+ * SPEC R6 (revised 2026-05-14): cohort median AND p95 of
+ * `bytesWith / bytesWithout` must stay at or below this ceiling. The
+ * original SPEC text said ≤ 1.20 (+20% from issue #21), but the
+ * first bench sweep showed structural per-element cost of ~+96% and
+ * cohort floor at ~1.50. The ceiling was raised to 1.60 with a
+ * reflexion note (see SPEC § Reflexion note T7). Encoding it as a
+ * single named constant prevents the future drift between code
+ * default, render label, and CHANGELOG prose that PR #23 review
+ * caught.
+ */
+export const SPEC_R6_CEILING = 1.6;
+/**
+ * Per-case outlier flag (informational, not blocking). Cases above
+ * this trip a warning in the report. Raised from 1.40 → 1.80 in the
+ * same SPEC R6 revision.
+ */
+export const SPEC_R6_OUTLIER_FLAG = 1.8;
 
 /** Per-case row in the boxes-budget report. */
 export interface BoxesBudgetEntry {
@@ -26,6 +45,11 @@ export interface BoxesBudgetEntry {
 export interface BoxesBudgetReport {
   /** ISO timestamp injected by the CLI wrapper; pure pipeline leaves empty. */
   generatedAt: string;
+  /** Ceiling that was applied (SPEC R6). Embedded so future readers don't
+   * need to cross-reference docs to know which threshold the verdict used. */
+  ceiling: number;
+  /** Per-case outlier flag threshold. */
+  outlierFlag: number;
   /** Number of cases that contributed to the cohort metrics (ratio is finite). */
   observedCount: number;
   /** Median of finite ratios. NaN if observedCount === 0. */
@@ -34,10 +58,15 @@ export interface BoxesBudgetReport {
   p95: number;
   /** Max finite ratio. NaN if observedCount === 0. */
   max: number;
-  /** Count of cases with ratio > 1.20 (the SPEC ceiling). */
+  /** Count of cases with ratio > 1.20 (informational, fixed threshold for
+   * cross-run trending — independent of the active ceiling). */
   casesOver1_20: number;
-  /** Count of cases with ratio > 1.40 (the per-case outlier flag). */
+  /** Count of cases with ratio > 1.40 (informational, fixed threshold). */
   casesOver1_40: number;
+  /** Count of cases over the current ceiling. */
+  casesOverCeiling: number;
+  /** Count of cases over the current outlier flag. */
+  casesOverOutlierFlag: number;
   /** All per-case entries, including the ones we couldn't measure (NaN ratio). */
   entries: BoxesBudgetEntry[];
 }
@@ -102,27 +131,47 @@ export function percentile(xs: readonly number[], p: number): number {
   return sorted[lo] + (sorted[hi] - sorted[lo]) * frac;
 }
 
-/** Aggregate entries into a full BoxesBudgetReport. `generatedAt` left empty. */
+/**
+ * Aggregate entries into a full BoxesBudgetReport.
+ *
+ * - `ceiling` / `outlierFlag` default to the named constants but the
+ *   caller can override (handy for unit tests). The report records the
+ *   value actually used so artifact consumers can read it directly.
+ * - `generatedAt` left empty for the CLI wrapper to fill.
+ */
 export function summarizeBoxesBudget(
   before: readonly CaseMetrics[],
   after: readonly CaseMetrics[],
+  ceiling: number = SPEC_R6_CEILING,
+  outlierFlag: number = SPEC_R6_OUTLIER_FLAG,
 ): BoxesBudgetReport {
   const entries = joinPasses(before, after);
   const ratios = entries.map((e) => e.ratio).filter((r) => Number.isFinite(r));
   return {
     generatedAt: "",
+    ceiling,
+    outlierFlag,
     observedCount: ratios.length,
     median: median(ratios),
     p95: percentile(ratios, 0.95),
     max: ratios.length === 0 ? Number.NaN : Math.max(...ratios),
     casesOver1_20: ratios.filter((r) => r > 1.2).length,
     casesOver1_40: ratios.filter((r) => r > 1.4).length,
+    casesOverCeiling: ratios.filter((r) => r > ceiling).length,
+    casesOverOutlierFlag: ratios.filter((r) => r > outlierFlag).length,
     entries,
   };
 }
 
-/** SPEC R6 gate: median AND p95 ≤ 1.20. Cohort with 0 observations fails. */
-export function passesGate(report: BoxesBudgetReport, ceiling = 1.2): boolean {
+/**
+ * SPEC R6 gate: median AND p95 ≤ ceiling. Cohort with 0 observations
+ * fails. Reads the ceiling from the report by default so caller, render
+ * label, and gate verdict all reference the same source of truth.
+ */
+export function passesGate(
+  report: BoxesBudgetReport,
+  ceiling: number = report.ceiling,
+): boolean {
   if (report.observedCount === 0) return false;
   return report.median <= ceiling && report.p95 <= ceiling;
 }
@@ -130,6 +179,7 @@ export function passesGate(report: BoxesBudgetReport, ceiling = 1.2): boolean {
 /** Render a sortable stdout table for human eyeballing. */
 export function renderBoxesBudgetTable(report: BoxesBudgetReport): string {
   const lines: string[] = [];
+  const ceilingLabel = report.ceiling.toFixed(2);
   lines.push("┌─ boxes-budget report ───────────────────────────────────────────┐");
   lines.push(`│ cases observed: ${report.observedCount.toString().padStart(3)}                                            │`);
   lines.push(`│ median ratio:   ${fmtRatio(report.median).padStart(7)}                                       │`);
@@ -137,7 +187,7 @@ export function renderBoxesBudgetTable(report: BoxesBudgetReport): string {
   lines.push(`│ max ratio:      ${fmtRatio(report.max).padStart(7)}                                       │`);
   lines.push(`│ cases > 1.20:   ${report.casesOver1_20.toString().padStart(3)}                                            │`);
   lines.push(`│ cases > 1.40:   ${report.casesOver1_40.toString().padStart(3)}                                            │`);
-  lines.push(`│ gate (≤ 1.20):  ${passesGate(report) ? "PASS" : "FAIL"}                                           │`);
+  lines.push(`│ gate (≤ ${ceilingLabel}):  ${passesGate(report) ? "PASS" : "FAIL"}                                           │`);
   lines.push("└─────────────────────────────────────────────────────────────────┘");
   lines.push("");
   lines.push("case                                bytes_without  bytes_with     ratio");

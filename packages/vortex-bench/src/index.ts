@@ -174,9 +174,12 @@ async function cmdCompareBoxes(args: string[]): Promise<number> {
   await writeFile(reportPath, JSON.stringify(summary, null, 2));
   process.stdout.write(`[report] ${reportPath}\n`);
 
-  // SPEC R6 gate: median AND p95 ≤ 1.20. Allow up-to-N case outliers if
-  // they don't drag the cohort metric. Exit 0 = gate pass, 3 = gate fail
-  // (distinct from 2 which `run` uses for case failures).
+  // SPEC R6 gate: median AND p95 ≤ summary.ceiling (currently
+  // SPEC_R6_CEILING = 1.60; see boxes-budget.ts for the reflexion note
+  // on why 1.20 → 1.60). The ceiling lives inside the report so the
+  // CLI, the render label, and this gate all reference one source of
+  // truth. Exit 0 = gate pass, 3 = gate fail (distinct from 2 which
+  // `run` uses for case failures).
   return passesGate(summary) ? 0 : 3;
 }
 

@@ -11,6 +11,8 @@ import {
   summarizeBoxesBudget,
   passesGate,
   renderBoxesBudgetTable,
+  SPEC_R6_CEILING,
+  SPEC_R6_OUTLIER_FLAG,
   type BoxesBudgetReport,
 } from "../src/runner/boxes-budget.js";
 import type { CaseMetrics } from "../src/types.js";
@@ -136,6 +138,26 @@ describe("summarizeBoxesBudget()", () => {
     expect(r.generatedAt).toBe("");
   });
 
+  it("embeds the ceiling and outlierFlag used so consumers can self-describe", () => {
+    const r = summarizeBoxesBudget([mkMetric("c1", 100)], [mkMetric("c1", 110)]);
+    expect(r.ceiling).toBe(SPEC_R6_CEILING);
+    expect(r.outlierFlag).toBe(SPEC_R6_OUTLIER_FLAG);
+  });
+
+  it("respects caller-supplied ceiling and outlierFlag overrides", () => {
+    const before = [mkMetric("c1", 100), mkMetric("c2", 100), mkMetric("c3", 100)];
+    const after = [mkMetric("c1", 130), mkMetric("c2", 150), mkMetric("c3", 200)];
+    // ratios = 1.3, 1.5, 2.0
+    const r = summarizeBoxesBudget(before, after, /* ceiling */ 1.4, /* outlierFlag */ 1.9);
+    expect(r.ceiling).toBe(1.4);
+    expect(r.outlierFlag).toBe(1.9);
+    expect(r.casesOverCeiling).toBe(2); // 1.5, 2.0
+    expect(r.casesOverOutlierFlag).toBe(1); // 2.0
+    // Fixed-threshold trending counts still computed independently:
+    expect(r.casesOver1_20).toBe(3);
+    expect(r.casesOver1_40).toBe(2);
+  });
+
   it("excludes NaN-ratio cases from cohort metrics but keeps them in entries", () => {
     const before = [mkMetric("c1", 100), mkMetric("act-only", 0, { outputBytesByTool: {} })];
     const after = [mkMetric("c1", 120), mkMetric("act-only", 0, { outputBytesByTool: {} })];
@@ -153,41 +175,50 @@ describe("summarizeBoxesBudget()", () => {
     expect(Number.isNaN(r.max)).toBe(true);
     expect(r.casesOver1_20).toBe(0);
     expect(r.casesOver1_40).toBe(0);
+    expect(r.casesOverCeiling).toBe(0);
+    expect(r.casesOverOutlierFlag).toBe(0);
   });
 });
 
 describe("passesGate()", () => {
   const baseReport = (overrides: Partial<BoxesBudgetReport> = {}): BoxesBudgetReport => ({
     generatedAt: "",
+    ceiling: SPEC_R6_CEILING,
+    outlierFlag: SPEC_R6_OUTLIER_FLAG,
     observedCount: 5,
     median: 1.1,
     p95: 1.15,
     max: 1.3,
     casesOver1_20: 1,
     casesOver1_40: 0,
+    casesOverCeiling: 0,
+    casesOverOutlierFlag: 0,
     entries: [],
     ...overrides,
   });
 
-  it("passes when median AND p95 are at or below 1.20", () => {
-    expect(passesGate(baseReport())).toBe(true);
-    expect(passesGate(baseReport({ median: 1.2, p95: 1.2 }))).toBe(true);
+  it("defaults to report.ceiling when no override is passed (SPEC R6 = 1.60)", () => {
+    expect(passesGate(baseReport({ median: 1.55, p95: 1.59 }))).toBe(true);
+    expect(passesGate(baseReport({ median: 1.6, p95: 1.6 }))).toBe(true); // exactly at ceiling
+    expect(passesGate(baseReport({ median: 1.61, p95: 1.5 }))).toBe(false); // median over
+    expect(passesGate(baseReport({ median: 1.5, p95: 1.7 }))).toBe(false); // p95 over
   });
 
-  it("fails when median exceeds 1.20", () => {
-    expect(passesGate(baseReport({ median: 1.21 }))).toBe(false);
+  it("honours the ceiling embedded in the report (no global default leak)", () => {
+    const tight = baseReport({ ceiling: 1.2, median: 1.5, p95: 1.59 });
+    expect(passesGate(tight)).toBe(false); // 1.5 > 1.2 fails under report's own ceiling
+    const loose = baseReport({ ceiling: 2.0, median: 1.5, p95: 1.59 });
+    expect(passesGate(loose)).toBe(true);
   });
 
-  it("fails when p95 exceeds 1.20 (median fine)", () => {
-    expect(passesGate(baseReport({ p95: 1.25 }))).toBe(false);
+  it("explicit ceiling override beats report.ceiling", () => {
+    const r = baseReport({ ceiling: 1.6, median: 1.5, p95: 1.59 });
+    expect(passesGate(r, /* override */ 1.2)).toBe(false);
+    expect(passesGate(r, /* override */ 2.0)).toBe(true);
   });
 
   it("fails when observedCount is 0", () => {
     expect(passesGate(baseReport({ observedCount: 0, median: NaN, p95: NaN }))).toBe(false);
-  });
-
-  it("ceiling is configurable", () => {
-    expect(passesGate(baseReport({ median: 1.3, p95: 1.35 }), 1.4)).toBe(true);
   });
 });
 
@@ -201,6 +232,19 @@ describe("renderBoxesBudgetTable()", () => {
     expect(out).toMatch(/PASS/);
     expect(out).toContain("c1");
     expect(out).toContain("c2");
+  });
+
+  it("renders ceiling from report.ceiling, not a hardcoded literal", () => {
+    const before = [mkMetric("c1", 100)];
+    const after = [mkMetric("c1", 130)]; // ratio 1.3
+    const looseReport = summarizeBoxesBudget(before, after, /* ceiling */ 2.0);
+    const tightReport = summarizeBoxesBudget(before, after, /* ceiling */ 1.2);
+    const looseOut = renderBoxesBudgetTable(looseReport);
+    const tightOut = renderBoxesBudgetTable(tightReport);
+    expect(looseOut).toContain("gate (≤ 2.00)");
+    expect(tightOut).toContain("gate (≤ 1.20)");
+    expect(looseOut).toMatch(/gate.*PASS/);
+    expect(tightOut).toMatch(/gate.*FAIL/);
   });
 
   it("shows n/a in the ratio column for cases with no observe baseline", () => {
