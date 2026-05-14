@@ -25,7 +25,7 @@ const def: CaseDefinition = {
     await ctx.call("vortex_wait_for", {
       mode: "idle",
       value: "dom",
-      timeout: 800
+      timeout: 1000  // 增加到 1s，确保 dropdown 完全展开
     });
 
     // 2. type 过滤，让虚拟列表只显示匹配项
@@ -34,32 +34,64 @@ const def: CaseDefinition = {
       target: "[data-testid=\"target-select-v2\"] input",
       text: "500"
     });
+    // 关键修复：等待更长时间让虚拟列表完成过滤和重新渲染
     await ctx.call("vortex_wait_for", {
       mode: "idle",
       value: "dom",
-      timeout: 800
+      timeout: 1500  // 增加到 1.5s，虚拟列表过滤需要更多时间
     });
 
     // 3. observe 抓 "Option 500" ref
     const snap = extractText(await ctx.call("vortex_observe", {}));
     const ref = findRef(snap, "Option 500");
+    
     if (ref) {
+      // 找到了，直接点击
       await ctx.call("vortex_act", {
         action: "click",
         target: ref
       });
-    } else {
-      ctx.recordObserveMiss(1);
-      await ctx.fallbackEvaluate({
-        code: `(() => {
-          for (const el of document.querySelectorAll('[role="option"], .el-select-dropdown__item')) {
-            if (el.textContent?.trim() === 'Option 500' && el.getBoundingClientRect().width > 0) {
-              el.click(); return 'ok';
-            }
-          }
-          return 'not-found';
-        })()`,
+      await ctx.call("vortex_wait_for", {
+        mode: "idle",
+        value: "dom",
+        timeout: 500
       });
+    } else {
+      // 没找到，记录并尝试 fallback
+      ctx.recordObserveMiss(1);
+      
+      // 先再次 observe 确认 dropdown 是否还开着
+      const snap2 = extractText(await ctx.call("vortex_observe", {}));
+      const ref2 = findRef(snap2, "Option 500");
+      
+      if (ref2) {
+        // 第二次找到了
+        await ctx.call("vortex_act", {
+          action: "click",
+          target: ref2
+        });
+      } else {
+        // 真的找不到，用 evaluate 兜底
+        await ctx.fallbackEvaluate({
+          async: true,
+          code: `
+            // 先确保 dropdown 还开着
+            const wrapper = document.querySelector('[data-testid="target-select-v2"] .el-select__wrapper');
+            if (wrapper && wrapper.getAttribute('aria-expanded') !== 'true') {
+              wrapper.click();
+            }
+            await new Promise(r => setTimeout(r, 500));
+            // 在虚拟列表中查找
+            for (const el of document.querySelectorAll('[role="option"], .el-vl__item, .el-select-dropdown__item')) {
+              if (el.textContent?.trim() === 'Option 500' && el.getBoundingClientRect().width > 0) {
+                el.click();
+                return 'ok';
+              }
+            }
+            return 'not-found';
+          `,
+        });
+      }
     }
 
     await assertResultContains(ctx, "value=opt-500");
