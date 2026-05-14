@@ -282,4 +282,24 @@ describe("observe handler — includeBoxes payload gate (Issue #21)", () => {
     expect(JSON.stringify(aEls)).toBe(JSON.stringify(bEls));
     expect(JSON.stringify(aEls)).not.toContain('"bbox"');
   });
+
+  it("C-H8: non-boolean includeBoxes values are rejected (strict === true)", async () => {
+    // Mirrors server.ts:348. A misconfigured caller sending a stringy or
+    // numeric truthy value must NOT silently flip emission on; otherwise
+    // the compact-text renderer (which uses strict ===) and the JSON
+    // payload disagree about whether bbox is present.
+    const stringyArgs = { format: "compact", includeBoxes: "true" as unknown as boolean };
+    const numericArgs = { format: "compact", includeBoxes: 1 as unknown as boolean };
+    const objectArgs = { format: "compact", includeBoxes: {} as unknown as boolean };
+
+    for (const args of [stringyArgs, numericArgs, objectArgs]) {
+      stubChrome({
+        frames: [{ frameId: 0, parentFrameId: -1, url: "https://x/" }],
+        scanResults: { 0: mkPage([mkElem({ inViewport: true })]) },
+      });
+      const resp = await router.dispatch(mkReq(args));
+      const r = resp.result as CompactResult;
+      expect(r.elements[0]).not.toHaveProperty("bbox");
+    }
+  });
 });

@@ -743,7 +743,14 @@ export function registerObserveHandlers(router: ActionRouter): void {
       // false keeps wire format byte-identical to v0.8 sub-project A for
       // existing callers. Only consulted by the compact path; detail=full
       // already emits the full object bbox unconditionally.
-      const includeBoxes = (args.includeBoxes as boolean | undefined) ?? false;
+      //
+      // Strict `=== true` mirrors server.ts:348 so both layers reject
+      // non-boolean values (e.g. `"true"`, `1`, `{}`) identically. The
+      // schema declares `type: "boolean"` but the router does no runtime
+      // validation; without strict equality the JSON payload could carry
+      // bbox while the compact-text renderer didn't (or vice versa),
+      // creating a silent cross-layer inconsistency.
+      const includeBoxes = args.includeBoxes === true;
 
       const frameTargets = await resolveTargetFrames(tid, explicitFrameId, framesParam);
       if (frameTargets.length === 0) {
