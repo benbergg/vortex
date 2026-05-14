@@ -1,0 +1,277 @@
+{
+  "generatedAt": "2026-05-14T02:27:59.565Z",
+  "observedCount": 24,
+  "median": 1.5027122434561924,
+  "p95": 1.5902944538945005,
+  "max": 1.5991390906645144,
+  "casesOver1_20": 22,
+  "casesOver1_40": 18,
+  "entries": [
+    {
+      "case": "aria-cursor-nested-no-dup",
+      "bytesWithout": 454,
+      "bytesWith": 667,
+      "delta": 213,
+      "ratio": 1.4691629955947136
+    },
+    {
+      "case": "cross-observe-ref-stale",
+      "bytesWithout": 908,
+      "bytesWith": 1334,
+      "delta": 426,
+      "ratio": 1.4691629955947136
+    },
+    {
+      "case": "el-autocomplete",
+      "bytesWithout": 996,
+      "bytesWith": 1543,
+      "delta": 547,
+      "ratio": 1.5491967871485943
+    },
+    {
+      "case": "el-cascader",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-color-picker",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-date-picker-daterange",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-date-picker-datetimerange",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-dialog-nested",
+      "bytesWithout": 979,
+      "bytesWith": 1504,
+      "delta": 525,
+      "ratio": 1.536261491317671
+    },
+    {
+      "case": "el-drawer",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-dropdown",
+      "bytesWithout": 2071,
+      "bytesWith": 3182,
+      "delta": 1111,
+      "ratio": 1.5364558184451955
+    },
+    {
+      "case": "el-form-composite",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-input-number",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-message-box",
+      "bytesWithout": 1091,
+      "bytesWith": 1681,
+      "delta": 590,
+      "ratio": 1.540788267644363
+    },
+    {
+      "case": "el-pagination",
+      "bytesWithout": 1311,
+      "bytesWith": 2087,
+      "delta": 776,
+      "ratio": 1.591914569031274
+    },
+    {
+      "case": "el-radio-group",
+      "bytesWithout": 1046,
+      "bytesWith": 1632,
+      "delta": 586,
+      "ratio": 1.560229445506692
+    },
+    {
+      "case": "el-select-multiple",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-select-single",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-select-v2",
+      "bytesWithout": 949,
+      "bytesWith": 1473,
+      "delta": 524,
+      "ratio": 1.5521601685985247
+    },
+    {
+      "case": "el-select-v2-virtual",
+      "bytesWithout": 1307,
+      "bytesWith": 1575,
+      "delta": 268,
+      "ratio": 1.2050497322111706
+    },
+    {
+      "case": "el-slider",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-slider-drag",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-table",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-tabs",
+      "bytesWithout": 1015,
+      "bytesWith": 1580,
+      "delta": 565,
+      "ratio": 1.5566502463054188
+    },
+    {
+      "case": "el-time-picker",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "el-transfer",
+      "bytesWithout": 1239,
+      "bytesWith": 1959,
+      "delta": 720,
+      "ratio": 1.5811138014527846
+    },
+    {
+      "case": "el-tree",
+      "bytesWithout": 3261,
+      "bytesWith": 5032,
+      "delta": 1771,
+      "ratio": 1.543084943268936
+    },
+    {
+      "case": "el-tree-select",
+      "bytesWithout": 3717,
+      "bytesWith": 5944,
+      "delta": 2227,
+      "ratio": 1.5991390906645144
+    },
+    {
+      "case": "el-upload",
+      "bytesWithout": 0,
+      "bytesWith": 0,
+      "delta": 0,
+      "ratio": null
+    },
+    {
+      "case": "icon-name-priority",
+      "bytesWithout": 261,
+      "bytesWith": 343,
+      "delta": 82,
+      "ratio": 1.314176245210728
+    },
+    {
+      "case": "iframe-nested-empty-deep",
+      "bytesWithout": 354,
+      "bytesWith": 416,
+      "delta": 62,
+      "ratio": 1.1751412429378532
+    },
+    {
+      "case": "iframe-nested-with-content",
+      "bytesWithout": 346,
+      "bytesWith": 469,
+      "delta": 123,
+      "ratio": 1.3554913294797688
+    },
+    {
+      "case": "jd-review-rm-01-open",
+      "bytesWithout": 692,
+      "bytesWith": 974,
+      "delta": 282,
+      "ratio": 1.407514450867052
+    },
+    {
+      "case": "jd-review-rm-02-switch-tab",
+      "bytesWithout": 692,
+      "bytesWith": 974,
+      "delta": 282,
+      "ratio": 1.407514450867052
+    },
+    {
+      "case": "jd-review-rm-03-scroll-load",
+      "bytesWithout": 174,
+      "bytesWith": 196,
+      "delta": 22,
+      "ratio": 1.1264367816091954
+    },
+    {
+      "case": "jd-review-rm-04-close",
+      "bytesWithout": 1558,
+      "bytesWith": 2144,
+      "delta": 586,
+      "ratio": 1.3761232349165597
+    },
+    {
+      "case": "jd-review-rm-05-photo-tag",
+      "bytesWithout": 692,
+      "bytesWith": 974,
+      "delta": 282,
+      "ratio": 1.407514450867052
+    },
+    {
+      "case": "jd-review-rm-06-sort-toggle",
+      "bytesWithout": 1210,
+      "bytesWith": 1752,
+      "delta": 542,
+      "ratio": 1.4479338842975207
+    },
+    {
+      "case": "latency-p50",
+      "bytesWithout": 972,
+      "bytesWith": 1495,
+      "delta": 523,
+      "ratio": 1.5380658436213992
+    }
+  ]
+}
