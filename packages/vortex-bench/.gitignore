@@ -3,7 +3,8 @@ dist/
 .env
 .env.local
 
-# reports：仅 baseline.json 入库，其他是单次产出
+# reports：仅 baseline.json 和 boxes-budget-*.json（PR 证据，跟随 SPEC R6 评测）入库
 reports/*.json
 !reports/baseline.json
+!reports/boxes-budget-*.json
 reports/*.md

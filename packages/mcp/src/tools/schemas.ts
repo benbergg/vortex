@@ -114,6 +114,11 @@ function observeTools(): ToolDef[] {
             ],
             default: "main",
           },
+          includeBoxes: {
+            type: "boolean",
+            description: "Append per-element bbox=[x,y,w,h] (integer px, frame-local viewport coords) to compact output; emits '# frame N offset=[x,y]' meta line for scanned non-main frames. Off-screen / zero-area elements omit the bbox segment. Default false. For visual-grounding callers (hybrid a11y-ref + bbox to a vision model).",
+            default: false,
+          },
           ...optionalTabId,
           ...optionalFrameId,
         },

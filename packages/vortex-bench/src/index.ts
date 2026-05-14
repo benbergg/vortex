@@ -7,6 +7,11 @@ import { resolve, dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { runCase } from "./runner/run-case.js";
 import { diffReports, renderDiffTable, hasCritical } from "./runner/diff.js";
+import {
+  summarizeBoxesBudget,
+  passesGate,
+  renderBoxesBudgetTable,
+} from "./runner/boxes-budget.js";
 import type { BenchReport, CaseDefinition, CaseMetrics } from "./types.js";
 
 const USAGE = `vortex-bench <command>
@@ -16,6 +21,10 @@ Commands:
   run --all              跑 cases/ 下全部
   diff                   跟 reports/baseline.json 对比
   baseline               把最近一次 latest.json 存成 baseline.json
+  compare-boxes [--all] [cases...]
+                         issue #21 token budget sweep: 跑同一组 case 两遍
+                         （baseline vs includeBoxes:true），输出 ratio /
+                         median / p95 / max + reports/boxes-budget-*.json
   --help                 显示帮助
 
 Env:
@@ -120,6 +129,60 @@ async function cmdDiff(): Promise<number> {
   return hasCritical(diffs) ? 2 : 0;
 }
 
+async function cmdCompareBoxes(args: string[]): Promise<number> {
+  const runAll = args.includes("--all");
+  const caseNames = runAll
+    ? await listCaseNames()
+    : args.filter((a) => !a.startsWith("-"));
+
+  if (caseNames.length === 0) {
+    process.stderr.write("[vortex-bench] compare-boxes 需要 <caseName> 或 --all\n");
+    return 1;
+  }
+
+  const mcpBin = resolveMcpBin();
+  const url = playgroundUrl();
+  process.stdout.write(`[vortex-bench] compare-boxes  playground=${url}  mcp=${mcpBin}\n`);
+  process.stdout.write(`[vortex-bench] 跑 ${caseNames.length} 个 case × 2 passes (baseline vs includeBoxes:true)\n\n`);
+
+  async function runPass(label: string, argOverrides?: Record<string, Record<string, unknown>>): Promise<CaseMetrics[]> {
+    process.stdout.write(`── pass: ${label} ──\n`);
+    const results: CaseMetrics[] = [];
+    for (const name of caseNames) {
+      const def = await loadCase(name);
+      const m = await runCase(def, { mcpBin, playgroundUrl: url, argOverrides });
+      results.push(m);
+      process.stdout.write(formatRow(m) + "\n");
+    }
+    process.stdout.write("\n");
+    return results;
+  }
+
+  const before = await runPass("baseline (no includeBoxes)");
+  const after = await runPass("includeBoxes:true", {
+    vortex_observe: { includeBoxes: true },
+  });
+
+  const summary = summarizeBoxesBudget(before, after);
+  summary.generatedAt = new Date().toISOString();
+
+  process.stdout.write(renderBoxesBudgetTable(summary) + "\n\n");
+
+  await mkdir(REPORTS_DIR, { recursive: true });
+  const stamp = summary.generatedAt.replace(/[:.]/g, "-");
+  const reportPath = join(REPORTS_DIR, `boxes-budget-${stamp}.json`);
+  await writeFile(reportPath, JSON.stringify(summary, null, 2));
+  process.stdout.write(`[report] ${reportPath}\n`);
+
+  // SPEC R6 gate: median AND p95 ≤ summary.ceiling (currently
+  // SPEC_R6_CEILING = 1.60; see boxes-budget.ts for the reflexion note
+  // on why 1.20 → 1.60). The ceiling lives inside the report so the
+  // CLI, the render label, and this gate all reference one source of
+  // truth. Exit 0 = gate pass, 3 = gate fail (distinct from 2 which
+  // `run` uses for case failures).
+  return passesGate(summary) ? 0 : 3;
+}
+
 async function cmdBaseline(): Promise<number> {
   const latestPath = join(REPORTS_DIR, "latest.json");
   const basePath = join(REPORTS_DIR, "baseline.json");
@@ -142,6 +205,8 @@ async function main(): Promise<number> {
       return cmdDiff();
     case "baseline":
       return cmdBaseline();
+    case "compare-boxes":
+      return cmdCompareBoxes(rest);
     default:
       process.stderr.write(`[vortex-bench] 未知命令: ${cmd}\n\n${USAGE}`);
       return 1;

@@ -739,6 +739,18 @@ export function registerObserveHandlers(router: ActionRouter): void {
       // also collects table rows / cells / column headers.
       const filterMode =
         (args.filter as "interactive" | "all" | undefined) ?? "interactive";
+      // Issue #21 — caller opts into per-element bbox emission. Default
+      // false keeps wire format byte-identical to v0.8 sub-project A for
+      // existing callers. Only consulted by the compact path; detail=full
+      // already emits the full object bbox unconditionally.
+      //
+      // Strict `=== true` mirrors server.ts:348 so both layers reject
+      // non-boolean values (e.g. `"true"`, `1`, `{}`) identically. The
+      // schema declares `type: "boolean"` but the router does no runtime
+      // validation; without strict equality the JSON payload could carry
+      // bbox while the compact-text renderer didn't (or vice versa),
+      // creating a silent cross-layer inconsistency.
+      const includeBoxes = args.includeBoxes === true;
 
       const frameTargets = await resolveTargetFrames(tid, explicitFrameId, framesParam);
       if (frameTargets.length === 0) {
@@ -853,6 +865,8 @@ export function registerObserveHandlers(router: ActionRouter): void {
         name: string;
         state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean };
         frameId: number;
+        // Issue #21 — populated only when input.includeBoxes && e.inViewport (T4).
+        bbox?: [number, number, number, number];
       };
       type FullElementOut = Omit<ScannedElement, "_sel"> & {
         frameId: number;
@@ -895,6 +909,25 @@ export function registerObserveHandlers(router: ActionRouter): void {
           const centerX = e.bbox.x + Math.round(e.bbox.w / 2);
           const centerY = e.bbox.y + Math.round(e.bbox.h / 2);
           if (format === "compact") {
+            // Issue #21 — emit bbox tuple in compact path only when
+            // (1) caller asked, (2) element intersects frame viewport,
+            // (3) rect has positive area. Page-side scan already
+            // discards 0-area rects (observe.ts:608) and rounds
+            // coordinates (observe.ts:680-685), but rounding again
+            // here defends against test fixtures that mock e.bbox
+            // with floats and keeps the contract self-evident.
+            const bboxTuple: [number, number, number, number] | undefined =
+              includeBoxes &&
+              e.inViewport &&
+              e.bbox.w > 0 &&
+              e.bbox.h > 0
+                ? [
+                    Math.round(e.bbox.x),
+                    Math.round(e.bbox.y),
+                    Math.round(e.bbox.w),
+                    Math.round(e.bbox.h),
+                  ]
+                : undefined;
             elementsOut.push({
               index: globalIdx,
               tag: e.tag,
@@ -902,6 +935,7 @@ export function registerObserveHandlers(router: ActionRouter): void {
               name: e.name,
               ...(e.state ? { state: e.state } : {}),
               frameId: s.frameId,
+              ...(bboxTuple ? { bbox: bboxTuple } : {}),
             });
           } else {
             // v0.6 full 结构：携带 ref 字符串（@eN / @fNeM）+ suggestedUsage 直接给
