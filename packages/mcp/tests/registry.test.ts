@@ -15,12 +15,16 @@ describe("getToolDefs", () => {
     expect(a).toEqual(b);
   });
 
-  it("returns v0.6 public 11 tools (3 task verbs + 8 atoms)", () => {
+  it("returns v0.8 public 15 tools (v0.6 11 + 4 v0.7.x backlog promotions)", () => {
     const names = getToolDefs().map((d) => d.name);
     expect(names.sort()).toEqual([
       "vortex_act",
       "vortex_debug_read",
+      "vortex_evaluate",
       "vortex_extract",
+      "vortex_file_upload",
+      "vortex_fill",
+      "vortex_mouse_drag",
       "vortex_navigate",
       "vortex_observe",
       "vortex_press",
@@ -33,16 +37,18 @@ describe("getToolDefs", () => {
   });
 
   it("v0.5 internalized tools are accessible via getInternalToolDef but not getToolDef", () => {
-    // v0.5 36 个 atom 中 25 个内部化（保留实现供 L4 dispatch 调）
+    // v0.5 36 个 atom 中 25 个内部化（保留实现供 L4 dispatch 调）。
+    // v0.8 把 fill / evaluate / mouse_drag / file_upload 4 个 promote 回公开，
+    // 其余仍内部化。
     const internalized = [
-      "vortex_click", "vortex_fill", "vortex_type", "vortex_select", "vortex_hover", "vortex_batch",
-      "vortex_fill_form", "vortex_get_text", "vortex_get_html", "vortex_evaluate",
-      "vortex_mouse_click", "vortex_mouse_drag", "vortex_mouse_move",
+      "vortex_click", "vortex_type", "vortex_select", "vortex_hover", "vortex_batch",
+      "vortex_fill_form", "vortex_get_text", "vortex_get_html",
+      "vortex_mouse_click", "vortex_mouse_move",
       "vortex_console", "vortex_network", "vortex_network_response_body",
       "vortex_storage_get", "vortex_storage_set", "vortex_storage_session",
       "vortex_tab_list", "vortex_frames_list", "vortex_wait", "vortex_wait_idle",
       "vortex_page_info", "vortex_history",
-      "vortex_file_upload", "vortex_file_download", "vortex_file_list_downloads",
+      "vortex_file_download", "vortex_file_list_downloads",
       "vortex_events", "vortex_ping",
     ];
     for (const n of internalized) {
@@ -84,8 +90,8 @@ describe("getToolDefs", () => {
     expect(navigate?.returnsImage).toBeUndefined();
   });
 
-  it("has exactly 11 public tools (v0.6 L4 surface)", () => {
-    expect(getToolDefs().length).toBe(11);
+  it("has exactly 15 public tools (v0.8 L4 surface)", () => {
+    expect(getToolDefs().length).toBe(15);
   });
 });
 

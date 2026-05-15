@@ -64,6 +64,7 @@ export async function runCase(def: CaseDefinition, opts: RunCaseOptions): Promis
   }
 
   const ctx: CaseContext = {
+    playgroundUrl: opts.playgroundUrl,
     async call(name, args) {
       return callTool(name, args);
     },

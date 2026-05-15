@@ -57,9 +57,11 @@ describe("handleCallTool routing logic", () => {
     expect(tabList?.action).not.toMatch(/^__/);
   });
 
-  it("public tools (v0.6) all have either L4.* or v0.5 action prefix", () => {
+  it("public tools (v0.8) all have either L4.* or v0.5 action prefix", () => {
+    // v0.8 加入 4 个新前缀：js. (vortex_evaluate) / mouse. (vortex_mouse_drag) /
+    // file. (vortex_file_upload)。vortex_fill 走 L4.fill 保持不变。
     for (const def of getToolDefs()) {
-      expect(def.action).toMatch(/^(L4\.|page\.|tab\.|capture\.|keyboard\.)/);
+      expect(def.action).toMatch(/^(L4\.|page\.|tab\.|capture\.|keyboard\.|js\.|mouse\.|file\.)/);
     }
   });
 });

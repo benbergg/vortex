@@ -18,44 +18,11 @@ const def: CaseDefinition = {
     });
 
     // 2. level 选 "高"（走 el-select，driver 按 label 匹配故传中文 label）
-    let levelOk = false;
-    try {
-      const res = await ctx.call("vortex_act", {
-        action: "fill",
-        target: "[data-testid=\"form-level\"]",
-        kind: "select",
-        value: "高"
-      });
-      const text = extractText(res);
-      levelOk = !text.toLowerCase().includes("error") && !text.includes("INVALID_PARAMS");
-    } catch {
-      levelOk = false;
-    }
-    if (!levelOk) {
-      await ctx.fallbackEvaluate({
-        code: `(() => {
-          const w = document.querySelector('[data-testid="form-level"]');
-          const t = w?.querySelector('.el-select__wrapper') || w?.querySelector('input');
-          (t)?.click();
-          return 'ok';
-        })()`,
-      });
-      await ctx.call("vortex_wait_for", {
-        mode: "idle",
-        value: "dom",
-        timeout: 2000
-      });
-      await ctx.fallbackEvaluate({
-        code: `(() => {
-          for (const el of document.querySelectorAll('.el-select-dropdown__item')) {
-            if (el.textContent?.trim() === '高' && el.getBoundingClientRect().width > 0) {
-              el.click(); return 'ok';
-            }
-          }
-          return 'not-found';
-        })()`,
-      });
-    }
+    await ctx.call("vortex_fill", {
+      target: "[data-testid=\"form-level\"]",
+      kind: "select",
+      value: "高"
+    });
 
     // 3. switch 开启：点 .el-switch__core（真正的交互点）
     await ctx.call("vortex_act", {
@@ -64,35 +31,11 @@ const def: CaseDefinition = {
     });
 
     // 4. checkbox-group 选 alpha + beta
-    let cbOk = false;
-    try {
-      const res = await ctx.call("vortex_act", {
-        action: "fill",
-        target: "[data-testid=\"form-tags\"]",
-        kind: "checkbox-group",
-        value: ["alpha", "beta"]
-      });
-      const text = extractText(res);
-      cbOk = !text.toLowerCase().includes("error") && !text.includes("INVALID_PARAMS");
-    } catch {
-      cbOk = false;
-    }
-    if (!cbOk) {
-      for (const v of ["alpha", "beta"]) {
-        await ctx.fallbackEvaluate({
-          code: `(() => {
-            const wrap = document.querySelector('[data-testid="form-tags"]');
-            if (!wrap) return 'no-wrap';
-            for (const label of wrap.querySelectorAll('.el-checkbox')) {
-              if (label.textContent?.includes(${JSON.stringify(v)})) {
-                (label).click(); return 'ok';
-              }
-            }
-            return 'not-found';
-          })()`,
-        });
-      }
-    }
+    await ctx.call("vortex_fill", {
+      target: "[data-testid=\"form-tags\"]",
+      kind: "checkbox-group",
+      value: ["alpha", "beta"]
+    });
 
     // 5. submit
     await ctx.call("vortex_act", {

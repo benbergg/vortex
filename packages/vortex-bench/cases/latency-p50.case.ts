@@ -49,10 +49,9 @@ const def: CaseDefinition = {
     }
 
     // ===== CDP 路径：切到 slider 页 vortex_mouse_drag × N =====
-    // TODO: ctx 当前不暴露 playgroundUrl，这里硬编码 5173；PR #1 引入 ctx.playgroundUrl 后改 ${ctx.playgroundUrl}/#/el-slider
     // 先 navigate 到 about:blank 卸载 dropdown，再切 slider，避免 hash router 同 origin state 残留
     await ctx.call("vortex_navigate", { url: "about:blank" });
-    await ctx.call("vortex_navigate", { url: "http://localhost:5173/#/el-slider" });
+    await ctx.call("vortex_navigate", { url: `${ctx.playgroundUrl}/#/el-slider` });
     await ctx.call("vortex_wait_for", {
       mode: "idle",
       value: "dom",

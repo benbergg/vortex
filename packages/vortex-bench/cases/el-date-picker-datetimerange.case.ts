@@ -16,8 +16,7 @@ const def: CaseDefinition = {
     try {
       // 注意：vortex datetimerange driver 目前要求 target 精确匹配 .el-date-editor.el-range-editor，
       // 不会自动 closest() 到外层 wrapper。这是 vortex 的可优化点（见 README）。
-      const res = await ctx.call("vortex_act", {
-        action: "fill",
+      const res = await ctx.call("vortex_fill", {
         target: "[data-testid=\"target-datetimerange\"] .el-date-editor.el-range-editor",
         kind: "datetimerange",
         value: { start: START, end: END }

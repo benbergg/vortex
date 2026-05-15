@@ -5,17 +5,14 @@
  * 真正的交互逻辑在页面 context 运行（见 dom.ts 的 COMMIT handler 内注入的 func），
  * 这里只声明可序列化的元数据：id / kind / closestSelector / 接受的 value 形状。
  *
- * 新增一个 driver = 往这里加一条 spec + 在 page-side func 的 switch 里加一个分支。
+ * 新增一个 driver = 在 @bytenew/vortex-shared/commit-kinds.ts 的 COMMIT_KINDS
+ * 加值 + 这里加一条 spec + 在 page-side func 的 switch 里加一个分支。
+ * CommitKind 类型由 shared 包单源导出，mcp schemas-public/schemas 与本文件
+ * 通过 COMMIT_KINDS 数组保持严格一致（I15 invariant 测试 lock）。
  */
 
-export type CommitKind =
-  | "daterange"
-  | "datetimerange"
-  | "cascader"
-  | "select"
-  | "time"
-  /** @since 0.4.0 (O-10) */
-  | "checkbox-group";
+export type { CommitKind } from "@bytenew/vortex-shared";
+import type { CommitKind } from "@bytenew/vortex-shared";
 
 export interface CommitDriverSpec {
   id: string;

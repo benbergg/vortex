@@ -1,11 +1,32 @@
 // packages/mcp/src/tools/schemas.ts
 
+import { COMMIT_KINDS } from "@bytenew/vortex-shared";
+
+/**
+ * MCP 2025-03-26+ tool annotations. Optional behavioural hints that
+ * LLM clients (Claude Code, Cursor, …) use to gate destructive / open-world
+ * tools with stricter user approval prompts.
+ *
+ * Set destructiveHint:true for tools that mutate user-visible state in ways
+ * the user cannot trivially undo (vortex_evaluate runs arbitrary JS in MAIN
+ * world; vortex_file_upload submits attacker-chosen bytes to logged-in target).
+ * Set openWorldHint:true when the tool interacts with the open web rather
+ * than a confined sandbox.
+ */
+export interface ToolAnnotations {
+  destructiveHint?: boolean;
+  openWorldHint?: boolean;
+  readOnlyHint?: boolean;
+  idempotentHint?: boolean;
+}
+
 export interface ToolDef {
   name: string;
   action: string;
   description: string;
   schema: object;
   returnsImage?: boolean;
+  annotations?: ToolAnnotations;
 }
 
 const optionalTabId = {
@@ -293,7 +314,7 @@ function domTools(): ToolDef[] {
           value: { description: "Plain value for inputs; {start,end} for date ranges; array for cascader/multi-select." },
           kind: {
             type: "string",
-            enum: ["daterange", "datetimerange", "cascader", "select", "checkbox-group"],
+            enum: [...COMMIT_KINDS],
             description: "Omit for plain inputs. Targets Element Plus / Ant Design composite widgets.",
           },
           fallbackToNative: { type: "boolean", default: false },
@@ -377,7 +398,7 @@ function domTools(): ToolDef[] {
                 value: {},
                 kind: {
                   type: "string",
-                  enum: ["daterange", "datetimerange", "cascader", "select", "checkbox-group"],
+                  enum: [...COMMIT_KINDS],
                 },
               },
               required: ["value"],

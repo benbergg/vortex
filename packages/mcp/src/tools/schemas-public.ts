@@ -17,6 +17,7 @@
 // public description strings stay terse (≤ 60 char per I15) so ref-syntax
 // guidance is carried by the internal `schemas.ts` tool descriptions.
 
+import { COMMIT_KINDS } from "@bytenew/vortex-shared";
 import type { ToolDef } from "./schemas.js";
 
 const tabFields = {
@@ -188,6 +189,73 @@ export const PUBLIC_TOOLS: ToolDef[] = [
         ...tabFields,
       },
       required: ["op"],
+    },
+  },
+  {
+    name: "vortex_evaluate",
+    action: "js.evaluate",
+    description: "Execute JavaScript in page context. async:true for await.",
+    schema: {
+      type: "object",
+      properties: {
+        code: { type: "string" },
+        async: { type: "boolean" },
+        ...tabFields,
+      },
+      required: ["code"],
+    },
+    // Arbitrary JS in MAIN world (sees page globals, can read cookies via fetch).
+    annotations: { destructiveHint: true, openWorldHint: true },
+  },
+  {
+    name: "vortex_mouse_drag",
+    action: "mouse.drag",
+    description: "CDP drag from (fromX,fromY) to (toX,toY). steps default 10.",
+    schema: {
+      type: "object",
+      properties: {
+        fromX: { type: "number" },
+        fromY: { type: "number" },
+        toX: { type: "number" },
+        toY: { type: "number" },
+        steps: { type: "number" },
+        coordSpace: { enum: ["frame", "viewport"] },
+        ...tabFields,
+      },
+      required: ["fromX", "fromY", "toX", "toY"],
+    },
+  },
+  {
+    name: "vortex_file_upload",
+    action: "file.upload",
+    description: "Upload file to input[type=file]. fileContent is base64.",
+    schema: {
+      type: "object",
+      properties: {
+        selector: { type: "string" },
+        fileName: { type: "string" },
+        fileContent: { type: "string" },
+        mimeType: { type: "string" },
+        ...tabFields,
+      },
+      required: ["selector", "fileName", "fileContent"],
+    },
+    // Submits attacker-chosen bytes to whatever endpoint the page form posts to.
+    annotations: { destructiveHint: true, openWorldHint: true },
+  },
+  {
+    name: "vortex_fill",
+    action: "L4.fill",
+    description: "Fill form field; kind=cascader/select/daterange for widgets.",
+    schema: {
+      type: "object",
+      properties: {
+        target: TargetRequired,
+        value: {},
+        kind: { enum: [...COMMIT_KINDS] },
+        ...tabFields,
+      },
+      required: ["target", "value"],
     },
   },
 ];

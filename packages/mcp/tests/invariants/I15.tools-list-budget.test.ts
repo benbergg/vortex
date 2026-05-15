@@ -1,8 +1,14 @@
 // I15: tools/list 字节硬断言 + 数量 + 内部化 grep。
-// spec: vortex重构-L4-spec.md §0.2.1 (4500B budget) + §3.3
+// spec: vortex重构-L4-spec.md §0.2.1 (4600B budget v0.8) + §3.3
+//
+// v0.8 cap: 4500 → 4600 B。v0.7.x backlog 重新暴露 4 个工具
+// (vortex_fill / vortex_evaluate / vortex_mouse_drag / vortex_file_upload)，
+// payload 实测 4537 B。trim description 会损 LLM 可读性，因此调升 cap
+// 而非压缩字符。下一个调整窗口预留至 v0.9 再 review。
 
 import { describe, it, expect } from "vitest";
-import { getToolDefs } from "../../src/tools/registry.js";
+import { COMMIT_KINDS } from "@bytenew/vortex-shared";
+import { getToolDefs, getInternalToolDef } from "../../src/tools/registry.js";
 
 describe("I15: tools/list budget + count + internalized grep", () => {
   const defs = getToolDefs();
@@ -10,20 +16,24 @@ describe("I15: tools/list budget + count + internalized grep", () => {
     defs.map(d => ({ name: d.name, description: d.description, inputSchema: d.schema })),
   );
 
-  it("tools/list 字节 ≤ 4500 B", () => {
-    expect(toolsListPayload.length).toBeLessThanOrEqual(4500);
+  it("tools/list 字节 ≤ 4600 B", () => {
+    expect(toolsListPayload.length).toBeLessThanOrEqual(4600);
   });
 
-  it("公开工具数量 = 11", () => {
-    expect(defs.length).toBe(11);
+  it("公开工具数量 = 15", () => {
+    expect(defs.length).toBe(15);
   });
 
-  it("11 个公开工具名匹配 spec L4 §1.1+§1.2", () => {
+  it("15 个公开工具名匹配 spec L4 §1.1+§1.2 (v0.8)", () => {
     const names = defs.map(d => d.name).sort();
     expect(names).toEqual([
       "vortex_act",
       "vortex_debug_read",
+      "vortex_evaluate",
       "vortex_extract",
+      "vortex_file_upload",
+      "vortex_fill",
+      "vortex_mouse_drag",
       "vortex_navigate",
       "vortex_observe",
       "vortex_press",
@@ -37,12 +47,14 @@ describe("I15: tools/list budget + count + internalized grep", () => {
 
   it("v0.5 已删/内部化的工具不在 tools/list", () => {
     const names = new Set(defs.map(d => d.name));
+    // v0.8: vortex_fill / vortex_evaluate / vortex_mouse_drag / vortex_file_upload
+    // 已从内部化回到公开（v0.7.x backlog promotion）。
     const internalized = [
       // 写操作 → act
-      "vortex_click", "vortex_fill", "vortex_type", "vortex_select",
+      "vortex_click", "vortex_type", "vortex_select",
       "vortex_scroll", "vortex_hover", "vortex_drag",
       // 读 → extract / observe
-      "vortex_get_text", "vortex_get_html", "vortex_evaluate",
+      "vortex_get_text", "vortex_get_html",
       "vortex_frames_list", "vortex_tab_list",
       // 等待 → wait_for
       "vortex_wait", "vortex_wait_idle", "vortex_page_info", "vortex_history",
@@ -51,8 +63,8 @@ describe("I15: tools/list budget + count + internalized grep", () => {
       // 存储 → storage
       "vortex_storage_get", "vortex_storage_set", "vortex_storage_session",
       // 内部化（act/observe 触发）
-      "vortex_mouse_click", "vortex_mouse_drag", "vortex_mouse_move",
-      "vortex_file_upload", "vortex_file_download", "vortex_file_list_downloads",
+      "vortex_mouse_click", "vortex_mouse_move",
+      "vortex_file_download", "vortex_file_list_downloads",
       "vortex_fill_form", "vortex_batch",
       // 删除（无业务价值 / 内部化）
       "vortex_ping",
@@ -85,6 +97,55 @@ describe("I15: tools/list budget + count + internalized grep", () => {
     for (const d of defs) {
       expect(() => checkNoPropertyDescription(d.schema, d.name)).not.toThrow();
     }
+  });
+});
+
+// v0.8 H-7 fix: `vortex_fill.kind` 在三处 schema 与 extension commit-drivers
+// 的 CommitKind 之间必须严格一致。把 COMMIT_KINDS 拆到 @bytenew/vortex-shared
+// 作为单一真值源后，下面三条测试 lock 公开/内部 schema 与 shared 数组一致，
+// 任何一边私自加值/减值都会断在 CI。
+describe("H-7: vortex_fill.kind enum stays in sync with shared COMMIT_KINDS", () => {
+  it("public vortex_fill.kind.enum == COMMIT_KINDS", () => {
+    const fill = getToolDefs().find(d => d.name === "vortex_fill")!;
+    const enumVals = (fill.schema as { properties: { kind: { enum: string[] } } }).properties.kind.enum;
+    expect([...enumVals].sort()).toEqual([...COMMIT_KINDS].sort());
+  });
+
+  it("internal vortex_fill.kind.enum == COMMIT_KINDS", () => {
+    const fill = getInternalToolDef("vortex_fill")!;
+    const enumVals = (fill.schema as { properties: { kind: { enum: string[] } } }).properties.kind.enum;
+    expect([...enumVals].sort()).toEqual([...COMMIT_KINDS].sort());
+  });
+
+  it("internal vortex_fill_form.items.kind.enum == COMMIT_KINDS", () => {
+    const fillForm = getInternalToolDef("vortex_fill_form")!;
+    const enumVals = (
+      fillForm.schema as {
+        properties: { fields: { items: { properties: { kind: { enum: string[] } } } } };
+      }
+    ).properties.fields.items.properties.kind.enum;
+    expect([...enumVals].sort()).toEqual([...COMMIT_KINDS].sort());
+  });
+});
+
+// H-13 fix: destructive tools must carry MCP annotations so LLM clients
+// (Claude Code, Cursor, …) can gate them with stricter approval prompts.
+describe("H-13: destructive public tools carry annotations.destructiveHint", () => {
+  it("vortex_evaluate has destructiveHint=true + openWorldHint=true", () => {
+    const evaluate = getToolDefs().find(d => d.name === "vortex_evaluate")!;
+    expect(evaluate.annotations?.destructiveHint).toBe(true);
+    expect(evaluate.annotations?.openWorldHint).toBe(true);
+  });
+
+  it("vortex_file_upload has destructiveHint=true + openWorldHint=true", () => {
+    const upload = getToolDefs().find(d => d.name === "vortex_file_upload")!;
+    expect(upload.annotations?.destructiveHint).toBe(true);
+    expect(upload.annotations?.openWorldHint).toBe(true);
+  });
+
+  it("non-destructive tools (e.g. vortex_extract) do NOT carry destructiveHint", () => {
+    const extract = getToolDefs().find(d => d.name === "vortex_extract")!;
+    expect(extract.annotations?.destructiveHint).toBeUndefined();
   });
 });
 

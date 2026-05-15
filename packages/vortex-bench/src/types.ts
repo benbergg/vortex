@@ -25,6 +25,12 @@ export interface CaseMetrics {
 }
 
 export interface CaseContext {
+  /**
+   * Playground 基础 URL（runner 真值源，来自 opts.playgroundUrl）。
+   * case 中途需要重新 navigate 时优先用此字段，避免每个 case 自读
+   * process.env 导致 env 名漂移。
+   */
+  readonly playgroundUrl: string;
   /** 直接调 MCP 工具，自动计数 callCount */
   call(name: string, args: Record<string, unknown>): Promise<unknown>;
   /** evaluate 兜底，callCount++ 且 fallbackToEvaluate++ */

@@ -14,8 +14,7 @@ const def: CaseDefinition = {
     let fillOk = false;
     let fillText = "";
     try {
-      const res = await ctx.call("vortex_act", {
-        action: "fill",
+      const res = await ctx.call("vortex_fill", {
         target: "[data-testid=\"target-daterange\"] .el-date-editor.el-range-editor",
         kind: "daterange",
         value: { start: START, end: END }
