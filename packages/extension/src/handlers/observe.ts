@@ -512,20 +512,51 @@ async function scanOneFrame(
           filter === "all"
             ? `${INTERACTIVE_SELECTORS},${TABLE_EXTRA_SELECTORS}`
             : INTERACTIVE_SELECTORS;
-        const nodeList = document.querySelectorAll(ROOT_SELECTORS);
+
+        // Walk open shadow roots in addition to the light DOM. The
+        // baseline 2026-05-19 run exposed that custom-element-heavy
+        // pages (web components / Lit / Stencil / lots of SaaS UIs)
+        // had 0 elements surfaced because document.querySelectorAll
+        // does not pierce shadow boundaries — the in-shadow buttons
+        // / inputs / links were invisible to observe. CDP's
+        // Accessibility.getFullAXTree DOES flatten open shadow but
+        // observe uses chrome.scripting.executeScript page-side scan
+        // (different code path from reasoning/ax-snapshot.ts which
+        // I22 covers). Closed shadow roots remain invisible per the
+        // CE spec — `element.shadowRoot` returns null for closed.
+        const SHADOW_WALK_MAX_DEPTH = 8;
+        function querySelectorAllDeep(
+          selector: string,
+          root: Document | ShadowRoot,
+          depth = 0,
+        ): Element[] {
+          const acc: Element[] = Array.from(root.querySelectorAll(selector));
+          if (depth >= SHADOW_WALK_MAX_DEPTH) return acc;
+          for (const host of root.querySelectorAll("*")) {
+            const sr = (host as HTMLElement).shadowRoot;
+            if (sr) acc.push(...querySelectorAllDeep(selector, sr, depth + 1));
+          }
+          return acc;
+        }
+
+        const nodeList = querySelectorAllDeep(ROOT_SELECTORS, document);
 
         // BUG-1: cursor:pointer fallback for custom interactive elements.
         // bytenew / Element Plus / Ant Design 等中文 SaaS 框架普遍用
         // <li/div cursor:pointer @click=...> 而非原生 button / [role=button]，
         // 静态白名单完全捕获不到。事件挂在 Vue/React vnode 层，元素本身
         // 没 onclick 也没 framework key，所以走 computed style 兜底。
-        const interactiveSet = new Set<Element>(Array.from(nodeList));
+        const interactiveSet = new Set<Element>(nodeList);
         // Sweep all elements (Vue/React UI libs frequently use custom
         // tags like <el-button> / <a-link> / <van-cell> for interactive
         // widgets — bytenew testc 行操作 link is <el-button> not <div>),
-        // skipping svg internals + non-rendered tags for perf.
-        const fallbackPool = document.querySelectorAll(
+        // skipping svg internals + non-rendered tags for perf. Shadow-
+        // aware via querySelectorAllDeep so a button inside a custom
+        // element's open shadow root is reachable through the
+        // cursor:pointer fallback path too.
+        const fallbackPool = querySelectorAllDeep(
           "*:not(svg *):not(script):not(style):not(meta):not(link):not(head):not(head *)",
+          document,
         );
         const FALLBACK_CAP = 5000; // hard ceiling against pathological pages
         const docRoot = document.documentElement;
