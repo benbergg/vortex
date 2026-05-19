@@ -5,6 +5,16 @@ import { ActionRouter } from "../src/lib/router.js";
 import { registerDomHandlers } from "../src/handlers/dom.js";
 import { COMMIT_DRIVERS, findDriver } from "../src/patterns/index.js";
 
+// PR #2 (commit 0e62721) split commit drivers into two execution paths:
+// daterange / datetimerange / cascader / time go through dedicated CDP helpers,
+// while checkbox-group / select load a page-side bundle and then dispatch via
+// nativePageQuery. The legacy executeScript-shape contract tests below now
+// target the bundle path (via kind="checkbox-group"); stub the loader so the
+// only executeScript call we observe is the page-query one we assert on.
+vi.mock("../src/adapter/page-side-loader.js", () => ({
+  loadPageSideModule: vi.fn().mockResolvedValue(undefined),
+}));
+
 function mkReq(
   tool: string,
   args: Record<string, unknown> = {},
@@ -111,19 +121,14 @@ describe("dom.commit handler (@since 0.4.0)", () => {
     expect(resp.error?.message).toContain("No commit driver");
   });
 
-  // Skipped: issue #13. PR #2 (commit 0e62721) switched dom.commit from direct
-  // `executeScript({ func, args })` injection to a page-side bundle invoke;
-  // the mock shapes below still model the old contract. Re-enable when the
-  // mock is rebuilt against `bundle.commit(...)`.
-  it.skip("passes driverId + closestSelector + value into executeScript func", async () => {
+  it("passes selector + closestSelector + value + timeout + driverId into executeScript args", async () => {
     executeScript.mockResolvedValue([
       {
         result: {
           result: {
             success: true,
-            driver: "element-plus-datetimerange",
-            startValue: "2026-01-01 00:00:00",
-            endValue: "2026-03-31 23:59:59",
+            driver: "element-plus-checkbox-group",
+            checkedAfter: ["a", "b"],
           },
         },
       },
@@ -132,9 +137,9 @@ describe("dom.commit handler (@since 0.4.0)", () => {
       mkReq(
         "dom.commit",
         {
-          kind: "datetimerange",
-          value: { start: "2026-01-01", end: "2026-03-31" },
-          selector: ".el-date-editor",
+          kind: "checkbox-group",
+          value: ["a", "b"],
+          selector: ".roles",
           timeout: 5000,
         },
         42,
@@ -143,23 +148,23 @@ describe("dom.commit handler (@since 0.4.0)", () => {
     expect(resp.error).toBeUndefined();
     expect(resp.result).toMatchObject({
       success: true,
-      driver: "element-plus-datetimerange",
+      driver: "element-plus-checkbox-group",
     });
     const call = executeScript.mock.calls[0][0];
-    expect(call.args[0]).toBe(".el-date-editor"); // selector
-    expect(call.args[1]).toBe("element-plus-datetimerange"); // driverId
-    expect(call.args[2]).toBe(".el-date-editor.el-range-editor"); // closestSelector
-    expect(call.args[3]).toEqual({ start: "2026-01-01", end: "2026-03-31" });
-    expect(call.args[4]).toBe(5000);
+    expect(call.args[0]).toBe(".roles");                       // selector
+    expect(call.args[1]).toBe(".el-checkbox-group");           // closestSelector
+    expect(call.args[2]).toEqual(["a", "b"]);                  // value
+    expect(call.args[3]).toBe(5000);                           // timeoutMs
+    expect(call.args[4]).toBe("element-plus-checkbox-group");  // driverId
   });
 
-  it.skip("maps page-side COMMIT_FAILED result to COMMIT_FAILED error with stage in context", async () => {
+  it("maps page-side COMMIT_FAILED result to COMMIT_FAILED error with stage in context", async () => {
     executeScript.mockResolvedValue([
       {
         result: {
-          error: "Picker did not open within timeout",
+          error: "Toggle did not converge",
           errorCode: "COMMIT_FAILED",
-          stage: "open-picker",
+          stage: "toggle",
         },
       },
     ]);
@@ -167,27 +172,27 @@ describe("dom.commit handler (@since 0.4.0)", () => {
       mkReq(
         "dom.commit",
         {
-          kind: "datetimerange",
-          value: { start: "2026-01-01", end: "2026-03-31" },
-          selector: ".el-date-editor",
+          kind: "checkbox-group",
+          value: ["a", "b"],
+          selector: ".roles",
         },
         42,
       ),
     );
     expect(resp.error?.code).toBe(VtxErrorCode.COMMIT_FAILED);
     expect(resp.error?.context?.extras).toMatchObject({
-      driverId: "element-plus-datetimerange",
-      stage: "open-picker",
+      driverId: "element-plus-checkbox-group",
+      stage: "toggle",
     });
   });
 
-  it.skip("maps page-side UNSUPPORTED_TARGET (closest mismatch) to UNSUPPORTED_TARGET", async () => {
+  it("maps page-side UNSUPPORTED_TARGET (closest mismatch) to UNSUPPORTED_TARGET", async () => {
     executeScript.mockResolvedValue([
       {
         result: {
-          error: 'Target does not match driver closestSelector ".el-date-editor.el-range-editor"',
+          error: 'Target does not match driver closestSelector ".el-checkbox-group"',
           errorCode: "UNSUPPORTED_TARGET",
-          extras: { driverId: "element-plus-datetimerange" },
+          extras: { driverId: "element-plus-checkbox-group" },
         },
       },
     ]);
@@ -195,8 +200,8 @@ describe("dom.commit handler (@since 0.4.0)", () => {
       mkReq(
         "dom.commit",
         {
-          kind: "datetimerange",
-          value: { start: "2026-01-01", end: "2026-03-31" },
+          kind: "checkbox-group",
+          value: ["a"],
           selector: "button.unrelated",
         },
         42,
@@ -205,7 +210,7 @@ describe("dom.commit handler (@since 0.4.0)", () => {
     expect(resp.error?.code).toBe(VtxErrorCode.UNSUPPORTED_TARGET);
   });
 
-  it.skip("maps ELEMENT_NOT_FOUND correctly", async () => {
+  it("maps ELEMENT_NOT_FOUND correctly", async () => {
     executeScript.mockResolvedValue([
       {
         result: {
@@ -218,8 +223,8 @@ describe("dom.commit handler (@since 0.4.0)", () => {
       mkReq(
         "dom.commit",
         {
-          kind: "datetimerange",
-          value: { start: "2026-01-01", end: "2026-03-31" },
+          kind: "checkbox-group",
+          value: ["a"],
           selector: ".missing",
         },
         42,
