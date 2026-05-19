@@ -1,5 +1,5 @@
 // L1 Capability Detector：探测当前环境能力，决定走 native / cdp 路径。
-// TODO: capabilityDetector 当前仅供 I2 测试 + L2 调用预留，生产 handler wire 在 PR #2 完成（spec §1.8）
+// Wired into production via action/fallback.ts (drag / typed-input adapters).
 
 import type { CapabilityDetector } from "./types.js";
 
@@ -63,8 +63,7 @@ function needsTrustedEvent(
   elementHint?: { tagName?: string },
 ): boolean {
   if (action === "drag") return DRAG_REQUIRES_CDP;
-  // 其他动作默认 untrusted event 即可（element-plus 等框架按 case 决定，由 L2 actionability 主导，PR #2 完善）。
-  // PR #1 仅给 conservative 默认：click/fill/type 都不强制 trusted。
+  // Other actions default to untrusted events; L2 actionability decides per case.
   void elementHint;
   return false;
 }

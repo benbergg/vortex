@@ -385,7 +385,14 @@ export async function handleCallTool(
           fieldParams.selector = f.target;
         }
       }
-      // TODO: kind 支持（dom.commit）留待后续版本 #0000
+      // dom.commit `kind` routing is not yet wired through this L4 facade
+      // (tracked in CHANGELOG v0.7.x backlog). Warn loudly so callers know the
+      // hint is dropped instead of silently coercing to plain dom.fill.
+      if (f.kind) {
+        process.stderr.write(
+          `[vortex-mcp] vortex_fill_form: kind="${f.kind}" is not yet supported; falling back to dom.fill.\n`,
+        );
+      }
       const action = "dom.fill";
       const resp = await sendRequest(action, fieldParams, PORT, tabId as number | undefined, effectiveTimeout);
       results.push({ index: i, ok: !resp.error });
