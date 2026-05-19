@@ -2,6 +2,37 @@
 
 import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 
+// v0.8 dual-format window telemetry. Bare refs `@eN` / `@fNeM` are accepted
+// for backward compat but slated for removal in v0.9; track in-session usage
+// so the v0.9 cut-over decision is data-driven rather than a guess.
+// One stderr warn fires on the first bare ref of a session — visible enough
+// for dogfood to notice, quiet enough to not flood. The counter accumulates
+// for the lifetime of the MCP process and is exposed through vortex_ping.
+let bareRefHits = 0;
+let bareRefFirstSeenAt: number | null = null;
+let bareRefWarned = false;
+
+function recordBareRefHit(target: string): void {
+  bareRefHits++;
+  if (bareRefFirstSeenAt === null) bareRefFirstSeenAt = Date.now();
+  if (!bareRefWarned) {
+    bareRefWarned = true;
+    process.stderr.write(
+      `[vortex-mcp] bare ref "${target}" used; this format is deprecated and will be rejected in v0.9. Use @<hash>:eN from vortex_observe.\n`,
+    );
+  }
+}
+
+export function getBareRefStats(): { hits: number; firstSeenAt: number | null } {
+  return { hits: bareRefHits, firstSeenAt: bareRefFirstSeenAt };
+}
+
+export function _resetBareRefStats(): void {
+  bareRefHits = 0;
+  bareRefFirstSeenAt = null;
+  bareRefWarned = false;
+}
+
 export type ParsedRef =
   | { kind: "ref"; index: number; frameId: number; hash?: string }
   | { kind: "selector"; selector: string };
@@ -73,6 +104,7 @@ export function resolveTargetParam(
 ): ResolvedTargetParam {
   const r = parseRef(target);
   if (r.kind === "selector") return { selector: r.selector };
+  if (r.hash === undefined) recordBareRefHit(target);
   if (!activeSnapshotId) {
     throw vtxError(
       VtxErrorCode.STALE_SNAPSHOT,

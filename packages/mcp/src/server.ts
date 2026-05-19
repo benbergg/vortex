@@ -243,6 +243,7 @@ export async function handleCallTool(
   // 特殊 tool: vortex_ping（MCP 自身诊断 + 版本指纹，@since 0.4.0）
   if (toolDef.action === "__mcp_ping__") {
     try {
+      const { getBareRefStats } = await import("./lib/ref-parser.js");
       const [tabsResp, versionResp] = await Promise.allSettled([
         sendRequest("tab.list", {}, PORT, undefined, 5000),
         sendRequest("diagnostics.version", {}, PORT, undefined, 5000),
@@ -285,6 +286,7 @@ export async function handleCallTool(
             toolCount,
             extensionActionCount: versionInfo.actionCount ?? null,
             diagnosticsSupported,
+            bareRefUsage: getBareRefStats(),
             ...(versionDrift ? { warning: versionDrift } : {}),
           }, null, 2),
         }],

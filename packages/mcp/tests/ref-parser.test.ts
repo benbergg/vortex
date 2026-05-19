@@ -1,5 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { parseRef, resolveTargetParam } from "../src/lib/ref-parser.js";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import {
+  parseRef,
+  resolveTargetParam,
+  getBareRefStats,
+  _resetBareRefStats,
+} from "../src/lib/ref-parser.js";
 
 describe("parseRef", () => {
   it("@e3 → { index: 3, frameId: 0 }", () => {
@@ -167,5 +172,65 @@ describe("resolveTargetParam — hash strict check (v0.8)", () => {
       snapshotId: "s_xyz",
       frameId: 3,
     });
+  });
+});
+
+describe("resolveTargetParam — bare-ref deprecation telemetry (v0.8 → v0.9)", () => {
+  beforeEach(() => {
+    _resetBareRefStats();
+  });
+
+  it("bare ref increments the counter", () => {
+    resolveTargetParam("@e1", "s_xyz", "a3f7");
+    expect(getBareRefStats().hits).toBe(1);
+  });
+
+  it("counter accumulates across calls", () => {
+    resolveTargetParam("@e1", "s_xyz", "a3f7");
+    resolveTargetParam("@f2e3", "s_xyz", "a3f7");
+    resolveTargetParam("@e5", "s_xyz", "a3f7");
+    expect(getBareRefStats().hits).toBe(3);
+  });
+
+  it("hashed ref does not increment the counter", () => {
+    resolveTargetParam("@a3f7:e1", "s_xyz", "a3f7");
+    resolveTargetParam("@a3f7:f2e3", "s_xyz", "a3f7");
+    expect(getBareRefStats().hits).toBe(0);
+  });
+
+  it("plain selector does not increment the counter", () => {
+    resolveTargetParam(".foo", "s_xyz", "a3f7");
+    expect(getBareRefStats().hits).toBe(0);
+  });
+
+  it("firstSeenAt is set on the first bare hit and stays stable", () => {
+    expect(getBareRefStats().firstSeenAt).toBeNull();
+    resolveTargetParam("@e1", "s_xyz", "a3f7");
+    const first = getBareRefStats().firstSeenAt;
+    expect(first).not.toBeNull();
+    resolveTargetParam("@e2", "s_xyz", "a3f7");
+    expect(getBareRefStats().firstSeenAt).toBe(first);
+  });
+
+  it("stderr deprecation warn fires exactly once per session", () => {
+    const writeSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      resolveTargetParam("@e1", "s_xyz", "a3f7");
+      resolveTargetParam("@e2", "s_xyz", "a3f7");
+      resolveTargetParam("@f2e3", "s_xyz", "a3f7");
+      const bareRefWarns = writeSpy.mock.calls.filter(
+        (c) => typeof c[0] === "string" && (c[0] as string).includes("bare ref"),
+      );
+      expect(bareRefWarns).toHaveLength(1);
+      expect(bareRefWarns[0][0]).toContain("deprecated");
+      expect(bareRefWarns[0][0]).toContain("@e1");
+    } finally {
+      writeSpy.mockRestore();
+    }
+  });
+
+  it("counter still increments even when activeSnapshotId is null (call throws after recording)", () => {
+    expect(() => resolveTargetParam("@e1", null, null)).toThrow();
+    expect(getBareRefStats().hits).toBe(1);
   });
 });

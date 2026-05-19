@@ -24,9 +24,11 @@ _新工作进入此段；ship 时改为版本号 + 日期。_
 
   **Closes v0.7.x backlog (5 items)**: `el-slider-drag` (needed `vortex_mouse_drag`) · `el-upload` (needed `vortex_file_upload`) · `el-date-picker-daterange` + `el-date-picker-datetimerange` (needed `vortex_fill` with `kind` enum exposed at L4) · `latency-p50` (needed `vortex_evaluate`). All five bench cases statically verified to call v0.8 public tools only; e2e validation deferred to v0.8 ship preflight. 11 bench cases migrated from `vortex_act({action:"fill", ...})` to direct `vortex_fill` calls.
 
+- **Bare-ref deprecation telemetry** (`packages/mcp/src/lib/ref-parser.ts`, `packages/mcp/src/server.ts`). `resolveTargetParam` now counts every bare `@eN` / `@fNeM` it resolves and fires a single stderr warn on the first occurrence of a session (`[vortex-mcp] bare ref "<target>" used; this format is deprecated and will be rejected in v0.9.`). `vortex_ping` exposes the counter as `bareRefUsage: { hits, firstSeenAt }`, letting callers query mid- or end-of-session usage. **Why**: the v0.9 removal of bare refs is currently a planning-doc claim with no data behind it. The counter + warn turn the dual-format window into measurable signal so the v0.9 cut-over decision is evidence-driven rather than a guess.
+
 ### 🔄 Backward compatibility
 
-- Bare refs `@eN` and `@fNeM` (v0.7.x format) **still resolve** through `activeSnapshotId`. The strict hash check only fires when the caller-supplied ref carries a hash prefix. This dual-format window is intentional for v0.8.x; bare refs are deprecated and will be rejected with `INVALID_PARAMS` in v0.9.
+- Bare refs `@eN` and `@fNeM` (v0.7.x format) **still resolve** through `activeSnapshotId`. The strict hash check only fires when the caller-supplied ref carries a hash prefix. This dual-format window is intentional for v0.8.x; bare refs are deprecated and will be rejected with `INVALID_PARAMS` in v0.9. Live usage is surfaced via `vortex_ping.bareRefUsage` (see telemetry entry above).
 
 ### 🗑 Removed
 
