@@ -114,7 +114,8 @@ function safeOrigin(url: string | undefined): string | null {
   }
 }
 
-async function resolveTargetFrames(
+/** Exported for unit tests; production callers go through the snapshot handler. */
+export async function resolveTargetFrames(
   tabId: number,
   explicitFrameId: number | undefined,
   framesParam: FramesParam,
@@ -148,7 +149,31 @@ async function resolveTargetFrames(
     const main = all.find((f) => f.frameId === 0);
     const mainOrigin = safeOrigin(main?.url);
     if (!mainOrigin) return main ? asTargets([main]) : [];
-    return asTargets(all.filter((f) => safeOrigin(f.url) === mainOrigin));
+    // Spec: `<iframe srcdoc>` inherits its parent document's origin
+    // (about:srcdoc is an opaque URL — `new URL("about:srcdoc").origin`
+    // returns the literal string "null"). Same applies recursively for
+    // a srcdoc nested inside a srcdoc. Walk the parent chain past
+    // opaque origins to find the first concrete one, then compare.
+    // Issue #15: without this, all-same-origin silently dropped srcdoc
+    // iframes that should have been included.
+    const byId = new Map(all.map((f) => [f.frameId, f]));
+    const inheritedOrigin = (
+      f: chrome.webNavigation.GetAllFrameResultDetails,
+    ): string | null => {
+      let cur: chrome.webNavigation.GetAllFrameResultDetails | undefined = f;
+      let depth = 0;
+      while (cur && depth < 16) {
+        const o = safeOrigin(cur.url);
+        // Concrete origin (non-opaque). Opaque URLs surface as "null".
+        if (o && o !== "null") return o;
+        const parentId = cur.parentFrameId;
+        if (parentId == null || parentId < 0) return null;
+        cur = byId.get(parentId);
+        depth++;
+      }
+      return null;
+    };
+    return asTargets(all.filter((f) => inheritedOrigin(f) === mainOrigin));
   }
   // 默认 "main"
   const main = all.find((f) => f.frameId === 0);
@@ -992,14 +1017,24 @@ export function registerObserveHandlers(router: ActionRouter): void {
         elements: elementMap,
       });
 
-      // 主 frame（或第一个命中帧）作为顶层 url/title/viewport 代表
-      const primary = scans.find((s) => s.frameId === 0 && s.page) ?? scans.find((s) => s.page);
+      // Top-level url/title/viewport ALWAYS reflect the main frame, even
+      // when its page-side scan failed. Issue #15-2: previously the
+      // fallback `scans.find((s) => s.page)` would promote the first
+      // scanned child frame (e.g. a cross-origin iframe) to "primary",
+      // making the LLM see the iframe origin as if it were the whole
+      // page. URL has two sources: the page-side `location.href` (when
+      // scan succeeded — preserves any client-side route changes) and
+      // chrome.webNavigation's reported URL (always available, even
+      // when scan failed). Title/viewport require a successful scan;
+      // fall back to empty / zeros so the renderer can still emit a
+      // header without misrepresenting which origin we're on.
+      const mainScan = scans.find((s) => s.frameId === 0);
       return {
         snapshotId,
         version: 2,
-        url: primary?.page?.url ?? "",
-        title: primary?.page?.title ?? "",
-        viewport: primary?.page?.viewport ?? {
+        url: mainScan?.page?.url ?? mainScan?.url ?? "",
+        title: mainScan?.page?.title ?? "",
+        viewport: mainScan?.page?.viewport ?? {
           width: 0,
           height: 0,
           scrollY: 0,

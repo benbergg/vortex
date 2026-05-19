@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>vortex_observe srcdoc inheritance fixture</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 24px; max-width: 640px; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 4px; }
+    iframe {
+      width: 100%;
+      height: 80px;
+      border: 1px dashed #999;
+      margin: 12px 0;
+    }
+    button { padding: 6px 14px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>srcdoc same-origin fixture</h1>
+  <p>
+    The main frame has a button below. The
+    <code>&lt;iframe srcdoc&gt;</code> after it contains its own button
+    living in an opaque <code>about:srcdoc</code> URL — but per HTML
+    spec the srcdoc inherits the parent's origin, so
+    <code>vortex_observe({ frames: "all-same-origin" })</code> must
+    surface both buttons.
+  </p>
+
+  <button id="main-btn" type="button">Main frame button</button>
+
+  <iframe
+    srcdoc='<!DOCTYPE html><html><body><button id="inner-btn" type="button">Srcdoc inner button</button></body></html>'
+  ></iframe>
+</body>
+</html>
