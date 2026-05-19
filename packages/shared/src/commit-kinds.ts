@@ -3,7 +3,7 @@
 // Consumed by:
 // - packages/extension/src/patterns/commit-drivers.ts (CommitKind type + runtime registry)
 // - packages/mcp/src/tools/schemas-public.ts (vortex_fill.kind enum)
-// - packages/mcp/src/tools/schemas.ts (internal vortex_fill / vortex_fill_form enums)
+// - packages/mcp/src/tools/schemas.ts (internal vortex_fill enum)
 //
 // Adding or removing a kind requires implementing / removing the corresponding
 // driver in commit-drivers.ts AND updating dom.ts commit handler switch.

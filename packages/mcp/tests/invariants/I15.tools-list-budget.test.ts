@@ -65,7 +65,7 @@ describe("I15: tools/list budget + count + internalized grep", () => {
       // 内部化（act/observe 触发）
       "vortex_mouse_click", "vortex_mouse_move",
       "vortex_file_download", "vortex_file_list_downloads",
-      "vortex_fill_form", "vortex_batch",
+      "vortex_batch",
       // 删除（无业务价值 / 内部化）
       "vortex_ping",
     ];
@@ -114,16 +114,6 @@ describe("H-7: vortex_fill.kind enum stays in sync with shared COMMIT_KINDS", ()
   it("internal vortex_fill.kind.enum == COMMIT_KINDS", () => {
     const fill = getInternalToolDef("vortex_fill")!;
     const enumVals = (fill.schema as { properties: { kind: { enum: string[] } } }).properties.kind.enum;
-    expect([...enumVals].sort()).toEqual([...COMMIT_KINDS].sort());
-  });
-
-  it("internal vortex_fill_form.items.kind.enum == COMMIT_KINDS", () => {
-    const fillForm = getInternalToolDef("vortex_fill_form")!;
-    const enumVals = (
-      fillForm.schema as {
-        properties: { fields: { items: { properties: { kind: { enum: string[] } } } } };
-      }
-    ).properties.fields.items.properties.kind.enum;
     expect([...enumVals].sort()).toEqual([...COMMIT_KINDS].sort());
   });
 });

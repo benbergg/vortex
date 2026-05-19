@@ -383,34 +383,6 @@ function domTools(): ToolDef[] {
       },
     },
     {
-      name: "vortex_fill_form",
-      action: "dom.fill",
-      description: "Fill multiple form fields. Each: {target, value, kind?}.",
-      schema: {
-        type: "object",
-        properties: {
-          fields: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                target: { type: "string", description: "@<hash>:eN ref or CSS selector (bare @eN accepted in v0.8.x; deprecated in v0.9)." },
-                value: {},
-                kind: {
-                  type: "string",
-                  enum: [...COMMIT_KINDS],
-                },
-              },
-              required: ["value"],
-            },
-          },
-          ...optionalTabId,
-          ...optionalFrameId,
-        },
-        required: ["fields"],
-      },
-    },
-    {
       name: "vortex_press",
       action: "keyboard.press",
       description: "Press key or shortcut (e.g. 'Enter', 'Ctrl+S', 'Tab').",

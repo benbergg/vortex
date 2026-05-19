@@ -42,7 +42,7 @@ describe("getToolDefs", () => {
     // 其余仍内部化。
     const internalized = [
       "vortex_click", "vortex_type", "vortex_select", "vortex_hover", "vortex_batch",
-      "vortex_fill_form", "vortex_get_text", "vortex_get_html",
+      "vortex_get_text", "vortex_get_html",
       "vortex_mouse_click", "vortex_mouse_move",
       "vortex_console", "vortex_network", "vortex_network_response_body",
       "vortex_storage_get", "vortex_storage_set", "vortex_storage_session",

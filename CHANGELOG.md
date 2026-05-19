@@ -24,6 +24,10 @@ _新工作进入此段；ship 时改为版本号 + 日期。_
 
 - Bare refs `@eN` and `@fNeM` (v0.7.x format) **still resolve** through `activeSnapshotId`. The strict hash check only fires when the caller-supplied ref carries a hash prefix. This dual-format window is intentional for v0.8.x; bare refs are deprecated and will be rejected with `INVALID_PARAMS` in v0.9.
 
+### 🗑 Removed
+
+- **Internal tool `vortex_fill_form`** (`packages/mcp/src/tools/schemas.ts`, `packages/mcp/src/server.ts`). The tool definition and its server-side per-field loop (`handleCallTool` special branch) are deleted as dead code: `handleCallTool` only resolves names via the public registry, and `dispatchNewTool` had no case for it, so the branch was unreachable. No production caller exists (cli / vortex-bench / extension / server packages searched). The `vortex-migrate` codemod still recognises `vortex_fill_form` in legacy sources and emits the existing migration warning ("v0.6 has no fill_form helper; expand to per-field vortex_act(action='fill') calls"); that migration entry is intentionally retained so v0.5 codebases keep getting the rewrite hint.
+
 ### 🐛 Fixed
 
 - `vortex_act` / `vortex_extract` / `vortex_wait_for` no longer silently rebind a ref captured in observe-1 to an element in observe-2 when both observes happen before the action. The mis-binding window is closed for all callers that adopt the new ref format.

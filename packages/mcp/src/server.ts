@@ -354,64 +354,6 @@ export async function handleCallTool(
     return withEvents([{ type: "text" as const, text: resultText }]);
   }
 
-  // 特殊 tool: vortex_fill_form（MCP 侧循环，依次调 dom.fill / dom.commit）
-  if (toolDef.name === "vortex_fill_form") {
-    const fields = params.fields as Array<{ target?: string; value: unknown; kind?: string }>;
-    const { tabId, timeout } = params;
-    const effectiveTimeout = (timeout as number) ?? DEFAULT_TIMEOUT;
-    const results: { index: number; ok: boolean }[] = [];
-    for (let i = 0; i < fields.length; i++) {
-      const f = fields[i];
-      // 翻译 target
-      let fieldParams: Record<string, unknown> = { value: f.value };
-      if (f.target) {
-        if (f.target.startsWith("@")) {
-          try {
-            const { resolveTargetParam } = await import("./lib/ref-parser.js");
-            const resolved = resolveTargetParam(f.target, activeSnapshotId, activeSnapshotHash);
-            if (resolved.selector) fieldParams.selector = resolved.selector;
-            if (resolved.index != null) {
-              fieldParams.index = resolved.index;
-              fieldParams.snapshotId = resolved.snapshotId;
-              if (resolved.frameId && resolved.frameId !== 0) fieldParams.frameId = resolved.frameId;
-            }
-          } catch (err) {
-            return {
-              isError: true,
-              content: [{ type: "text" as const, text: `field[${i}] target error: ${(err as Error).message}` }],
-            };
-          }
-        } else {
-          fieldParams.selector = f.target;
-        }
-      }
-      // dom.commit `kind` routing is not yet wired through this L4 facade
-      // (tracked in CHANGELOG v0.7.x backlog). Warn loudly so callers know the
-      // hint is dropped instead of silently coercing to plain dom.fill.
-      if (f.kind) {
-        process.stderr.write(
-          `[vortex-mcp] vortex_fill_form: kind="${f.kind}" is not yet supported; falling back to dom.fill.\n`,
-        );
-      }
-      const action = "dom.fill";
-      const resp = await sendRequest(action, fieldParams, PORT, tabId as number | undefined, effectiveTimeout);
-      results.push({ index: i, ok: !resp.error });
-      if (resp.error) {
-        return {
-          isError: true,
-          content: [{
-            type: "text" as const,
-            text: `field[${i}] failed: [${resp.error.code}] ${resp.error.message}`,
-          }],
-        };
-      }
-    }
-    return withEvents([{
-      type: "text" as const,
-      text: JSON.stringify({ filledCount: results.length }, null, 2),
-    }]);
-  }
-
   // target 翻译：@eN / @fNeM → { index, snapshotId, frameId }
   const target = params.target as string | undefined;
   if (target) {

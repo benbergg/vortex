@@ -233,8 +233,10 @@ describe("dispatchNewTool", () => {
     expect(result).toBeNull();
   });
 
-  it("工具总数应为 36", async () => {
+  it("工具总数应为 35", async () => {
+    // v0.8.x: vortex_fill_form removed as dead internal tool (no caller — the
+    // L4 facade routes per-field through vortex_act / vortex_fill instead).
     const { getAllToolDefs } = await import("../src/tools/schemas.js");
-    expect(getAllToolDefs().length).toBe(36);
+    expect(getAllToolDefs().length).toBe(35);
   });
 });
