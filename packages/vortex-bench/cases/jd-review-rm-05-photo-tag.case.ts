@@ -1,3 +1,5 @@
+// Fixture-based: playground/public/jd-review-modal.html mirrors JD's review
+// modal pattern. NOT a live jd.com test.
 // RM-05: 切「图/视频」keyword tag —— P1 fix 在 keyword tag 上的延伸验证。
 // 关键测点：
 //   - "图/视频5000+" tag 是 keyword 组（与 sentiment "差评200+" 同 class）

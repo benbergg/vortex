@@ -1,3 +1,5 @@
+// Fixture-based: playground/public/jd-review-modal.html mirrors JD's review
+// modal pattern. NOT a live jd.com test.
 // RM-06: 排序切换 —— sort label 是 div+cursor:pointer，含 is-active class。
 // 关键测点：
 //   - 初始 "最新" [active]，"当前商品" 无 [active]

@@ -1,3 +1,5 @@
+// Fixture-based: playground/public/jd-review-modal.html mirrors JD's review
+// modal pattern. NOT a live jd.com test.
 // RM-04: 关闭弹窗 —— div+cursor:pointer 的 close icon
 // 关键测点：
 //   - 关闭 div（无 role 无 aria-label）能被 vortex 收到

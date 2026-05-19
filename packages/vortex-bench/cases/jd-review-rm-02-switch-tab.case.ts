@@ -1,3 +1,5 @@
+// Fixture-based: playground/public/jd-review-modal.html mirrors JD's review
+// modal pattern. NOT a live jd.com test.
 // RM-02: 切到「差评」tab —— 数据集更新 + active class 切换
 // 关键测点：
 //   - 多个同 class（_tag_rgt47_12）的 tag，vortex 必须用 ref 精确点击「差评」

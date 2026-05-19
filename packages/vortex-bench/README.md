@@ -50,7 +50,9 @@ pnpm -F @bytenew/vortex-bench bench diff        # 和 baseline.json 比
 pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 baseline
 ```
 
-## 覆盖矩阵（baseline：**26 case / 26 pass / 0 fail** 🎉）
+## 覆盖矩阵
+
+> Baseline 状态：v0.5 时代的 26-case baseline 已归档到 `reports/archive/baseline-v0.5-26cases-2026-04-22.json`，当前 case 总数 **38**。`reports/baseline.json` 待用 `pnpm bench:baseline` 重新生成（见 [`reports/README.md`](reports/README.md)）。
 
 | case | widget | 状态 | 信号 |
 |------|--------|------|------|
@@ -80,6 +82,25 @@ pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 basel
 | **el-select-v2** | 虚拟滚动 select（1000 项）| ✓ | fill kind=select 直接命中前几条 |
 | **el-select-v2-virtual** | 跨屏选（Option 500）| ✓ | filterable + type 过滤让 virtual list 剩匹配项 |
 | **el-slider-drag** | CDP 真拖拽（20 → 80） | ✓ | 新 `vortex_mouse_drag` 工具：N 步 move + mouse down/up |
+
+### 复杂网页 / dogfood fixture cases
+
+灵感来自真站，但实际跑在本地 `playground/public/*.html` fixture 上（避免反爬 / 网络抖动 / ToS 风险）。
+
+| case | 模式 | 模拟的真站特征 |
+|------|------|----------------|
+| `jd-review-rm-01-open` | 弹窗触发 | JD 评价：`div + cursor:pointer` 触发，弹窗 portal 渲染 |
+| `jd-review-rm-02-switch-tab` | 同 class 多 tag 切换 | 多个相同 class 的标签 tab，依赖 vortex ref 精确点击 |
+| `jd-review-rm-03-scroll-load` | 内部 container 滚动加载 | 评价区滚动触发懒加载，`vortex_act(action='scroll')` 命中内部容器 |
+| `jd-review-rm-04-close` | div close icon | 无 role 无 aria-label 的关闭 div + Escape 兜底 |
+| `jd-review-rm-05-photo-tag` | keyword tag 切换 | "图/视频5000+" 异文本嵌套（P1 ancestor-text fix 验证点）|
+| `jd-review-rm-06-sort-toggle` | active 状态切换 | `is-active` class 互斥切换的 sort label |
+| `iframe-nested-with-content` | 3 层嵌套 iframe | 跨 frame 元素可被 `vortex_observe(frames=all-permitted)` 捕捉 |
+| `aria-cursor-nested-no-dup` | ARIA + cursor:pointer 嵌套去重 | 防 dual-instance：`<li role=menuitem>` 内层 `<div cursor:pointer>` 不重复输出 |
+| `icon-name-priority` | icon 命名优先级 | svg `<title>` > alt > aria-label > className（denylist for `el-`/`ant-`/`iconfont`）|
+| `cross-observe-ref-stale` | hashed ref 跨 observe | 第二次 observe 后用旧 ref 抛 `STALE_SNAPSHOT`（v0.8 sub-A 防回归）|
+
+> 想加新真站灵感 case：把 fixture HTML 落在 `playground/public/<name>.html`，case 文件用 `playgroundPath: "/<name>.html"`（注意不走 SPA hash router，是 vite static serve），开头加 `// Fixture-based: ...` 注释。
 
 ## v0.6.0 → (latest) 修复记录
 

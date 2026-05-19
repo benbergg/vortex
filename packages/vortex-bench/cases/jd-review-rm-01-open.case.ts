@@ -1,3 +1,5 @@
+// Fixture-based: playground/public/jd-review-modal.html mirrors JD's review
+// modal pattern. NOT a live jd.com test (which would be flaky and against ToS).
 // RM-01: 打开 JD 评价弹窗（cursor:pointer div + portal 渲染）
 // 关键测点：
 //   - .all-btn 是 div + cursor:pointer，无 role —— vortex cursor:pointer fallback 应识别

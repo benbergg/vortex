@@ -1,3 +1,5 @@
+// Fixture-based: playground/public/jd-review-modal.html mirrors JD's review
+// modal pattern. NOT a live jd.com test.
 // RM-03: 滚动加载 —— 内部 container 触底加载更多评价
 // 关键测点：
 //   - vortex_act(action='scroll') 能否对内部 container 触发滚动
