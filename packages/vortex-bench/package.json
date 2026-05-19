@@ -16,6 +16,7 @@
     "playground": "vite --config playground/vite.config.ts",
     "playground:build": "vite build --config playground/vite.config.ts",
     "bench": "tsx src/index.ts",
+    "bench:baseline": "tsx src/index.ts run --all && cp reports/latest.json reports/baseline.json && echo '[bench] baseline.json refreshed from latest.json'",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
