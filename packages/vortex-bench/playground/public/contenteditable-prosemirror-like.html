@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>contentEditable + ProseMirror-like fixture</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 800px; }
+    #editor {
+      border: 1px solid #ccc; padding: 12px; min-height: 80px;
+      font-family: serif; line-height: 1.6;
+    }
+    #editor:focus { outline: 2px solid #4488ff; }
+    #plain-editor {
+      border: 1px solid #ccc; padding: 12px; min-height: 80px;
+      margin-top: 24px;
+    }
+    #plain-editor:focus { outline: 2px solid #44aa44; }
+    #result, #plain-result { margin-top: 12px; font-family: monospace; color: #555; }
+  </style>
+</head>
+<body>
+  <h1>contentEditable + ProseMirror-like input pipeline</h1>
+  <p>The top editor mirrors a real rich-text editor (ProseMirror,
+     Slate, Lexical): it preventDefault's <code>beforeinput</code>,
+     re-renders its DOM content from an internal model, and only
+     accepts <code>isTrusted=true</code> (native browser-source) input
+     events. Synthetic <code>InputEvent</code> dispatches are dropped.
+     The bottom editor is a plain contentEditable div with no input
+     interception, but it has the same vortex_fill / vortex_type
+     entry-point problem: <code>el.value</code> doesn't exist on a
+     div, so the host-side input-value-setter path throws
+     <code>Illegal invocation</code> and the keyboard-event path's
+     <code>if (el.value !== undefined)</code> guard silently no-ops.</p>
+
+  <h2>1. ProseMirror-like rich-text editor</h2>
+  <div id="editor" contenteditable="true" data-testid="rich-editor"
+       role="textbox" aria-multiline="true" aria-label="Document body">
+    <p>Initial paragraph.</p>
+  </div>
+  <div id="result" data-testid="rich-result">model.text = "Initial paragraph."</div>
+
+  <h2>2. Plain contentEditable div (no input interception)</h2>
+  <div id="plain-editor" contenteditable="true" data-testid="plain-editor"
+       role="textbox" aria-multiline="true" aria-label="Plain editor">
+  </div>
+  <div id="plain-result" data-testid="plain-result">plain.text = ""</div>
+
+  <script>
+    // -------- ProseMirror-like editor --------
+    // Internal model. View only re-renders from this model on
+    // trusted beforeinput. Synthetic dispatches are ignored to mirror
+    // production rich-text editor semantics.
+    const editor = document.getElementById('editor');
+    const result = document.getElementById('result');
+    let model = "Initial paragraph.";
+
+    function render() {
+      editor.innerHTML = `<p>${model.replace(/</g, '&lt;')}</p>`;
+      result.textContent = `model.text = ${JSON.stringify(model)}`;
+    }
+
+    editor.addEventListener('beforeinput', (e) => {
+      if (!e.isTrusted) return;        // dismiss synthetic events
+      if (e.inputType === 'insertText' && typeof e.data === 'string') {
+        e.preventDefault();
+        model += e.data;
+        render();
+      } else if (e.inputType === 'deleteContentBackward') {
+        e.preventDefault();
+        model = model.slice(0, -1);
+        render();
+      }
+    });
+
+    // Also accept Enter as a real key event (not editor logic — just
+    // mirroring "type pipeline reaches the editor").
+    editor.addEventListener('keydown', (e) => {
+      if (!e.isTrusted) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        model += '\n';
+        render();
+      }
+    });
+
+    render();
+
+    // -------- Plain contentEditable --------
+    const plain = document.getElementById('plain-editor');
+    const plainResult = document.getElementById('plain-result');
+    const updatePlain = () => {
+      plainResult.textContent = `plain.text = ${JSON.stringify(plain.textContent || "")}`;
+    };
+    plain.addEventListener('input', updatePlain);
+    updatePlain();
+  </script>
+</body>
+</html>

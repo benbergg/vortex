@@ -232,6 +232,91 @@ export function registerDomHandlers(
       // L2 integration: actionability + auto-wait pre-check (editable required)
       await waitActionable(tid, frameId, selector, { timeout: (args.timeout as number | undefined) ?? 5000, needsEditable: true });
 
+      // Probe target: shared validation + contentEditable detection.
+      // The page-side handler below runs the legacy
+      // dispatch-KeyboardEvent + el.value path used by every
+      // input/textarea case in bench. Rich-text editors
+      // (ProseMirror / Slate / Lexical / Notion / Confluence) reject
+      // synthetic events (isTrusted=false) and don't expose .value,
+      // so the host-side code routes them through CDP Input.insertText
+      // — the only path that produces a native browser-source input
+      // event capable of driving a real rich-text editor's
+      // beforeinput → transaction pipeline.
+      const probe = await nativePageQuery<{
+        ok?: true;
+        isContentEditable?: boolean;
+        errorCode?: string;
+        error?: string;
+        extras?: Record<string, unknown>;
+      } | undefined>(
+        tid,
+        frameId,
+        (sel: string) => {
+          const els = document.querySelectorAll(sel);
+          if (els.length === 0) {
+            return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
+          }
+          if (els.length > 1) {
+            return {
+              errorCode: "SELECTOR_AMBIGUOUS",
+              error: `Selector "${sel}" matched ${els.length} elements`,
+              extras: { matchCount: els.length },
+            };
+          }
+          const el = els[0] as HTMLElement;
+          if ((el as HTMLInputElement).disabled === true) {
+            return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
+          }
+          const rect = el.getBoundingClientRect();
+          if (rect.width === 0 || rect.height === 0) {
+            return {
+              errorCode: "ELEMENT_DETACHED",
+              error: `Element ${sel} has zero dimensions (detached or hidden)`,
+            };
+          }
+          const inView =
+            rect.top < window.innerHeight &&
+            rect.bottom > 0 &&
+            rect.left < window.innerWidth &&
+            rect.right > 0;
+          if (!inView) {
+            return {
+              errorCode: "ELEMENT_OFFSCREEN",
+              error: `Element ${sel} is outside the viewport`,
+            };
+          }
+          // Pre-focus so the upcoming CDP insertText / dispatch
+          // event chain has a focused element to land on. focus()
+          // is idempotent if the element is already active.
+          el.focus();
+          return { ok: true, isContentEditable: el.isContentEditable === true };
+        },
+        [selector],
+      );
+      if (probe?.error) {
+        mapPageError(probe, selector);
+      }
+
+      if (probe?.isContentEditable) {
+        // contentEditable path — Input.insertText is the only way to
+        // produce a trusted beforeinput event that ProseMirror /
+        // Slate / Lexical / Notion / Confluence will accept.
+        // Delay is honored by chunking per character; default 0
+        // sends the whole text in one IPC roundtrip.
+        await debuggerMgr.attach(tid);
+        if (delay > 0) {
+          for (const ch of text) {
+            await debuggerMgr.sendCommand(tid, "Input.insertText", { text: ch });
+            await new Promise((r) => setTimeout(r, delay));
+          }
+        } else {
+          await debuggerMgr.sendCommand(tid, "Input.insertText", { text });
+        }
+        return { success: true, typed: text.length, path: "cdp-insertText" };
+      }
+
+      // input / textarea path — legacy synthetic dispatch (kept
+      // byte-identical to v0.8 for every passing case in bench).
       const res = await nativePageQuery<{
         result?: unknown;
         error?: string;
@@ -242,41 +327,11 @@ export function registerDomHandlers(
         frameId,
         async (sel: string, txt: string, delayMs: number) => {
           try {
-            // === 探测（与 CLICK 同步；见 CLICK 普通路径）===
             const els = document.querySelectorAll(sel);
             if (els.length === 0) {
               return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
             }
-            if (els.length > 1) {
-              return {
-                errorCode: "SELECTOR_AMBIGUOUS",
-                error: `Selector "${sel}" matched ${els.length} elements`,
-                extras: { matchCount: els.length },
-              };
-            }
             const el = els[0] as HTMLInputElement;
-            if (el.disabled === true) {
-              return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
-            }
-            const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) {
-              return {
-                errorCode: "ELEMENT_DETACHED",
-                error: `Element ${sel} has zero dimensions (detached or hidden)`,
-              };
-            }
-            const inView =
-              rect.top < window.innerHeight &&
-              rect.bottom > 0 &&
-              rect.left < window.innerWidth &&
-              rect.right > 0;
-            if (!inView) {
-              return {
-                errorCode: "ELEMENT_OFFSCREEN",
-                error: `Element ${sel} is outside the viewport`,
-              };
-            }
-            // === type 操作 ===
             el.focus();
             for (const char of txt) {
               const eventInit = { key: char, bubbles: true, cancelable: true };
@@ -289,7 +344,7 @@ export function registerDomHandlers(
                 await new Promise((r) => setTimeout(r, delayMs));
               }
             }
-            return { result: { success: true, typed: txt.length } };
+            return { result: { success: true, typed: txt.length, path: "page-side-dispatch" } };
           } catch (err) {
             return { error: err instanceof Error ? err.message : String(err) };
           }
