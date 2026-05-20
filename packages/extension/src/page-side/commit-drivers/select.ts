@@ -121,10 +121,52 @@
       };
     }
 
-    // 3. Find and click option for each label
+    // 3a. el-select-v2 filterable mode: when the wrapper has class
+    //     `is-filterable`, the dropdown is rendered as a virtual list
+    //     and only ~10 items live in the DOM at any moment. To reach a
+    //     cross-screen option (e.g. Option 500 in a 1000-item list),
+    //     write the label as a filter string via the inner input —
+    //     same input the framework binds for typing-to-filter. This
+    //     bypasses dom.type's actionability check (Element Plus
+    //     stacks a placeholder div over the input, triggering
+    //     OBSCURED) by writing directly through nativeInputValueSetter.
+    //     Issue #24.
+    const filterInput =
+      (root.querySelector(".el-select__input") as HTMLInputElement | null) ??
+      (root.querySelector("input.el-select-v2__input") as HTMLInputElement | null);
+    const wrapperIsFilterable = wrapper.classList.contains("is-filterable");
+    const supportsFilter =
+      !!filterInput && wrapperIsFilterable;
+
+    const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    function writeFilter(input: HTMLInputElement, value: string): void {
+      if (nativeInputValueSetter) {
+        nativeInputValueSetter.call(input, value);
+      } else {
+        input.value = value;
+      }
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+
+    // 3b. Find and click option for each label
     const clicked: string[] = [];
     const unknown: string[] = [];
     for (const label of labels) {
+      if (supportsFilter && filterInput) {
+        // Clear any prior filter (matters in multi-select / re-iter)
+        writeFilter(filterInput, "");
+        await sleep(50);
+        // Type the label as filter — virtual list re-renders to
+        // only items whose label matches (substring on textContent).
+        writeFilter(filterInput, label);
+        // Let Vue reactivity + virtual list re-layout settle.
+        // 150ms covers an Element Plus v2 cycle on a 1000-item list.
+        await sleep(150);
+      }
+
       const items = Array.from(
         dropdown.querySelectorAll(".el-select-dropdown__item"),
       ) as HTMLElement[];
@@ -136,6 +178,13 @@
       dispatchMouseClick(hit);
       clicked.push(label);
       await sleep(40); // let Vue run one tick before clicking next option
+    }
+
+    // Reset filter so the placeholder div doesn't keep showing the
+    // search string after the popper closes (cosmetic, matters in
+    // multi-select where popper stays open).
+    if (supportsFilter && filterInput && filterInput.value) {
+      writeFilter(filterInput, "");
     }
 
     // 4. Multi-select: click wrapper to close popper; single-select closes automatically
