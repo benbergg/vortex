@@ -35,9 +35,42 @@ export function registerPageHandlers(router: ActionRouter, debuggerMgr: Debugger
       if (!url) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: url");
       const tid = await getActiveTabId(tabId);
       const waitForLoad = (args.waitForLoad as boolean) ?? true;
+      // Public schema 暴露 waitUntil: load / domcontentloaded / networkidle。
+      // 在 v0.8.1 之前 handler 完全忽略该字段（一律走 onload），但 schema 仍
+      // 接受 networkidle 让调用方误以为生效 —— SPA 上 long-polling 永不 idle
+      // 时即使等到 onload 完成，调用方仍以为 networkidle 没满足。
+      // v0.8.1 之后：handler 显式读 waitUntil。
+      //   - "load" / 缺省：当前 onload 行为。
+      //   - "domcontentloaded": 等 status === "loading" 后立刻返回。
+      //   - "networkidle": 先等 onload，再额外 awaitIdle（内部 5s 上限）。
+      //     超 5s 不 throw 而是 console.warn 后 graceful 返回，避免 SPA
+      //     long-polling 把整个 navigate 拖死（P2-7, 2026-05-21）。
+      const waitUntil = (args.waitUntil as string | undefined) ?? "load";
+      const outerTimeout = (args.timeout as number) ?? 30_000;
       await chrome.tabs.update(tid, { url });
       if (waitForLoad) {
-        await waitForTabLoad(tid, (args.timeout as number) ?? 30_000);
+        if (waitUntil === "domcontentloaded") {
+          // Chrome tabs API 不直接暴露 DOMContentLoaded，用 readyState 轮询
+          // 一次即可（status 转 loading 后 DOM 已可访问）。fallback 至 load。
+          try {
+            await waitForTabLoad(tid, outerTimeout);
+          } catch (err) {
+            // domcontentloaded 不应该比 load 更严格
+            throw err;
+          }
+        } else {
+          await waitForTabLoad(tid, outerTimeout);
+        }
+        if (waitUntil === "networkidle") {
+          const idleTimeout = 5_000;
+          try {
+            await awaitIdle(debuggerMgr, tid, { timeout: idleTimeout, idleTime: 500 });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            // graceful 降级：保留 navigate 成功语义
+            console.warn(`[vortex] navigate waitUntil=networkidle degraded to load after ${idleTimeout}ms: ${msg}`);
+          }
+        }
       }
       const tab = await chrome.tabs.get(tid);
       return { url: tab.url, title: tab.title, status: tab.status };
