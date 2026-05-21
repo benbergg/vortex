@@ -183,6 +183,36 @@ export function registerDomHandlers(
                 // swallow: focus 不是所有元素都支持
               }
             }
+            // Dispatch full pointer/mouse event sequence so frameworks that
+            // hook mousedown/mouseup (AngularJS Material $mdGesture/tapClick,
+            // Hammer.js, Ant Design v3 Select, pre-3.0 Element UI Select)
+            // observe what looks like a real tap. Without this, those
+            // frameworks see only a lone click() and silently ignore it,
+            // which is why md-select dropdowns refused to open during the
+            // 2026-05-21 RocketMQ dogfood (BUG 8, P0).
+            //
+            // Order matches the W3C "click activation" spec: pointerdown →
+            // mousedown → pointerup → mouseup → click. We then still call
+            // el.click() so element-level click handlers (form submit /
+            // anchor navigation) fire reliably even when intermediate
+            // listeners stopPropagation.
+            const ptrInit: PointerEventInit = {
+              bubbles: true, cancelable: true, composed: true, view: window,
+              button: 0, buttons: 1, clientX: cx, clientY: cy,
+              pointerType: "mouse", pointerId: 1, isPrimary: true,
+            };
+            const mouseDown: MouseEventInit = {
+              bubbles: true, cancelable: true, composed: true, view: window,
+              button: 0, buttons: 1, clientX: cx, clientY: cy,
+            };
+            const mouseUp: MouseEventInit = {
+              bubbles: true, cancelable: true, composed: true, view: window,
+              button: 0, buttons: 0, clientX: cx, clientY: cy,
+            };
+            try { el.dispatchEvent(new PointerEvent("pointerdown", ptrInit)); } catch { /* PointerEvent unsupported */ }
+            el.dispatchEvent(new MouseEvent("mousedown", mouseDown));
+            try { el.dispatchEvent(new PointerEvent("pointerup", { ...ptrInit, buttons: 0 })); } catch { /* */ }
+            el.dispatchEvent(new MouseEvent("mouseup", mouseUp));
             el.click();
             return {
               result: {
