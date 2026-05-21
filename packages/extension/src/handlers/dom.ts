@@ -552,6 +552,23 @@ export function registerDomHandlers(
           sy: number | undefined,
         ) => {
           try {
+            // 找最近 scrollable 祖先：沿 parentElement 链找 overflow:auto|scroll
+            // 且 scrollHeight > clientHeight 的元素。modal 内 overflow:auto 容器
+            // 是最常见的"卡在 window 不动"场景（P1-5, 2026-05-21）。
+            const findScrollableAncestor = (el: Element | null): Element | null => {
+              for (let cur: Element | null = el; cur; cur = cur.parentElement) {
+                if (cur === document.documentElement || cur === document.body) break;
+                const cs = getComputedStyle(cur);
+                const overflowY = cs.overflowY;
+                const overflowX = cs.overflowX;
+                const scrolls = (overflowY === "auto" || overflowY === "scroll" || overflowX === "auto" || overflowX === "scroll");
+                if (scrolls && (cur.scrollHeight > cur.clientHeight || cur.scrollWidth > cur.clientWidth)) {
+                  return cur;
+                }
+              }
+              return null;
+            };
+
             // 确定滚动容器
             let scrollTarget: Element | Window = window;
             if (cont) {
@@ -560,8 +577,19 @@ export function registerDomHandlers(
               scrollTarget = containerEl;
             }
 
-            // 如果指定了目标元素，滚动到该元素
-            if (sel) {
+            // selector + position 组合：滚动 selector 元素的最近 scrollable 祖先
+            // 而不是把元素居中（scrollIntoView 对 modal 内 overflow 容器无效，
+            // 是用户 P1-5 报告的根因）
+            if (sel && pos && !cont) {
+              const el = document.querySelector(sel);
+              if (!el) return { error: `Element not found: ${sel}` };
+              const ancestor = findScrollableAncestor(el);
+              if (ancestor) {
+                scrollTarget = ancestor;
+              }
+              // fall through to position branch（scrollTarget 已切换）
+            } else if (sel) {
+              // 仅 selector（无 position）：保持原 scrollIntoView 语义
               const el = document.querySelector(sel);
               if (!el) return { error: `Element not found: ${sel}` };
               el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -646,7 +674,27 @@ export function registerDomHandlers(
             // === hover 操作 ===
             el.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true, cancelable: true }));
             el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, cancelable: true }));
-            return { result: { success: true } };
+            // 静态 tooltip 信息：CSS `title` 的 OS 级 tooltip 不依赖 JS 事件
+            // 触发（需要鼠标在元素上真停留），JS 无法可靠等到。所以直接读
+            // 元素的 tooltip 相关属性返回，调用方不再依赖 DOM 渲染（P2-8,
+            // 2026-05-21）。
+            const tooltipInfo: Record<string, string> = {};
+            const title = el.getAttribute("title");
+            if (title) tooltipInfo.title = title;
+            const ariaLabel = el.getAttribute("aria-label");
+            if (ariaLabel) tooltipInfo.ariaLabel = ariaLabel;
+            const ariaDescribedBy = el.getAttribute("aria-describedby");
+            if (ariaDescribedBy) {
+              tooltipInfo.ariaDescribedBy = ariaDescribedBy;
+              const desc = document.getElementById(ariaDescribedBy);
+              if (desc) {
+                const t = (desc.textContent || "").replace(/\s+/g, " ").trim();
+                if (t) tooltipInfo.ariaDescription = t.slice(0, 200);
+              }
+            }
+            const dataTooltip = el.getAttribute("data-tooltip") || el.getAttribute("data-original-title");
+            if (dataTooltip) tooltipInfo.dataTooltip = dataTooltip;
+            return { result: { success: true, ...tooltipInfo } };
           } catch (err) {
             return { error: err instanceof Error ? err.message : String(err) };
           }
