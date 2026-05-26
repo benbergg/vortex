@@ -83,6 +83,7 @@ export const SERIALIZE_SNAPSHOT_CODE = `(function(){
           var frozen = serializeEl(doc.documentElement);
           return "<iframe"+attrs+" srcdoc=\\""+esc(frozen)+"\\"></iframe>";
         }
+        return "<iframe"+attrs+"></iframe><!--iframe doc not accessible-->";
       } catch(e){ return "<iframe"+attrs+"></iframe><!--cross-origin iframe not captured-->"; }
     }
 

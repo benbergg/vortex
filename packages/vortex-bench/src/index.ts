@@ -329,15 +329,19 @@ async function cmdScan(args: string[]): Promise<number> {
 
 async function cmdSnapshot(args: string[]): Promise<number> {
   // bench snapshot <name> [--url <url>] [--frames <main|all-same-origin|all-permitted>]
-  const name = args.find((a) => !a.startsWith("-"));
-  if (!name) {
-    process.stderr.write("[vortex-bench] snapshot 需要 <name>(产出 synth/<name>.html + .manifest.json)\n");
-    return 1;
-  }
   const urlIdx = args.indexOf("--url");
   const url = urlIdx >= 0 ? args[urlIdx + 1] : undefined;
   const framesIdx = args.indexOf("--frames");
   const frames = framesIdx >= 0 ? args[framesIdx + 1] : undefined;
+  // name = 第一个既非 flag 也非 flag 值的位置参数(防 --url <url> 在前时误选 url 为 name)
+  const consumed = new Set<number>();
+  if (urlIdx >= 0) { consumed.add(urlIdx); consumed.add(urlIdx + 1); }
+  if (framesIdx >= 0) { consumed.add(framesIdx); consumed.add(framesIdx + 1); }
+  const name = args.find((a, i) => !consumed.has(i) && !a.startsWith("-"));
+  if (!name) {
+    process.stderr.write("[vortex-bench] snapshot 需要 <name>(产出 synth/<name>.html + .manifest.json)\n");
+    return 1;
+  }
 
   const mcpBin = resolveMcpBin();
   process.stdout.write(`[vortex-bench] snapshot ${name}  mcp=${mcpBin}${url ? `  url=${url}` : "  (当前活动 tab)"}\n`);

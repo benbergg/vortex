@@ -59,7 +59,17 @@ export async function captureSnapshot(opts: SnapshotOptions): Promise<SnapshotRe
 
     // 1) 序列化 + 提议候选(一次 evaluate)
     const serRaw = extractText(await call("vortex_evaluate", { code: SERIALIZE_SNAPSHOT_CODE }));
-    const ser = JSON.parse(serRaw) as SerializeResult;
+    if (!serRaw.trim()) {
+      throw new Error("[snapshot] vortex_evaluate 返回空串,页面可能未加载完或脚本被 CSP 拦截");
+    }
+    let ser: SerializeResult;
+    try {
+      ser = JSON.parse(serRaw) as SerializeResult;
+    } catch (e) {
+      throw new Error(
+        `[snapshot] 序列化结果非合法 JSON: ${e instanceof Error ? e.message : String(e)}; 头120字: ${serRaw.slice(0, 120)}`,
+      );
+    }
 
     // 2) 当前页 observe(includeBoxes)作 delta 对照
     const obsText = extractText(await call("vortex_observe", { frames, includeBoxes: true }));
