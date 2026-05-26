@@ -60,6 +60,7 @@ export const SERIALIZE_SNAPSHOT_CODE = `(function(){
     for (var i=0;i<el.attributes.length;i++){
       var a = el.attributes[i];
       if (a.name === "style") continue;
+      if (a.name === "data-vtx-oracle") continue;
       attrs += " "+a.name+"=\\""+esc(a.value)+"\\"";
     }
     if (isCandidate(el)){
@@ -105,5 +106,7 @@ export const SERIALIZE_SNAPSHOT_CODE = `(function(){
   }
 
   var html = "<!doctype html>\\n" + serializeEl(document.documentElement);
-  return JSON.stringify({ html: html, candidates: candidates });
+  // 返回对象(非 JSON.stringify):vortex_evaluate 会把返回值序列化一次。
+  // 若这里再 stringify 会双重编码,bench 侧 JSON.parse 得到字符串而非对象。
+  return { html: html, candidates: candidates };
 })()`;
