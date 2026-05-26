@@ -1,0 +1,10 @@
+{
+  "fixture": "teleport-popper-overlay",
+  "path": "/synth/teleport-popper-overlay.html",
+  "frames": "main",
+  "entries": [
+    { "id": "dropdown-trigger", "interactive": true, "expectedName": "下拉", "expectedRole": "button", "pattern": "teleport-popper-overlay" },
+    { "id": "opt-a", "interactive": true, "expectedName": "选项A", "expectedRole": "menuitem", "pattern": "teleport-popper-overlay", "note": "portal 到 body 仍应被 observe 抓到" },
+    { "id": "opt-b", "interactive": true, "expectedName": "选项B", "expectedRole": "menuitem", "pattern": "teleport-popper-overlay" }
+  ]
+}

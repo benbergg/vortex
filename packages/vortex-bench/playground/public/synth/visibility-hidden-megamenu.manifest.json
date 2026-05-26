@@ -1,0 +1,9 @@
+{
+  "fixture": "visibility-hidden-megamenu",
+  "path": "/synth/visibility-hidden-megamenu.html",
+  "frames": "main",
+  "entries": [
+    { "id": "trigger", "interactive": true, "expectedName": "菜单", "expectedRole": "button", "pattern": "visibility-hidden-megamenu" },
+    { "id": "hidden-link", "interactive": false, "expectedName": null, "expectedRole": null, "pattern": "visibility-hidden-megamenu", "note": "visibility:hidden,不该被 observe 收" }
+  ]
+}
