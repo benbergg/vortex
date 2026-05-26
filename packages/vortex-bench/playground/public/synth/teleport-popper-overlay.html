@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>teleport popper</title></head><body>
+<h1>teleport 弹层</h1>
+<button data-vtx-oracle="dropdown-trigger" onclick="document.getElementById('pop').style.display='block'">下拉</button>
+<div id="root"></div>
+<!-- 弹层 portal 到 body 末尾(脱离 trigger DOM 子树) -->
+<div id="pop" style="display:block;position:absolute;top:120px;left:20px">
+  <div role="menuitem" data-vtx-oracle="opt-a">选项A</div>
+  <div role="menuitem" data-vtx-oracle="opt-b">选项B</div>
+</div>
+</body></html>

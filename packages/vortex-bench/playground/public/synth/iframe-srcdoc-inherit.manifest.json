@@ -1,0 +1,9 @@
+{
+  "fixture": "iframe-srcdoc-inherit",
+  "path": "/synth/iframe-srcdoc-inherit.html",
+  "frames": "all-same-origin",
+  "entries": [
+    { "id": "main-btn", "interactive": true, "expectedName": "主框按钮", "expectedRole": "button", "pattern": "iframe-srcdoc-inherit" },
+    { "id": "child-btn", "interactive": true, "expectedName": "子框按钮", "expectedRole": "button", "pattern": "iframe-srcdoc-inherit", "joinBy": "name", "note": "srcdoc 继承父 origin,observe(all-same-origin) 应返回;跨 frame 用 name-join" }
+  ]
+}

@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>open shadow</title></head><body>
+<h1>open shadow root 内层</h1>
+<my-widget data-vtx-oracle="shadow-btn"></my-widget>
+<script>
+customElements.define("my-widget", class extends HTMLElement {
+  connectedCallback(){
+    const sr=this.attachShadow({mode:"open"});
+    const b=document.createElement("button");
+    b.textContent="影子按钮";
+    sr.appendChild(b);
+  }
+});
+</script>
+</body></html>
