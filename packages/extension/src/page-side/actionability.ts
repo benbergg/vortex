@@ -15,7 +15,9 @@ export type ActionabilityFailure =
   | "NOT_STABLE"
   | "OBSCURED"
   | "DISABLED"
-  | "NOT_EDITABLE";
+  | "NOT_EDITABLE"
+  // issue #27: 元素在 open shadow 内,querySelector 解析不到 → 永久不可解析,快速失败。
+  | "OPEN_SHADOW";
 
 export type ActionabilityResult =
   | { ok: true; rect: { x: number; y: number; w: number; h: number } }
@@ -30,6 +32,40 @@ export type ActionabilityResult =
 
   function isAttached(el: Element): boolean {
     return el.isConnected;
+  }
+
+  // issue #27: 当 document.querySelector(selector) 落空时,探测该 selector 是否匹配
+  // 某个 open shadow root 内的元素。observe 经 querySelectorAllDeep 穿 open shadow 发出
+  // 这类 ref(且 buildSelector 在 shadow 边界断裂,常退化为裸 tag 如 "button"),但本 probe
+  // 与 act/fill 的 querySelector 不穿 shadow → 永久解析不到。命中 → 让 host 快速失败
+  // (OPEN_SHADOW 非重试)给出诊断,而非 NOT_ATTACHED 空转满 timeout(act hang >5s)。
+  // 仅在 querySelector 落空(失败路径)时调用。
+  function existsInOpenShadow(selector: string): boolean {
+    function walk(root: Document | ShadowRoot, depth: number): boolean {
+      if (depth > 10) return false;
+      let nodes: NodeListOf<Element>;
+      try {
+        nodes = root.querySelectorAll("*");
+      } catch {
+        return false;
+      }
+      for (const host of Array.from(nodes)) {
+        const sr = host.shadowRoot;
+        if (!sr) continue;
+        try {
+          if (sr.querySelector(selector)) return true;
+        } catch {
+          // selector 在该 scope 内非法 CSS — 忽略,继续
+        }
+        if (walk(sr, depth + 1)) return true;
+      }
+      return false;
+    }
+    try {
+      return walk(document, 0);
+    } catch {
+      return false;
+    }
   }
 
   // Calibration #1: vortex decision — prefer checkVisibility(), do not check opacity, do not use offsetParent.
@@ -199,7 +235,12 @@ export type ActionabilityResult =
     } catch {
       el = null;
     }
-    if (!el) return { ok: false, reason: "NOT_ATTACHED" };
+    if (!el) {
+      // querySelector 落空:可能是元素未挂载(transient,可重试),也可能在 open shadow
+      // 内(永久不可解析,issue #27)。区分二者——后者快速失败给诊断,而非空转满 timeout。
+      if (existsInOpenShadow(selector)) return { ok: false, reason: "OPEN_SHADOW" };
+      return { ok: false, reason: "NOT_ATTACHED" };
+    }
     if (!isAttached(el)) return { ok: false, reason: "NOT_ATTACHED" };
     if (!isVisible(el)) return { ok: false, reason: "NOT_VISIBLE" };
     if (!isEnabled(el)) return { ok: false, reason: "DISABLED" };

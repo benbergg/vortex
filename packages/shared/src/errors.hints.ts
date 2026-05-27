@@ -207,6 +207,11 @@ export const DEFAULT_ERROR_META: Record<VtxErrorCode, VtxErrorMeta> = {
     recoverable: false,
   },
 
+  OPEN_SHADOW_DOM: {
+    hint: "Element lives inside an open shadow root that vortex_observe surfaced but act cannot reach via a CSS selector. Expose a light-DOM proxy selector for the control, or have the component render the actionable element in light DOM.",
+    recoverable: false,
+  },
+
   // -- L4 Task layer（@since 0.6.0 PR #4）--
   INVALID_TARGET: {
     hint: "Use a target ref string like @e3 (returned from vortex_observe) or a CSS selector. The Descriptor object form arrives in v0.6.x once the resolver lands.",
