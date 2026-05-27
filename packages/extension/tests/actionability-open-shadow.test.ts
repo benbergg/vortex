@@ -1,16 +1,9 @@
-// Regression for issue #27: act on an open-shadow-internal element must fail FAST
-// with OPEN_SHADOW_DOM, instead of the page-side probe returning NOT_ATTACHED and
-// auto-wait retrying it into a full 5s TIMEOUT (the "act hang >5s" symptom found by
-// the autonomous discovery engine #3 robustness layer).
+// Tier 2（act/extract 穿透 open shadow）：act on an open-shadow-internal element 现在
+// 能解析到该元素并继续可操作性检查，而非 #27 的 OPEN_SHADOW_DOM 快速失败。
 //
-// Root cause: observe walks open shadow via querySelectorAllDeep and emits a ref for
-// the shadow-internal element, but buildSelector breaks at the shadow boundary
-// (parentElement is null) and returns a bare tag selector like "button". act's
-// document.querySelector("button") cannot pierce shadow → null → NOT_ATTACHED → retry.
-//
-// Fix: when querySelector finds nothing, the probe does a one-shot open-shadow deep
-// check; a match inside an open shadow root → reason OPEN_SHADOW (non-retryable in
-// auto-wait) → throws OPEN_SHADOW_DOM immediately with a diagnostic hint.
+// 演进：#27（PR #29）让 shadow ref act 快速失败（probe 返 OPEN_SHADOW → OPEN_SHADOW_DOM），
+// 替代 5s hang。Tier 2 让 probe 经 findInOpenShadow 真正解析到元素 → 可操作。
+// 本测试锁定新行为：probe 命中 shadow 元素（不再 OPEN_SHADOW / NOT_ATTACHED）。
 
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { VtxErrorCode } from "@bytenew/vortex-shared";
@@ -26,78 +19,70 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("actionability open-shadow fast-fail (issue #27)", () => {
-  it("act on open-shadow-internal element throws OPEN_SHADOW_DOM, not TIMEOUT", async () => {
+describe("actionability open-shadow deep resolution (Tier 2)", () => {
+  it("open-shadow-internal 元素经 findInOpenShadow 解析为可操作（rect+efp 给定）", async () => {
     vi.resetModules();
-    const dom = setupActionabilityEnv({ html: '<div id="host"></div>' });
-
-    // Attach an OPEN shadow root with a button inside. No light-DOM button exists,
-    // so document.querySelector("button") returns null (jsdom does not pierce shadow).
+    const dom = setupActionabilityEnv({
+      html: '<div id="host"></div>',
+      // efp 返回 shadow button，模拟「目标接收事件」（非遮挡）
+      elementFromPoint: () => (globalThis as any).__shadowBtn ?? null,
+    });
     const host = dom.window.document.getElementById("host")!;
     const sr = host.attachShadow({ mode: "open" });
     const btn = dom.window.document.createElement("button");
     btn.textContent = "影子按钮";
     sr.appendChild(btn);
+    (globalThis as any).__shadowBtn = btn;
+    // jsdom 无 layout：给 shadow button 一个非零 rect，使可见性检查通过。
+    btn.getBoundingClientRect = () =>
+      ({ x: 10, y: 10, width: 40, height: 20, top: 10, left: 10, right: 50, bottom: 30 } as DOMRect);
 
     await import("../src/page-side/actionability.js");
     const { waitActionable } = await import("../src/action/auto-wait.js");
 
-    // timeout is generous on purpose: the fix throws immediately (non-retryable),
-    // so this resolves fast. Before the fix it would loop the full timeout then
-    // throw TIMEOUT — the regression this test locks out.
-    let caught: any;
-    await waitActionable(1, undefined, "button", { timeout: 2000 }).catch((e) => {
-      caught = e;
-    });
-
-    expect(caught).toBeDefined();
-    expect(caught.code).toBe(VtxErrorCode.OPEN_SHADOW_DOM);
-    expect(caught.code).not.toBe(VtxErrorCode.TIMEOUT);
+    // 解析成功 → waitActionable resolve（无 throw，返回 WaitOk { ok: true, rect }）。
+    await expect(
+      waitActionable(1, undefined, "button", { timeout: 2000 }),
+    ).resolves.toMatchObject({ ok: true });
   });
 
-  it("element nested two shadow levels deep is also detected (recursive walk)", async () => {
+  it("嵌套两层 open shadow 也能解析（递归 walk）", async () => {
     vi.resetModules();
-    const dom = setupActionabilityEnv({ html: '<div id="host"></div>' });
-
-    // host → open shadow → innerHost → open shadow → button. The button lives two
-    // shadow levels down, exercising existsInOpenShadow's recursive walk(sr, depth+1).
-    const host = dom.window.document.getElementById("host")!;
-    const sr1 = host.attachShadow({ mode: "open" });
-    const innerHost = dom.window.document.createElement("div");
-    sr1.appendChild(innerHost);
-    const sr2 = innerHost.attachShadow({ mode: "open" });
+    const dom = setupActionabilityEnv({
+      html: '<div id="host"></div>',
+      elementFromPoint: () => (globalThis as any).__shadowBtn ?? null,
+    });
+    const sr1 = dom.window.document.getElementById("host")!.attachShadow({ mode: "open" });
+    const inner = dom.window.document.createElement("div");
+    sr1.appendChild(inner);
+    const sr2 = inner.attachShadow({ mode: "open" });
     const btn = dom.window.document.createElement("button");
-    btn.textContent = "深层影子按钮";
     sr2.appendChild(btn);
+    (globalThis as any).__shadowBtn = btn;
+    btn.getBoundingClientRect = () =>
+      ({ x: 10, y: 10, width: 40, height: 20, top: 10, left: 10, right: 50, bottom: 30 } as DOMRect);
 
     await import("../src/page-side/actionability.js");
     const { waitActionable } = await import("../src/action/auto-wait.js");
 
-    let caught: any;
-    await waitActionable(1, undefined, "button", { timeout: 2000 }).catch((e) => {
-      caught = e;
-    });
-
-    expect(caught).toBeDefined();
-    expect(caught.code).toBe(VtxErrorCode.OPEN_SHADOW_DOM);
+    await expect(
+      waitActionable(1, undefined, "button", { timeout: 2000 }),
+    ).resolves.toMatchObject({ ok: true });
   });
 
-  it("genuinely missing element (no shadow match) still reports NOT_ATTACHED → TIMEOUT", async () => {
+  it("真实缺失元素（无 light 无 shadow）仍 NOT_ATTACHED → TIMEOUT", async () => {
     vi.resetModules();
     const dom = setupActionabilityEnv({ html: "<div id='x'></div>" });
     void dom;
+    (globalThis as any).__shadowBtn = null;
 
     await import("../src/page-side/actionability.js");
     const { waitActionable } = await import("../src/action/auto-wait.js");
 
-    // "button" matches nothing anywhere (no light button, no shadow) → NOT_ATTACHED
-    // remains retryable → TIMEOUT after the (short) timeout. Confirms the fast-fail
-    // is scoped to genuine open-shadow matches and does not swallow transient-attach.
     let caught: any;
     await waitActionable(1, undefined, "button", { timeout: 150 }).catch((e) => {
       caught = e;
     });
-
     expect(caught).toBeDefined();
     expect(caught.code).toBe(VtxErrorCode.TIMEOUT);
   });
