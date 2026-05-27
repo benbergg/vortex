@@ -4,7 +4,7 @@
 
 import { createMcpConnection, closeMcpConnection } from "./mcp-client.js";
 import { parseObserveSnapshot } from "./observe-parser.js";
-import { classifyExtract, type ExtractResult } from "./robustness-classify.js";
+import { classifyAct, type ActResult } from "./robustness-classify.js";
 import { aggregateFixture, CONTRACT_VIOLATION_CODES } from "./robustness-aggregate.js";
 import { confirmContractViolations, refIdentity } from "./robustness-confirm.js";
 import type { FixtureRobustness, RefOutcome } from "../robustness-types.js";
@@ -51,9 +51,19 @@ export async function probeLive(
   const outcomes: RefOutcome[] = [];
 
   const probe = async (ref: string, role: string, name: string | null): Promise<RefOutcome> => {
+    // extract 经 content.getText:解析不到 → 干净抛 Error[ELEMENT_NOT_FOUND](content.ts:175);
+    // 成功 → {text,controls}(无 Error)。故 classifyAct(解析 Error 文本)即可:not-found→typed-error
+    // ELEMENT_NOT_FOUND(R0),success→ok。无需 null-result 检测(extract 不静默返 null)。
     const raw = await runExtractProbe(call, ref);
-    const cls = classifyExtract(raw);
-    return { ref, role, name, kind: cls.kind, code: cls.code, detail: raw.text.slice(0, 120) };
+    const cls = classifyAct(raw);
+    return {
+      ref,
+      role,
+      name,
+      kind: cls.kind,
+      code: cls.code,
+      detail: raw.timedOut ? "extract 超时(>5s)" : raw.text.slice(0, 120),
+    };
   };
 
   try {
@@ -105,7 +115,7 @@ export async function probeLive(
 async function runExtractProbe(
   call: (name: string, args: Record<string, unknown>) => Promise<unknown>,
   ref: string,
-): Promise<ExtractResult> {
+): Promise<ActResult> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const res = await Promise.race([

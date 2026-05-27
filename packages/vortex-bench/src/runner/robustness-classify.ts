@@ -30,37 +30,7 @@ export function classifyAct(r: ActResult): ClassifiedAct {
   return { kind: "ok", code: null };
 }
 
-/** 一次 vortex_extract 探测的原始结果 */
-export interface ExtractResult {
-  text: string;
-  threw: boolean;
-  timedOut: boolean;
-}
-
-/** extract 结果中是否含 element 数据(顶层 tag 字段)= ref 解析成功 */
-function hasElementData(text: string): boolean {
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    return (
-      parsed !== null &&
-      typeof parsed === "object" &&
-      typeof (parsed as { tag?: unknown }).tag === "string"
-    );
-  } catch {
-    return false; // 非 JSON(罕见)→ 视作解析失败
-  }
-}
-
-/**
- * 分类一次 vortex_extract 结果。与 classifyAct 的关键差异:extract 对解析不到的 ref
- * 静默返 null(非 Error),故 null-result(无 tag)判为 ELEMENT_NOT_FOUND 类 R0。
- * 优先级:timeout > Error[CODE] 文本 > threw(crash) > 含 tag(ok) > 其余(ELEMENT_NOT_FOUND)。
- */
-export function classifyExtract(r: ExtractResult): ClassifiedAct {
-  if (r.timedOut) return { kind: "timeout", code: null };
-  const m = r.text.match(ERROR_CODE_RE);
-  if (m) return { kind: "typed-error", code: m[1] };
-  if (r.threw) return { kind: "crash", code: null };
-  if (hasElementData(r.text)) return { kind: "ok", code: null };
-  return { kind: "typed-error", code: "ELEMENT_NOT_FOUND" };
-}
+// 注:#3.x live extract 复用 classifyAct —— vortex_extract 经 content.getText,解析不到的
+// ref 干净抛 Error[ELEMENT_NOT_FOUND](content.ts:175),成功返 {text,controls}(无 Error)。
+// 故 classifyAct 的 Error 文本解析对 extract 同样正确(not-found→typed-error,success→ok),
+// 无需 null-result 检测。(早期 classifyExtract/hasElementData 基于误读的 dom.ts 死路径,已删。)
