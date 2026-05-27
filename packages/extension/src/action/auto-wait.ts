@@ -21,6 +21,7 @@ const RETRY_INTERVAL_MS: Record<ActionabilityFailure, number> = {
   OBSCURED: 100,
   DISABLED: 200,
   NOT_EDITABLE: -1,   // do not retry — semantic error, throw immediately
+  OPEN_SHADOW: -1,    // issue #27: open-shadow element is permanently unresolvable by CSS selector — fail fast, don't retry into TIMEOUT
 };
 
 export interface WaitOptions extends CheckOptions {
@@ -93,5 +94,6 @@ function mapToVtxCode(reason: ActionabilityFailure): VtxErrorCode {
     case "OBSCURED":     return VtxErrorCode.OBSCURED;
     case "DISABLED":     return VtxErrorCode.DISABLED;
     case "NOT_EDITABLE": return VtxErrorCode.NOT_EDITABLE;
+    case "OPEN_SHADOW":  return VtxErrorCode.OPEN_SHADOW_DOM;
   }
 }

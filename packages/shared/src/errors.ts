@@ -61,7 +61,7 @@ export const VtxErrorCode = {
   /** Drag operation but CDP unavailable */
   DRAG_REQUIRES_CDP: "DRAG_REQUIRES_CDP",
 
-  // -- L3 Reasoning（8 类，@since 0.6.0 PR #3）--
+  // -- L3 Reasoning（9 类：8 @since 0.6.0 PR #3 + OPEN_SHADOW_DOM @issue #27）--
   /** a11y tree 不可用（CSP / sandboxed page），无法 getFullAXTree。*/
   A11Y_UNAVAILABLE: "A11Y_UNAVAILABLE",
   /** chrome.debugger.attach 失败（缺权限、tab 已关闭等）。*/
@@ -78,6 +78,10 @@ export const VtxErrorCode = {
   CROSS_ORIGIN_IFRAME: "CROSS_ORIGIN_IFRAME",
   /** closed shadow host，无法穿透。*/
   CLOSED_SHADOW_DOM: "CLOSED_SHADOW_DOM",
+  /** 元素在 open shadow root 内：observe 经 querySelectorAllDeep 穿 shadow 发出了 ref，
+   *  但 act/fill 的 CSS selector 解析不穿 shadow → 永久不可解析。快速失败给诊断，
+   *  而非 NOT_ATTACHED 重试满 timeout（issue #27）。*/
+  OPEN_SHADOW_DOM: "OPEN_SHADOW_DOM",
 
   // -- L4 Task layer（2 类，@since 0.6.0 PR #4）--
   /** target 既不是合法 ref 也不是 valid descriptor 对象。*/
