@@ -18,6 +18,9 @@ import { scanFixture } from "./runner/scan.js";
 import { renderScanMarkdown, rankFindings } from "./scan-report.js";
 import type { FixtureScanResult, ScanReport, SynthManifest } from "./scan-types.js";
 import { captureSnapshot } from "./runner/snapshot.js";
+import { probeFixture } from "./runner/robustness.js";
+import { renderRobustnessMarkdown, rankRobustnessFindings } from "./robustness-report.js";
+import type { FixtureRobustness, RobustnessReport } from "./robustness-types.js";
 
 const USAGE = `vortex-bench <command>
 
@@ -36,6 +39,8 @@ Commands:
   scan --pattern <name>  扫单个 pattern
   snapshot <name>        冻结当前活动 tab 为 synth/<name>.html + 提议 manifest
   snapshot <name> --url <u>  先 navigate 再冻结
+  robustness --all       探全部 fixture 的 observe→act 契约,产 reports/robustness/<ts>.{md,json}
+  robustness --pattern <name>  探单个 fixture
   --help                 显示帮助
 
 Env:
@@ -50,6 +55,7 @@ const CASES_DIR = resolve(PKG_ROOT, "cases");
 const REPORTS_DIR = resolve(PKG_ROOT, "reports");
 const SYNTH_DIR = resolve(PKG_ROOT, "playground", "public", "synth");
 const SCAN_REPORTS_DIR = resolve(REPORTS_DIR, "scan");
+const ROBUSTNESS_REPORTS_DIR = resolve(REPORTS_DIR, "robustness");
 
 function resolveMcpBin(): string {
   if (process.env.VORTEX_MCP_BIN) return resolve(process.env.VORTEX_MCP_BIN);
@@ -361,6 +367,67 @@ async function cmdSnapshot(args: string[]): Promise<number> {
   return 0;
 }
 
+async function cmdRobustness(args: string[]): Promise<number> {
+  const runAll = args.includes("--all");
+  let names: string[];
+  if (runAll) {
+    names = await listSynthManifests();
+  } else {
+    const patternIdx = args.indexOf("--pattern");
+    if (patternIdx >= 0 && args[patternIdx + 1]) names = [args[patternIdx + 1]];
+    else names = args.filter((a) => !a.startsWith("-"));
+  }
+  if (names.length === 0) {
+    process.stderr.write("[vortex-bench] robustness 需要 --all 或 --pattern <name> 或 <name...>\n");
+    return 1;
+  }
+
+  const mcpBin = resolveMcpBin();
+  const url = playgroundUrl();
+  process.stdout.write(`[vortex-bench] robustness  playground=${url}  mcp=${mcpBin}\n`);
+  process.stdout.write(`[vortex-bench] 探 ${names.length} 个 fixture 的 observe→act 契约\n\n`);
+
+  const report: RobustnessReport = {
+    generatedAt: new Date().toISOString(), playgroundUrl: url, fixtures: [], findings: [],
+  };
+  for (const name of names) {
+    let fx: FixtureRobustness;
+    try {
+      const manifest = await loadManifest(name);
+      if (isProposed(manifest)) {
+        process.stdout.write(`⊘ ${name.padEnd(28)} 跳过未审提议稿(_proposed:true)\n`);
+        continue;
+      }
+      fx = await probeFixture(manifest, { mcpBin, playgroundUrl: url });
+    } catch (e) {
+      fx = {
+        fixture: name, path: "", totalRefs: 0, okCount: 0, okRate: 1, histogram: {},
+        findings: [], error: `加载/探测失败: ${e instanceof Error ? e.message : String(e)}`,
+      };
+    }
+    report.fixtures.push(fx);
+    report.findings.push(...fx.findings);
+    const r0 = fx.findings.filter((f) => f.severity === "R0").length;
+    const r1 = fx.findings.filter((f) => f.severity === "R1").length;
+    process.stdout.write(
+      `${r0 === 0 ? "✓" : "✗"} ${name.padEnd(28)} refs=${fx.totalRefs} okRate=${(fx.okRate * 100).toFixed(0)}% ` +
+      `R0=${r0} R1=${r1}${fx.error ? `  ⚠ ${fx.error}` : ""}\n`,
+    );
+  }
+  report.findings = rankRobustnessFindings(report.findings);
+
+  await mkdir(ROBUSTNESS_REPORTS_DIR, { recursive: true });
+  const stamp = report.generatedAt.replace(/[:.]/g, "-");
+  const jsonPath = join(ROBUSTNESS_REPORTS_DIR, `${stamp}.json`);
+  const mdPath = join(ROBUSTNESS_REPORTS_DIR, `${stamp}.md`);
+  await writeFile(jsonPath, JSON.stringify(report, null, 2));
+  await writeFile(mdPath, renderRobustnessMarkdown(report));
+  process.stdout.write(`\n[report] ${mdPath}\n[report] ${jsonPath}\n`);
+
+  const totalR0 = report.findings.filter((f) => f.severity === "R0").length;
+  return totalR0 === 0 ? 0 : 2;
+}
+
 async function main(): Promise<number> {
   const [, , cmd, ...rest] = process.argv;
   if (!cmd || cmd === "--help" || cmd === "-h") {
@@ -380,6 +447,8 @@ async function main(): Promise<number> {
       return cmdScan(rest);
     case "snapshot":
       return cmdSnapshot(rest);
+    case "robustness":
+      return cmdRobustness(rest);
     default:
       process.stderr.write(`[vortex-bench] 未知命令: ${cmd}\n\n${USAGE}`);
       return 1;
