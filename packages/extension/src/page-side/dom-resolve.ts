@@ -18,6 +18,11 @@ import { queryDeep, queryAllDeep } from "./shadow-walk.js";
     },
     queryAllDeep: (selector: string): Element[] => {
       try {
+        // light-DOM 优先：light DOM 有命中就用它（与 pre-Tier-2 querySelectorAll 行为一致），
+        // 避免裸 CSS selector 在无关 open shadow 树里巧合命中而误报 SELECTOR_AMBIGUOUS。
+        // 仅当 light DOM 零命中（典型：observe 戳的 [data-vortex-rid] 在 shadow 内）才穿 shadow。
+        const light = Array.from(document.querySelectorAll(selector));
+        if (light.length > 0) return light;
         return queryAllDeep(selector, document);
       } catch {
         return [];

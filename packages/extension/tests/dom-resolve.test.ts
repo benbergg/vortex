@@ -37,7 +37,7 @@ describe("dom-resolve page-side module", () => {
     expect(ns.queryAllDeep(":::bad")).toEqual([]);
   });
 
-  it("queryAllDeep 同时命中 light-DOM 和 shadow-internal 的 .x 元素（length=2）", async () => {
+  it("queryAllDeep light-DOM 优先：light-DOM 有命中时不穿 shadow（length=1）", async () => {
     vi.resetModules();
     await import("../src/page-side/dom-resolve.js");
 
@@ -46,15 +46,34 @@ describe("dom-resolve page-side module", () => {
     lightEl.className = "x";
     document.body.appendChild(lightEl);
 
-    // shadow 内的 .x
+    // shadow 内同样有一个 .x，但 light-DOM 非空，不应穿 shadow
     const sr = document.getElementById("host")!.attachShadow({ mode: "open" });
     const shadowEl = document.createElement("div");
     shadowEl.className = "x";
     sr.appendChild(shadowEl);
 
     const results = (window as any).__vortexDomResolve.queryAllDeep(".x");
-    expect(results.length).toBe(2);
+    expect(results.length).toBe(1);
     expect(results).toContain(lightEl);
-    expect(results).toContain(shadowEl);
+    expect(results).not.toContain(shadowEl);
+  });
+
+  it("queryAllDeep shadow 兜底：light-DOM 零命中时穿 shadow，多命中仍返回全部（length=2）", async () => {
+    vi.resetModules();
+    await import("../src/page-side/dom-resolve.js");
+
+    // light-DOM 无 .y 元素
+    const sr = document.getElementById("host")!.attachShadow({ mode: "open" });
+    const shadowEl1 = document.createElement("div");
+    shadowEl1.className = "y";
+    const shadowEl2 = document.createElement("span");
+    shadowEl2.className = "y";
+    sr.appendChild(shadowEl1);
+    sr.appendChild(shadowEl2);
+
+    const results = (window as any).__vortexDomResolve.queryAllDeep(".y");
+    expect(results.length).toBe(2);
+    expect(results).toContain(shadowEl1);
+    expect(results).toContain(shadowEl2);
   });
 });

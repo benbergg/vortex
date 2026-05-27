@@ -274,7 +274,8 @@ export function registerDomHandlers(
       // — the only path that produces a native browser-source input
       // event capable of driving a real rich-text editor's
       // beforeinput → transaction pipeline.
-      // 加载 dom-resolve 模块，使 inline func 能通过 shadow 穿透解析 selector
+      // 加载 dom-resolve 模块，使 inline func 能通过 shadow 穿透解析 selector。
+      // 此处单次加载同时覆盖下方两处查询站点：probe（actionability 检测）与 input/textarea dispatch。
       await loadPageSideModule(tid, frameId, "dom-resolve");
       const probe = await nativePageQuery<{
         ok?: true;
