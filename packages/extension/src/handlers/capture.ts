@@ -81,6 +81,7 @@ export function registerCaptureHandlers(
       return {
         dataUrl,
         format,
+        ...(format === "jpeg" && quality != null ? { quality } : {}),
         fullPage: !!fullPage,
         timestamp: Date.now(),
       };
@@ -92,6 +93,8 @@ export function registerCaptureHandlers(
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const frameId = args.frameId as number | undefined;
       if (frameId != null) await ensureFrameAttached(tid, frameId);
+      const format = (args.format as "png" | "jpeg") ?? "png";
+      const quality = args.quality as number | undefined;
 
       // 1. 在目标 frame 内取元素 rect
       const rectResults = await chrome.scripting.executeScript({
@@ -116,7 +119,8 @@ export function registerCaptureHandlers(
 
       // 3. CDP 裁剪截图
       const dataUrl = await captureTab(debuggerMgr, tid, {
-        format: "png",
+        format,
+        quality,
         clip: {
           x: rect.x + offsetX,
           y: rect.y + offsetY,
@@ -127,6 +131,8 @@ export function registerCaptureHandlers(
 
       return {
         dataUrl,
+        format,
+        ...(format === "jpeg" && quality != null ? { quality } : {}),
         selector,
         rect: {
           x: rect.x + offsetX,

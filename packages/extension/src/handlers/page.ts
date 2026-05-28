@@ -163,6 +163,70 @@ export function registerPageHandlers(router: ActionRouter, debuggerMgr: Debugger
         minRequests: (args.minRequests as number | undefined) ?? 0,
       });
     },
+
+    [PageActions.WAIT_FOR_EXPRESSION]: async (args, tabId) => {
+      const expression = args.expression as string;
+      if (!expression) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: expression");
+      const tid = await getActiveTabId(tabId);
+      const timeout = (args.timeout as number) ?? 10_000;
+      const pollInterval = (args.pollInterval as number) ?? 100;
+      const frameId = args.frameId as number | undefined;
+      if (frameId != null) await ensureFrameAttached(tid, frameId);
+
+      const results = await chrome.scripting.executeScript({
+        target: buildExecuteTarget(tid, frameId),
+        // page-side polling: requestAnimationFrame for the visible-update phase,
+        // setTimeout for the inter-poll gap. Stops on first truthy value or on
+        // timeout. Returns { ok, value, waitedMs, error? } so the caller can
+        // distinguish "expr threw" from "expr never went truthy".
+        func: (expr: string, timeoutMs: number, intervalMs: number) => {
+          return new Promise<{ ok: boolean; value?: unknown; waitedMs: number; error?: string }>(
+            (resolve) => {
+              const start = Date.now();
+              let lastError: string | undefined;
+              const tryOnce = () => {
+                try {
+                  const v = eval(expr);
+                  if (v) {
+                    resolve({ ok: true, value: v as unknown, waitedMs: Date.now() - start });
+                    return true;
+                  }
+                } catch (err) {
+                  lastError = err instanceof Error ? err.message : String(err);
+                }
+                return false;
+              };
+              if (tryOnce()) return;
+              const poll = () => {
+                if (tryOnce()) return;
+                if (Date.now() - start >= timeoutMs) {
+                  resolve({ ok: false, waitedMs: Date.now() - start, error: lastError });
+                  return;
+                }
+                setTimeout(() => requestAnimationFrame(poll), intervalMs);
+              };
+              setTimeout(() => requestAnimationFrame(poll), intervalMs);
+            },
+          );
+        },
+        args: [expression, timeout, pollInterval],
+        world: "MAIN",
+      });
+      const res = results[0]?.result as
+        | { ok: boolean; value?: unknown; waitedMs: number; error?: string }
+        | undefined;
+      if (!res) throw vtxError(VtxErrorCode.INTERNAL_ERROR, "waitForExpression returned no result", { tabId: tid, frameId });
+      if (!res.ok) {
+        throw vtxError(
+          VtxErrorCode.TIMEOUT,
+          res.error
+            ? `Expression never resolved truthy within ${timeout}ms; last evaluation threw: ${res.error}`
+            : `Expression never resolved truthy within ${timeout}ms`,
+          { tabId: tid, frameId, extras: { expression, waitedMs: res.waitedMs, lastError: res.error } },
+        );
+      }
+      return { ready: true, value: res.value, waitedMs: res.waitedMs };
+    },
   });
 }
 

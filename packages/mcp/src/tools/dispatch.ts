@@ -187,10 +187,25 @@ export function dispatchNewTool(
           if (next.includeAllTabs === undefined) next.includeAllTabs = true;
           return { action: "page.info", params: next };
         }
+        case "custom": {
+          // value: a JS expression evaluated repeatedly until truthy or timeout.
+          // Use cases idle/element cannot express:
+          //   - Alpine.js mount: 'document.body._x_dataStack && _x_dataStack.length > 0'
+          //   - Vue/React global ready flag: 'window.__APP_READY__ === true'
+          //   - LocalStorage-driven boot: 'JSON.parse(localStorage.user || "null") != null'
+          if (typeof value !== "string" || !value.trim()) {
+            throw vtxError(
+              VtxErrorCode.INVALID_PARAMS,
+              "wait_for(mode=custom): value must be a non-empty JS expression string.",
+            );
+          }
+          next.expression = value;
+          return { action: "page.waitForExpression", params: next };
+        }
         default:
           throw vtxError(
             VtxErrorCode.INVALID_PARAMS,
-            `wait_for: mode must be one of element|idle|info, got ${String(mode)}`,
+            `wait_for: mode must be one of element|idle|info|custom, got ${String(mode)}`,
           );
       }
     }

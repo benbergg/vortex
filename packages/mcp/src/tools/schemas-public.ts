@@ -122,12 +122,14 @@ export const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "vortex_screenshot",
     action: "capture.screenshot",
-    description: "Capture a screenshot of page or element.",
+    description: "Screenshot page/element. jpeg+quality saves tokens.",
     schema: {
       type: "object",
       properties: {
         target: TargetOptional,
         fullPage: { type: "boolean" },
+        format: { enum: ["png", "jpeg"] },
+        quality: { type: "number" },
         ...tabFields,
       },
     },
@@ -136,11 +138,11 @@ export const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "vortex_wait_for",
     action: "L4.wait_for",
-    description: "Wait for element / idle / page info.",
+    description: "Wait element/idle/info/custom(value=JS expr truthy).",
     schema: {
       type: "object",
       properties: {
-        mode: { enum: ["element", "idle", "info"] },
+        mode: { enum: ["element", "idle", "info", "custom"] },
         value: {},
         timeout: { type: "number" },
         ...tabFields,

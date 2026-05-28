@@ -1,10 +1,14 @@
 // I15: tools/list 字节硬断言 + 数量 + 内部化 grep。
-// spec: vortex重构-L4-spec.md §0.2.1 (4600B budget v0.8) + §3.3
+// spec: vortex重构-L4-spec.md §0.2.1 (4700B budget v0.8.x) + §3.3
 //
 // v0.8 cap: 4500 → 4600 B。v0.7.x backlog 重新暴露 4 个工具
 // (vortex_fill / vortex_evaluate / vortex_mouse_drag / vortex_file_upload)，
 // payload 实测 4537 B。trim description 会损 LLM 可读性，因此调升 cap
 // 而非压缩字符。下一个调整窗口预留至 v0.9 再 review。
+//
+// v0.8.x: 4600 → 4700 B。vortex_screenshot 增加 format/quality 字段
+// 提升 token 节省能力（caller 可 opt-in jpeg quality，实测体积可降 ~40%），
+// description 也要点出此能力以引导 LLM 使用。同样优先 cap 微调而非压缩字符。
 
 import { describe, it, expect } from "vitest";
 import { COMMIT_KINDS } from "@bytenew/vortex-shared";
@@ -16,8 +20,8 @@ describe("I15: tools/list budget + count + internalized grep", () => {
     defs.map(d => ({ name: d.name, description: d.description, inputSchema: d.schema })),
   );
 
-  it("tools/list 字节 ≤ 4600 B", () => {
-    expect(toolsListPayload.length).toBeLessThanOrEqual(4600);
+  it("tools/list 字节 ≤ 4700 B", () => {
+    expect(toolsListPayload.length).toBeLessThanOrEqual(4700);
   });
 
   it("公开工具数量 = 15", () => {

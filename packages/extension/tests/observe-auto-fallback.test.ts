@@ -76,7 +76,7 @@ describe("observe auto-fallback (shell+iframe sites)", () => {
     registerObserveHandlers(router);
   });
 
-  it("triggers fallback: caller omits frames, main has < 20 interactive, child iframe exists → scans iframe and sets autoFallback=true", async () => {
+  it("triggers fallback: caller omits frames, main has < 50 interactive, child iframe exists → scans iframe and sets autoFallback=true", async () => {
     // Mimics Zentao: main frame is shell with 14 nav links, content is in iframe
     stubChrome({
       frames: [
@@ -115,14 +115,14 @@ describe("observe auto-fallback (shell+iframe sites)", () => {
     expect(r.meta.autoFallback).toBeUndefined();
   });
 
-  it("does NOT trigger when main has >= threshold (20) interactive elements", async () => {
+  it("does NOT trigger when main has >= threshold (50) interactive elements", async () => {
     stubChrome({
       frames: [
         { frameId: 0, parentFrameId: -1, url: "https://spa.example/" },
         { frameId: 190, parentFrameId: 0, url: "https://spa.example/widget" },
       ],
       scanResults: {
-        0: mkPage(50),
+        0: mkPage(100),
         190: mkPage(10),
       },
     });
@@ -167,7 +167,7 @@ describe("observe auto-fallback (shell+iframe sites)", () => {
   it("does NOT trigger when main scan failed (page=null) — preserves real error instead of silent fallback", async () => {
     // Mimic main scan failure (cross-origin rejection / frame destroyed mid-scan).
     // executeScript returns null result for main, but webNavigation lists the
-    // frames. Without the guard, page=null would yield elementCount=0 < 20 and
+    // frames. Without the guard, page=null would yield elementCount=0 < 50 and
     // silently fallback to iframe content, masking the main scan failure.
     const executeScript = vi.fn(async ({ target, args }: { target: { frameIds?: number[] }; args?: unknown[] }) => {
       const frameId = target.frameIds?.[0];
@@ -202,14 +202,14 @@ describe("observe auto-fallback (shell+iframe sites)", () => {
     expect(main?.scanned).toBe(false);
   });
 
-  it("triggers at boundary: main has exactly 19 elements (just below threshold=20)", async () => {
+  it("triggers at boundary: main has exactly 49 elements (just below threshold=50)", async () => {
     stubChrome({
       frames: [
         { frameId: 0, parentFrameId: -1, url: "https://shell/" },
         { frameId: 190, parentFrameId: 0, url: "https://shell/iframe" },
       ],
       scanResults: {
-        0: mkPage(19),
+        0: mkPage(49),
         190: mkPage(30),
       },
     });
@@ -219,14 +219,14 @@ describe("observe auto-fallback (shell+iframe sites)", () => {
     expect(r.meta.autoFallback).toBe(true);
   });
 
-  it("does NOT trigger at boundary: main has exactly 20 elements (at threshold)", async () => {
+  it("does NOT trigger at boundary: main has exactly 50 elements (at threshold)", async () => {
     stubChrome({
       frames: [
         { frameId: 0, parentFrameId: -1, url: "https://shell/" },
         { frameId: 190, parentFrameId: 0, url: "https://shell/iframe" },
       ],
       scanResults: {
-        0: mkPage(20),
+        0: mkPage(50),
         190: mkPage(30),
       },
     });

@@ -28,10 +28,13 @@ type FramesParam =
  * 5 Whys 定位：默认值是给 SPA 优化的，但 LLM 无页面先验知识 → Poka-Yoke 缺失。
  * 此 fallback 让 caller 第一次 observe 就拿到内容（dogfood 卡点 #1）。
  *
- * Threshold=20：禅道顶部 nav 14-15 link，<20 触发；现代 SPA 主 frame 通常 ≥50 元素，
- * 不触发；no-iframe 页面 child=0 也不触发，三重门避免误判。
+ * Threshold=50（调升自 v0.7.4 初始的 20）：覆盖含主导航的现代 shell 页面
+ * （如 testc.bytenew.com 主壳带 60+ 顶部 nav link 但业务在跨域 iframe，原 20
+ * 触发不到）。现代 SPA 主 frame 通常 ≥100 元素，不触发；no-iframe 页面 child=0
+ * 也不触发，三重门避免误判。dogfood 反馈：voc-front 会话发现"含 nav 主壳 +
+ * iframe 业务"在 testc.bytenew.com 不触发，迫使 caller 手动加 frames=all-permitted。
  */
-const FALLBACK_INTERACTIVE_THRESHOLD = 20;
+const FALLBACK_INTERACTIVE_THRESHOLD = 50;
 
 /**
  * 轻量 MV3 match pattern 匹配器：支持 `<all_urls>` / `scheme://host-pattern/path-pattern`。
@@ -237,6 +240,13 @@ async function scanOneFrame(
           "[role=option]",
           "[tabindex]:not([tabindex='-1'])",
           "[contenteditable]",
+          // Inline onclick handler — covers jQuery-era PHP backoffice / WebForms
+          // pages (e.g. Zentao legacy panels, phpMyAdmin) where business actions
+          // are wired as `<div onclick="...">` / `<a onclick="..." href="#">`
+          // without semantic role or cursor:pointer CSS. Modern Vue/React apps
+          // bind via @click in the framework runtime (no [onclick] attribute),
+          // so this selector is a pure additive on legacy surface.
+          "[onclick]",
         ].join(",");
 
         const COLLECTED_ATTRS = [

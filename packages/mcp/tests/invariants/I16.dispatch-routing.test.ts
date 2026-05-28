@@ -151,6 +151,36 @@ describe("I16: dispatch routing for 11 public tools", () => {
       expect(() => dispatchNewTool("vortex_wait_for", { mode: "url", value: "https://x" }))
         .toThrowError(/INVALID_PARAMS|mode must be one of/);
     });
+
+    it("mode=custom + JS expr → page.waitForExpression + expression 字段", () => {
+      const r = dispatchNewTool("vortex_wait_for", {
+        mode: "custom",
+        value: "document.body._x_dataStack && _x_dataStack.length > 0",
+      });
+      expect(r?.action).toBe("page.waitForExpression");
+      expect(r?.params.expression).toBe(
+        "document.body._x_dataStack && _x_dataStack.length > 0",
+      );
+    });
+
+    it("mode=custom 透传 timeout", () => {
+      const r = dispatchNewTool("vortex_wait_for", {
+        mode: "custom",
+        value: "window.__APP_READY__",
+        timeout: 8000,
+      });
+      expect(r?.params.timeout).toBe(8000);
+    });
+
+    it("mode=custom rejects empty value (no fallback to truthy 'undefined')", () => {
+      expect(() => dispatchNewTool("vortex_wait_for", { mode: "custom", value: "" }))
+        .toThrowError(/INVALID_PARAMS|non-empty JS expression/);
+    });
+
+    it("mode=custom rejects non-string value (guards against caller passing {} or number)", () => {
+      expect(() => dispatchNewTool("vortex_wait_for", { mode: "custom", value: 1 }))
+        .toThrowError(/INVALID_PARAMS|non-empty JS expression/);
+    });
   });
 
   describe("vortex_debug_read → source 分发", () => {
