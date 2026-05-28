@@ -22,6 +22,7 @@ const MAX_FULLPAGE_HEIGHT = 8000;
 /**
  * 基于 CDP Page.captureScreenshot 的截图实现。
  * 不要求 tab 活跃，支持 viewport / fullPage / clip 三种模式。
+ * 内部字段：deviceScaleFactor 用于 bench LLM-judge 高 DPR 截图，frameId 为单 frame clip。
  */
 async function captureTab(
   debuggerMgr: DebuggerManager,
@@ -31,37 +32,82 @@ async function captureTab(
     quality?: number;
     fullPage?: boolean;
     clip?: { x: number; y: number; width: number; height: number };
+    deviceScaleFactor?: 1 | 2;
   } = {},
 ): Promise<string> {
-  const { format = "png", quality, fullPage = false, clip } = options;
+  const { format = "png", quality, fullPage = false, clip, deviceScaleFactor } = options;
 
   await debuggerMgr.enableDomain(tabId, "Page");
 
-  const params: any = {
-    format,
-    captureBeyondViewport: fullPage || !!clip,
-  };
-
-  if (format === "jpeg" && quality != null) {
-    params.quality = quality;
+  const needsDprOverride = deviceScaleFactor != null && deviceScaleFactor !== 1;
+  if (needsDprOverride) {
+    await debuggerMgr.enableDomain(tabId, "Emulation");
+    await debuggerMgr.sendCommand(tabId, "Emulation.setDeviceMetricsOverride", {
+      deviceScaleFactor,
+      width: 0,
+      height: 0,
+      mobile: false,
+    });
   }
 
-  if (clip) {
-    params.clip = { ...clip, scale: 1 };
-  } else if (fullPage) {
-    const metrics = await debuggerMgr.sendCommand(tabId, "Page.getLayoutMetrics") as any;
-    const contentSize = metrics.cssContentSize ?? metrics.contentSize;
-    params.clip = {
-      x: 0,
-      y: 0,
-      width: contentSize.width,
-      height: Math.min(contentSize.height, MAX_FULLPAGE_HEIGHT),
-      scale: 1,
+  try {
+    const params: any = {
+      format,
+      captureBeyondViewport: fullPage || !!clip,
     };
+    if (format === "jpeg" && quality != null) params.quality = quality;
+    if (clip) {
+      params.clip = { ...clip, scale: 1 };
+    } else if (fullPage) {
+      const metrics = await debuggerMgr.sendCommand(tabId, "Page.getLayoutMetrics") as any;
+      const contentSize = metrics.cssContentSize ?? metrics.contentSize;
+      params.clip = {
+        x: 0,
+        y: 0,
+        width: contentSize.width,
+        height: Math.min(contentSize.height, MAX_FULLPAGE_HEIGHT),
+        scale: 1,
+      };
+    }
+    const result = await debuggerMgr.sendCommand(tabId, "Page.captureScreenshot", params) as { data: string };
+    return `data:image/${format};base64,${result.data}`;
+  } finally {
+    if (needsDprOverride) {
+      // 设计文档 §3.5 + 决策 6: reset 失败让异常向上抛,bench sweep 应 abort
+      await debuggerMgr.sendCommand(tabId, "Emulation.clearDeviceMetricsOverride", {});
+    }
   }
+}
 
-  const result = await debuggerMgr.sendCommand(tabId, "Page.captureScreenshot", params) as { data: string };
-  return `data:image/${format};base64,${result.data}`;
+/**
+ * 单截某 frame 时计算 viewport bbox 作 CDP clip。
+ * 用 chrome.scripting.executeScript 在目标 frame 内取 documentElement bounding rect,
+ * 再加 iframe-offset 拼绝对坐标。frameId=0 不走此路径(由 SCREENSHOT handler 守卫)。
+ */
+async function computeFrameClip(
+  tabId: number,
+  frameId: number,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  await ensureFrameAttached(tabId, frameId);
+  const rectResults = await chrome.scripting.executeScript({
+    target: buildExecuteTarget(tabId, frameId),
+    func: () => {
+      const r = document.documentElement.getBoundingClientRect();
+      return { result: { x: r.left, y: r.top, width: r.width, height: r.height } };
+    },
+    world: "MAIN",
+  });
+  const rect = (rectResults[0]?.result as { result?: any })?.result;
+  if (!rect) {
+    throw vtxError(VtxErrorCode.JS_EXECUTION_ERROR, `Failed to compute clip for frameId=${frameId}`);
+  }
+  const { x: offsetX, y: offsetY } = await getIframeOffset(tabId, frameId);
+  return {
+    x: rect.x + offsetX,
+    y: rect.y + offsetY,
+    width: rect.width,
+    height: rect.height,
+  };
 }
 
 export function registerCaptureHandlers(
@@ -75,13 +121,22 @@ export function registerCaptureHandlers(
       const quality = args.quality as number | undefined;
       const fullPage = args.fullPage as boolean | undefined;
       const clip = args.clip as { x: number; y: number; width: number; height: number } | undefined;
+      const deviceScaleFactor = args.deviceScaleFactor as 1 | 2 | undefined;
+      const frameId = args.frameId as number | undefined;
 
-      const dataUrl = await captureTab(debuggerMgr, tid, { format, quality, fullPage, clip });
+      let effectiveClip = clip;
+      if (frameId != null && frameId !== 0 && !clip) {
+        effectiveClip = await computeFrameClip(tid, frameId);
+      }
+
+      const dataUrl = await captureTab(debuggerMgr, tid, { format, quality, fullPage, clip: effectiveClip, deviceScaleFactor });
 
       return {
         dataUrl,
         format,
         ...(format === "jpeg" && quality != null ? { quality } : {}),
+        ...(deviceScaleFactor != null ? { deviceScaleFactor } : {}),
+        ...(frameId != null ? { frameId } : {}),
         fullPage: !!fullPage,
         timestamp: Date.now(),
       };
