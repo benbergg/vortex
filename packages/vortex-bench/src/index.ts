@@ -22,6 +22,9 @@ import { probeFixture } from "./runner/robustness.js";
 import { probeLive, type LiveTarget } from "./runner/robustness-live.js";
 import { renderRobustnessMarkdown, rankRobustnessFindings } from "./robustness-report.js";
 import type { FixtureRobustness, RobustnessReport } from "./robustness-types.js";
+import { judgePage, type JudgeTarget } from "./runner/judge.js";
+import { renderJudgeMarkdown } from "./judge-report.js";
+import type { JudgeReport, JudgePageResult } from "./judge-types.js";
 
 const USAGE = `vortex-bench <command>
 
@@ -45,11 +48,19 @@ Commands:
   robustness --url <url>       live 只读探单个真站 observe→act 契约
   robustness --current-tab     live 只读探当前已加载/已登录 tab
   robustness --seeds [file]    live 批量探种子列表(默认 live-seeds.json)
+  judge --all            synth 全量 + 消融校准(产 FP/TP 表;需 BIGMODEL_API_KEY)
+  judge --pattern <name> 单 synth fixture 校准
+  judge --url <url>      live 真站单页判 recall-miss
+  judge --seeds [file]   live 批量种子
+  judge --current-tab    当前已加载/已登录 tab
+  judge --model <id>     切模型(默认 glm-4.6v;BigModel 平台模型 ID)
+  judge --ablate <k>     synth 消融抽行数(默认 3)
   --help                 显示帮助
 
 Env:
   VORTEX_MCP_BIN         默认 ../mcp/dist/src/server.js
   PLAYGROUND_URL         默认 http://localhost:5173
+  BIGMODEL_API_KEY       judge 子命令必需(BigModel 平台 https://open.bigmodel.cn API key)
 `;
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -61,6 +72,7 @@ const SYNTH_DIR = resolve(PKG_ROOT, "playground", "public", "synth");
 const SCAN_REPORTS_DIR = resolve(REPORTS_DIR, "scan");
 const ROBUSTNESS_REPORTS_DIR = resolve(REPORTS_DIR, "robustness");
 const ROBUSTNESS_LIVE_REPORTS_DIR = resolve(REPORTS_DIR, "robustness-live");
+const JUDGE_REPORTS_DIR = resolve(REPORTS_DIR, "judge");
 
 function resolveMcpBin(): string {
   if (process.env.VORTEX_MCP_BIN) return resolve(process.env.VORTEX_MCP_BIN);
@@ -493,6 +505,90 @@ async function cmdRobustnessLive(targets: LiveTarget[]): Promise<number> {
   return totalR0 === 0 ? 0 : 2;
 }
 
+async function cmdJudge(args: string[]): Promise<number> {
+  const modelIdx = args.indexOf("--model");
+  const model = modelIdx >= 0 && args[modelIdx + 1] ? args[modelIdx + 1] : "glm-4.6v";
+  const ablateIdx = args.indexOf("--ablate");
+  const ablate = ablateIdx >= 0 && args[ablateIdx + 1] ? Number.parseInt(args[ablateIdx + 1], 10) : 3;
+  const mcpBin = resolveMcpBin();
+  const url = playgroundUrl();
+
+  // 决定目标集 + 模式
+  let targets: JudgeTarget[];
+  let mode: "synth" | "live";
+  const urlIdx = args.indexOf("--url");
+  const seedsIdx = args.indexOf("--seeds");
+  if (urlIdx >= 0 && args[urlIdx + 1]) {
+    mode = "live"; targets = [{ url: args[urlIdx + 1], page: args[urlIdx + 1] }];
+  } else if (args.includes("--current-tab")) {
+    mode = "live"; targets = [{ currentTab: true, page: "current-tab" }];
+  } else if (seedsIdx >= 0) {
+    mode = "live";
+    const file = args[seedsIdx + 1] && !args[seedsIdx + 1].startsWith("-")
+      ? resolve(args[seedsIdx + 1]) : resolve(PKG_ROOT, "live-seeds.json");
+    const urls = await loadSeeds(file);
+    targets = urls.map((u) => ({ url: u, page: u }));
+  } else {
+    mode = "synth";
+    let names: string[];
+    if (args.includes("--all")) names = await listSynthManifests();
+    else {
+      const pIdx = args.indexOf("--pattern");
+      if (pIdx >= 0 && args[pIdx + 1]) {
+        names = [args[pIdx + 1]];
+      } else {
+        // 仿 cmdSnapshot 的 index-based consumed Set 范式:
+        // 记录 flag 及其值的下标,positional name 取下标不在 consumed 且不以 - 开头的项。
+        // 避免 fixture 名恰好等于 model 串或 ablate 数字时被值比较误删。
+        const consumed = new Set<number>();
+        if (modelIdx >= 0) { consumed.add(modelIdx); consumed.add(modelIdx + 1); }
+        if (ablateIdx >= 0) { consumed.add(ablateIdx); consumed.add(ablateIdx + 1); }
+        names = args.filter((a, i) => !consumed.has(i) && !a.startsWith("-"));
+      }
+    }
+    if (names.length === 0) {
+      process.stderr.write("[vortex-bench] judge 需要 --all / --pattern <name> / --url / --seeds / --current-tab\n");
+      return 1;
+    }
+    const manifests = await Promise.all(names.map((n) => loadManifest(n).catch(() => null)));
+    targets = names.flatMap((n, i) => {
+      const m = manifests[i];
+      if (!m || isProposed(m)) return [];
+      return [{ synthPath: m.path, page: n }];
+    });
+  }
+
+  process.stdout.write(`[vortex-bench] judge  mode=${mode}  model=${model}  mcp=${mcpBin}\n`);
+  process.stdout.write(`[vortex-bench] 判 ${targets.length} 个 page 的 observe recall-miss\n\n`);
+
+  const report: JudgeReport = { generatedAt: new Date().toISOString(), model, mode, pages: [], findings: [] };
+  for (const t of targets) {
+    let p: JudgePageResult;
+    try {
+      p = await judgePage(t, { mcpBin, model, playgroundUrl: url, ablate });
+    } catch (e) {
+      p = { page: t.page, totalObserveRows: 0, confirmedMisses: [], findings: [], error: e instanceof Error ? e.message : String(e) };
+    }
+    report.pages.push(p);
+    report.findings.push(...p.findings);
+    if (mode === "synth" && p.calibration) {
+      const c = p.calibration;
+      process.stdout.write(`• ${p.page.padEnd(28)} FP=${c.fpConfirmed} TP=${c.ablatedRecovered}/${c.ablatedCount}${p.error ? `  ⚠ ${p.error}` : ""}\n`);
+    } else {
+      process.stdout.write(`${p.findings.length === 0 ? "✓" : "✗"} ${p.page.slice(0, 40).padEnd(40)} recall-miss=${p.findings.length}${p.error ? `  ⚠ ${p.error}` : ""}\n`);
+    }
+  }
+
+  await mkdir(JUDGE_REPORTS_DIR, { recursive: true });
+  const stamp = report.generatedAt.replace(/[:.]/g, "-");
+  const jsonPath = join(JUDGE_REPORTS_DIR, `${stamp}.json`);
+  const mdPath = join(JUDGE_REPORTS_DIR, `${stamp}.md`);
+  await writeFile(jsonPath, JSON.stringify(report, null, 2));
+  await writeFile(mdPath, renderJudgeMarkdown(report));
+  process.stdout.write(`\n[report] ${mdPath}\n[report] ${jsonPath}\n`);
+  return 0; // judge 是抽样咨询层,非硬门(findings 需人工分诊)
+}
+
 async function main(): Promise<number> {
   const [, , cmd, ...rest] = process.argv;
   if (!cmd || cmd === "--help" || cmd === "-h") {
@@ -514,6 +610,8 @@ async function main(): Promise<number> {
       return cmdSnapshot(rest);
     case "robustness":
       return cmdRobustness(rest);
+    case "judge":
+      return cmdJudge(rest);
     default:
       process.stderr.write(`[vortex-bench] 未知命令: ${cmd}\n\n${USAGE}`);
       return 1;
