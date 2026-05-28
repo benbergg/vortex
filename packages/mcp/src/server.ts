@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { watch } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { realpathSync } from "node:fs";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -530,7 +531,22 @@ async function main(): Promise<void> {
   await server.connect(transport);
 }
 
-main().catch((err) => {
-  console.error("Failed to start vortex MCP server:", err);
-  process.exit(1);
-});
+// CLI-entry guard：仅在直接作为 `node server.js` 启动时执行 main()。被 vitest
+// import 时 process.argv[1] 指向 vitest runner，main() 不再触发，避免每个
+// worker 都跑 fs.watch + stdio.connect 造成 EMFILE 与 5s 以上的导入毛刺。
+// 比较走 realpathSync 以兼容 pnpm/npm 的 .bin/ 符号链接。
+const isMainModule = (() => {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
+  } catch {
+    return false;
+  }
+})();
+
+if (isMainModule) {
+  main().catch((err) => {
+    console.error("Failed to start vortex MCP server:", err);
+    process.exit(1);
+  });
+}
