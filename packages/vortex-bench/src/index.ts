@@ -27,6 +27,12 @@ import { renderJudgeMarkdown } from "./judge-report.js";
 import type { JudgeReport, JudgePageResult } from "./judge-types.js";
 import { resolveProfile } from "./runner/judge-screenshot-profile.js";
 import type { ScreenshotProfile } from "./runner/judge-screenshot-profile.js";
+import { generate } from "./runner/fuzz-generate.js";
+import { runPage, runSelfTest, cleanupTmp, extractDiscrepancies, selfTestPassed } from "./runner/fuzz-run.js";
+import { shrink } from "./runner/fuzz-shrink.js";
+import { promote } from "./runner/fuzz-promote.js";
+import { renderFuzzMarkdown } from "./fuzz-report.js";
+import type { FuzzReport, FuzzFinding, FuzzPage, PrimitiveKind } from "./fuzz-types.js";
 
 const USAGE = `vortex-bench <command>
 
@@ -60,6 +66,9 @@ Commands:
   judge --screenshot-profile <name>
                          截图 profile(q70|q85|q85+dpr2|q85+dpr2+png|q85+dpr2+png+per-frame)
                          默认 q70(jpeg quality=70, dpr=1)
+  fuzz --seeds N         生成 N 个 seed 跑 observe-正确性 fuzzing(默认 50)
+  fuzz --seed S          只跑单个 seed S(复现)
+  fuzz --no-promote      不沉淀,只报告
   --help                 显示帮助
 
 Env:
@@ -78,6 +87,7 @@ const SCAN_REPORTS_DIR = resolve(REPORTS_DIR, "scan");
 const ROBUSTNESS_REPORTS_DIR = resolve(REPORTS_DIR, "robustness");
 const ROBUSTNESS_LIVE_REPORTS_DIR = resolve(REPORTS_DIR, "robustness-live");
 const JUDGE_REPORTS_DIR = resolve(REPORTS_DIR, "judge");
+const FUZZ_REPORTS_DIR = resolve(REPORTS_DIR, "fuzz");
 
 function resolveMcpBin(): string {
   if (process.env.VORTEX_MCP_BIN) return resolve(process.env.VORTEX_MCP_BIN);
@@ -607,6 +617,92 @@ async function cmdJudge(args: string[]): Promise<number> {
   return 0; // judge 是抽样咨询层,非硬门(findings 需人工分诊)
 }
 
+async function cmdFuzz(args: string[]): Promise<number> {
+  const seedsIdx = args.indexOf("--seeds");
+  const seedIdx = args.indexOf("--seed");
+  const noPromote = args.includes("--no-promote");
+  const mcpBin = resolveMcpBin();
+  const url = playgroundUrl();
+  const runOpts = { mcpBin, playgroundUrl: url, synthDir: SYNTH_DIR };
+
+  let seeds: number[];
+  if (seedIdx >= 0) {
+    const seedRaw = args[seedIdx + 1];
+    if (!seedRaw || !Number.isFinite(Number(seedRaw))) {
+      process.stderr.write(`[vortex-bench] --seed 需要有效整数，得到: ${seedRaw ?? "(无值)"}\n`);
+      return 1;
+    }
+    seeds = [Number(seedRaw)];
+  } else {
+    const rawN = seedsIdx >= 0 && args[seedsIdx + 1] ? Number(args[seedsIdx + 1]) : 50;
+    if (!Number.isInteger(rawN) || rawN < 1) {
+      process.stderr.write(`[vortex-bench] --seeds 需要正整数，得到: ${args[seedsIdx + 1]}\n`);
+      return 1;
+    }
+    seeds = Array.from({ length: rawN }, (_, i) => i);
+  }
+
+  process.stdout.write(`[vortex-bench] fuzz  playground=${url}  seeds=${seeds.length}\n`);
+
+  const findings: FuzzFinding[] = [];
+  const promoted: string[] = [];
+  let selfTestOk = true;
+  let quarantined: PrimitiveKind[] = [];
+
+  try {
+    process.stdout.write(`[vortex-bench] 原语自检...\n`);
+    const selfTestResult = await runSelfTest(runOpts);
+    quarantined = selfTestResult.quarantined;
+    selfTestOk = selfTestPassed(selfTestResult.scans);
+    if (!selfTestOk) {
+      process.stderr.write(`⚠ 自检失败,隔离原语: ${quarantined.join(", ")}(继续但复合发现可能含这些原语的噪声)\n`);
+    }
+
+    for (const seed of seeds) {
+      const page = generate(seed);
+      const scan = await runPage(page, runOpts);
+      const fs = extractDiscrepancies(seed, scan);
+      findings.push(...fs);
+
+      const structural = fs.filter((f) => f.cls === "structural");
+      if (structural.length > 0 && !noPromote) {
+        const stillFails = async (p: FuzzPage): Promise<boolean> => {
+          const s = await runPage(p, runOpts);
+          return extractDiscrepancies(p.seed, s).some((f) => f.cls === "structural");
+        };
+        const min = await shrink(page, stillFails);
+        // 收缩后重新扫描以获取最小页实际的 discrepancy kind（收缩可能改变原语组合）
+        const minScan = await runPage(min, runOpts);
+        const minFindings = extractDiscrepancies(min.seed, minScan);
+        const minStructural = minFindings.filter((f) => f.cls === "structural");
+        const promoteKind = minStructural.length > 0 ? minStructural[0].kind : structural[0].kind;
+        const res = await promote(min, SYNTH_DIR, promoteKind);
+        if (res.promoted) promoted.push(res.fixture);
+        process.stdout.write(`✗ seed=${seed} structural=${structural.length} → ${res.promoted ? `沉淀 ${res.fixture}` : `已存在 ${res.fixture}`}\n`);
+      } else {
+        process.stdout.write(`${fs.length === 0 ? "✓" : "·"} seed=${seed} findings=${fs.length}\n`);
+      }
+    }
+  } finally {
+    await cleanupTmp(SYNTH_DIR);
+  }
+
+  const report: FuzzReport = {
+    generatedAt: new Date().toISOString(),
+    playgroundUrl: url, seedsRun: seeds.length, selfTestOk, quarantined,
+    findings, promoted,
+  };
+  await mkdir(FUZZ_REPORTS_DIR, { recursive: true });
+  const ts = report.generatedAt.replace(/[:.]/g, "-");
+  const jsonPath = join(FUZZ_REPORTS_DIR, `${ts}.json`);
+  const mdPath = join(FUZZ_REPORTS_DIR, `${ts}.md`);
+  await writeFile(jsonPath, JSON.stringify(report, null, 2), "utf-8");
+  await writeFile(mdPath, renderFuzzMarkdown(report), "utf-8");
+  process.stdout.write(`\n[vortex-bench] fuzz 完成: structural=${findings.filter((f) => f.cls === "structural").length} name=${findings.filter((f) => f.cls === "name").length} 沉淀=${promoted.length}\n`);
+  process.stdout.write(`\n[report] ${mdPath}\n[report] ${jsonPath}\n`);
+  return 0;
+}
+
 async function main(): Promise<number> {
   const [, , cmd, ...rest] = process.argv;
   if (!cmd || cmd === "--help" || cmd === "-h") {
@@ -630,6 +726,8 @@ async function main(): Promise<number> {
       return cmdRobustness(rest);
     case "judge":
       return cmdJudge(rest);
+    case "fuzz":
+      return cmdFuzz(rest);
     default:
       process.stderr.write(`[vortex-bench] 未知命令: ${cmd}\n\n${USAGE}`);
       return 1;
