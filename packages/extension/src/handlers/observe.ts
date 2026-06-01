@@ -934,15 +934,14 @@ export function registerObserveHandlers(router: ActionRouter): void {
               .filter((f) => {
                 if (f.frameId === 0) return false;
                 if (isFrameInPermissions(f.url)) return true;
-                // 仅对 opaque-origin 子框走 inherited same-origin 兜底:
-                // about:srcdoc 自身 url 无法匹配 host_permissions,但继承父文档源
-                // 且与父同 tree(注入权限随父)。独立 http 子框仍以 host_permissions
-                // 为准,不被同源放宽(它们需各自的注入权限)。
-                const self = safeOrigin(f.url);
-                const isOpaque = self === null || self === "null";
-                return (
-                  isOpaque && mainOrigin != null && inheritedOrigin(f, byId) === mainOrigin
-                );
+                // 仅对 srcdoc 子框走 inherited same-origin 兜底:about:srcdoc 自身 url
+                // 无法匹配 host_permissions,但继承父文档源且与父同 tree(注入权限随父)。
+                // 按 url 精确限定为 about:srcdoc,排除同为 opaque-origin 的 about:blank /
+                // data: 子框(它们不继承父源,不应被同源放宽)。独立 http 子框仍以
+                // host_permissions 为准。注:sandbox srcdoc(无 allow-same-origin)url 同为
+                // about:srcdoc 但运行时为 unique origin,会被纳入并在注入时失败兜底(非泄露)。
+                if (f.url !== "about:srcdoc") return false;
+                return mainOrigin != null && inheritedOrigin(f, byId) === mainOrigin;
               })
               .filter((f) => !scans.some((s) => s.frameId === f.frameId))
               .map((f) => ({

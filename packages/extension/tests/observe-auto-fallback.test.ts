@@ -339,4 +339,40 @@ describe("observe auto-fallback (shell+iframe sites)", () => {
     expect(r.elements.length).toBe(2);
     expect(r.meta.autoFallback).toBe(true);
   });
+
+  it("does NOT loosen for an about:blank child (opaque but not srcdoc)", async () => {
+    // about:blank shares srcdoc's opaque origin ("null") but is NOT srcdoc — it
+    // must not be swept in via the same-origin loosening. The loosening is gated
+    // on url === "about:srcdoc" precisely to exclude about:blank / data: children.
+    const executeScript = vi.fn(
+      async ({ target, args }: { target: { frameIds?: number[] }; args?: unknown[] }) => {
+        const frameId = target.frameIds?.[0];
+        if (typeof args?.[0] === "string") return [{ result: { x: 0, y: 0 } }];
+        const pages: Record<number, ReturnType<typeof mkPage>> = { 0: mkPage(1) };
+        return [{ result: frameId != null ? pages[frameId] ?? null : null }];
+      },
+    );
+    vi.stubGlobal("chrome", {
+      tabs: { query: vi.fn().mockResolvedValue([{ id: 42 }]) },
+      webNavigation: {
+        getAllFrames: vi.fn().mockResolvedValue([
+          { frameId: 0, parentFrameId: -1, url: "https://example.com/page" },
+          { frameId: 1, parentFrameId: 0, url: "about:blank" },
+        ]),
+      },
+      scripting: { executeScript },
+      runtime: {
+        getManifest: vi.fn().mockReturnValue({ host_permissions: ["<all_urls>"] }),
+      },
+    });
+    const resp = await router.dispatch(mkReq("observe.snapshot", {}, 42));
+    const r = resp.result as {
+      frames: Array<{ frameId: number }>;
+      elements: unknown[];
+      meta: { autoFallback?: true };
+    };
+    // about:blank child must be excluded → only main frame scanned, no fallback
+    expect(r.frames.map((f) => f.frameId)).toEqual([0]);
+    expect(r.meta.autoFallback).toBeUndefined();
+  });
 });
