@@ -5,6 +5,27 @@
 import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
 
 /**
+ * MCP client 会把 untyped `value:{}` schema 的「对象/数组」实参序列化成 JSON
+ * 字符串（字符串实参则原样透传）。期望结构化 value 的路径——act scroll 的
+ * `{container,position,x,y}`、fill 结构化 kind（cascader/checkbox-group/
+ * 多选 select/daterange…）——必须先把这种字符串还原，否则下游
+ * `typeof value === "object"` / `Array.isArray(value)` 判否，导致参数被静默丢弃。
+ *
+ * 规则：仅当 value 是 JSON 字符串且 parse 出对象/数组时返回解析值；普通文本
+ * （select 单值 "北京"、time "12:30:00"、scroll 非 JSON）原样返回，不误伤。
+ * 2026-06-01 ag-grid(scroll) + Element Plus cascader(fill) 真实 client 路径实证。
+ */
+function parseStructuredValue(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed !== null && typeof parsed === "object" ? parsed : value;
+  } catch {
+    return value;
+  }
+}
+
+/**
  * 基于新 MCP tool 名，动态决定发哪个 extension action 以及如何 reshape 参数。
  * 返回 null 表示该工具直接使用 toolDef.action，无需特殊处理。
  *
@@ -44,8 +65,16 @@ export function dispatchNewTool(
       return { action, params: idleMs != null ? { [idleKey]: idleMs, ...rest } : rest };
     }
     case "vortex_fill": {
-      const { kind, ...rest } = params;
-      return { action: kind ? "dom.commit" : "dom.fill", params: kind ? { kind, ...rest } : rest };
+      const { kind, value, ...rest } = params;
+      if (!kind) {
+        // 纯文本 fill：value 是字符串数据，原样透传（不 parse，避免误把
+        // 形似 JSON 的文本当结构化值）。
+        return { action: "dom.fill", params: { value, ...rest } };
+      }
+      // 结构化 kind：dom.commit driver 期望 cascader=string[] /
+      // checkbox-group={values:string[]} / 多选 select=string[] 等结构化值，
+      // 但 client 已把它序列化成 JSON 字符串，此处还原。
+      return { action: "dom.commit", params: { kind, value: parseStructuredValue(value), ...rest } };
     }
     case "vortex_evaluate": {
       const { async: isAsync, ...rest } = params;
@@ -111,24 +140,34 @@ export function dispatchNewTool(
       // value 语义按 action 分流：
       // - scroll 时 value 是参数对象 {container?, position?, x?, y?} → spread 到 args，
       //   底层 dom.scroll 直接读 args.container / args.position / args.x / args.y
-      // - fill/type/select 时 value 是要设置的数据（string/object/array），透传 next.value
+      // - fill/select 时 value 是要设置的数据（string/object/array），透传 next.value
+      // - type 时 value 是文本，但 dom.type handler 读 args.text → 归到 next.text
       // - hover/click 时 value 通常 undefined
+      //
+      // scroll 依赖结构化参数；client 已把对象 value 序列化成 JSON 字符串，
+      // 故先还原（见 parseStructuredValue）。否则 `typeof === "object"` 判否 →
+      // spread+strip 全跳过 → selector 残留 → dom.scroll 走 scrollIntoView 屏蔽
+      // container/position，且静默返回 success（2026-06-01 ag-grid dogfood 实证）。
+      const scrollValue: unknown =
+        actionName === "scroll" ? parseStructuredValue(value) : value;
       if (
         actionName === "scroll" &&
-        value !== null &&
-        typeof value === "object" &&
-        !Array.isArray(value)
+        scrollValue !== null &&
+        typeof scrollValue === "object" &&
+        !Array.isArray(scrollValue)
       ) {
-        Object.assign(next, value as Record<string, unknown>);
+        Object.assign(next, scrollValue as Record<string, unknown>);
         // server.ts 已把 params.target 翻译成 params.selector（@ref → selector
         // 或 raw selector 直传）；strip selector / target 二者，让 dom.scroll 走
         // position 分支，否则 handler 见 sel 即 scrollIntoView 屏蔽 container/position。
-        const v = value as Record<string, unknown>;
+        const v = scrollValue as Record<string, unknown>;
         if ("container" in v || "position" in v || "x" in v || "y" in v) {
           delete next.target;
           delete next.selector;
           delete next.index; // ref 形式翻成 index 时也 strip
         }
+      } else if (actionName === "type") {
+        if (value !== undefined) next.text = value;
       } else if (value !== undefined) {
         next.value = value;
       }

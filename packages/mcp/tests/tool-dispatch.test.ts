@@ -228,6 +228,91 @@ describe("dispatchNewTool", () => {
     expect(params).not.toHaveProperty("value");
   });
 
+  // ── 2026-06-01 真实站点 dogfood(ag-grid)发现 ────────────────────────────
+  // BUG G:MCP client 会把 untyped `value:{}` 的对象实参序列化成 JSON 字符串。
+  // 旧测试传「真对象」所以一直 green,但 e2e 实际收到的是字符串 →
+  // `typeof value === "object"` 判否 → spread+strip 全跳过 → selector 残留 →
+  // 底层 dom.scroll 走 scrollIntoView 屏蔽 container/position,且静默返回 success。
+  // 修复:scroll 的字符串 value 先 JSON.parse 再判定。
+  it("vortex_act(scroll, value 为 JSON 字符串) 解析后 spread + strip selector（e2e 真实形态）", () => {
+    const { action, params } = dispatchNewTool("vortex_act", {
+      selector: "body",
+      action: "scroll",
+      value: '{"container":".scroll-box","y":3000}', // client 序列化后的字符串
+    })!;
+    expect(action).toBe("dom.scroll");
+    expect(params.container).toBe(".scroll-box");
+    expect(params.y).toBe(3000);
+    expect(params).not.toHaveProperty("selector");
+    expect(params).not.toHaveProperty("target");
+    expect(params).not.toHaveProperty("value");
+  });
+
+  it("vortex_act(scroll, value 为非 JSON 字符串) 不崩溃，保留 selector 走 scrollIntoView", () => {
+    const { action, params } = dispatchNewTool("vortex_act", {
+      selector: "._lastItem",
+      action: "scroll",
+      value: "not-json",
+    })!;
+    expect(action).toBe("dom.scroll");
+    expect(params.selector).toBe("._lastItem");
+  });
+
+  // BUG H:dom.type handler 读 `args.text`,但 dispatch 把数据放 `next.value`,
+  // 导致 vortex_act(type) 永远报 "Missing required param: text"(纯字符串也复现)。
+  // fill/select 的 handler 读 `args.value` 所以正常,唯独 type 错位。
+  it("vortex_act(type, value='abc') 映射到 text（dom.type 读 args.text）", () => {
+    const { action, params } = dispatchNewTool("vortex_act", {
+      action: "type",
+      target: "@e1",
+      value: "abc",
+    })!;
+    expect(action).toBe("dom.type");
+    expect(params.text).toBe("abc");
+  });
+
+  // BUG lead(同 G 根因):client 把 fill 结构化 kind 的数组/对象 value 也序列化成
+  // JSON 字符串，dom.commit driver 期望 string[] / {values} → `Array.isArray` 判否
+  // 报 "value must be a non-empty label path array"。修复:结构化 kind 的字符串
+  // value 先 JSON.parse 还原。Element Plus cascader e2e 实证。
+  it("vortex_fill(kind=cascader, value 为 JSON 字符串数组) 解析回数组", () => {
+    const { action, params } = dispatchNewTool("vortex_fill", {
+      target: "@e1",
+      kind: "cascader",
+      value: '["Guide","Disciplines","Consistency"]',
+    })!;
+    expect(action).toBe("dom.commit");
+    expect(params.value).toEqual(["Guide", "Disciplines", "Consistency"]);
+    expect(params.kind).toBe("cascader");
+  });
+
+  it("vortex_fill(kind=checkbox-group, value 为 JSON 字符串对象) 解析回对象", () => {
+    const { params } = dispatchNewTool("vortex_fill", {
+      target: "@e1",
+      kind: "checkbox-group",
+      value: '{"values":["A","B"]}',
+    })!;
+    expect(params.value).toEqual({ values: ["A", "B"] });
+  });
+
+  it("vortex_fill(kind=select, 单值普通字符串) 不被 JSON.parse 误伤", () => {
+    const { params } = dispatchNewTool("vortex_fill", {
+      target: "@e1",
+      kind: "select",
+      value: "北京", // 非 JSON,保持原字符串
+    })!;
+    expect(params.value).toBe("北京");
+  });
+
+  it("vortex_fill(纯文本 fill,无 kind) value 原样透传不 parse", () => {
+    const { action, params } = dispatchNewTool("vortex_fill", {
+      target: "@e1",
+      value: "[1,2]", // 形似 JSON 的普通文本,纯 fill 不应 parse
+    })!;
+    expect(action).toBe("dom.fill");
+    expect(params.value).toBe("[1,2]");
+  });
+
   it("未知工具名返回 null（走 toolDef.action 默认路径）", () => {
     const result = dispatchNewTool("vortex_click", {});
     expect(result).toBeNull();
