@@ -288,6 +288,8 @@ async function scanOneFrame(
         // className 路径带 denylist，过滤掉 Element Plus / Ant / Vant 等框架前缀类
         // 和通用泛词 (icon/iconfont/btn/button/wrapper/container)——它们对 LLM 等同
         // "icon"/"button"，零信息（testc 实测 `el-icon` × 3 + `el-popover_*` × 2）。
+        // 以及生成式原子类（emotion `css-*` / styled-components `sc-*`）纯 hash，
+        // 否决以免框架前缀被否后级联回退到 emotion token（preview.pro.ant.design dogfood）。
         // CSS Modules `_closeIcon_1ygkr_39` → `closeIcon` 仍正常保留（不在 denylist）。
         // 共用于：(1) cursor:pointer fallback gate (2) getAccessibleName 末尾兜底。
         const ICON_CLASS_DENY_PREFIXES = ["el-", "ant-", "anticon", "van-"];
@@ -321,6 +323,13 @@ async function scanOneFrame(
             const lower = cleaned.toLowerCase().replace(/_+$/, "");
             if (ICON_CLASS_DENY_NAMES.has(lower)) continue;
             if (ICON_CLASS_DENY_PREFIXES.some((p) => lower.startsWith(p))) continue;
+            // 生成式原子类(emotion `css-*` / styled-components `sc-*`)是纯 hash,
+            // 零语义。必须否决——否则当真语义类先被框架前缀 denylist 否决时
+            // (如 `ant-pro-layout-bg-list css-tql0nm`:`ant-` 否决后),名字会
+            // 级联回退到 emotion token `css-tql0nm`,比无名更糟;且让本应被
+            // BUG-3 噪声过滤器丢弃的非交互背景层凭这个假名续命被误报为可交互
+            // (2026-06-01 preview.pro.ant.design dogfood 实测)。
+            if (/^css-/.test(lower) || /^sc-[a-z]/.test(lower)) continue;
             return cleaned;
           }
           return "";
