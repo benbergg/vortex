@@ -58,7 +58,9 @@ export function generate(seed: number): FuzzPage {
   // 噪声叶子/容器构造:深度受限,避免爆炸
   let classCounter = 0;
   const nextClass = (): string => `nx${classCounter++}`;
-  const makeNoise = (depth: number, children: AstNode[]): NoiseNode => {
+  // allowHidden:false 时仍做相同的 PRNG 采样,但不赋值 hidden,
+  // 保证非 srcdoc 路径字节一致(PRNG 序列不变)。
+  const makeNoise = (depth: number, children: AstNode[], allowHidden = true): NoiseNode => {
     const node: NoiseNode = {
       type: "noise",
       tag: r.bool(0.8) ? "div" : "span",
@@ -66,15 +68,20 @@ export function generate(seed: number): FuzzPage {
       children,
     };
     // 15% 概率给可见噪声子树套隐藏(让其下原语成为 interactive:false 用例)
-    if (depth > 0 && r.bool(0.15)) node.hidden = r.pick(HIDDEN_MODES);
+    if (depth > 0 && r.bool(0.15)) {
+      if (allowHidden) node.hidden = r.pick(HIDDEN_MODES);
+      else r.pick(HIDDEN_MODES); // 保持 PRNG 步进一致,丢弃结果
+    }
     return node;
   };
 
   // 把 primitives 散布到随机深度的噪声树里
+  // srcdoc-button 不允许被放进隐藏包装(display:none 会导致 iframe 不渲染)。
   const placePrimitive = (p: PrimitiveNode, maxDepth: number): AstNode => {
+    const allowHidden = p.kind !== "srcdoc-button";
     let node: AstNode = p;
     const wraps = r.int(maxDepth + 1); // 0..maxDepth 层包装
-    for (let d = 0; d < wraps; d++) node = makeNoise(d + 1, [node]);
+    for (let d = 0; d < wraps; d++) node = makeNoise(d + 1, [node], allowHidden);
     return node;
   };
 

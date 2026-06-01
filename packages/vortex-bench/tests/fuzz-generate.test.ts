@@ -37,6 +37,17 @@ describe("fuzz-generate", () => {
     expect(ALL_PRIMITIVE_KINDS).toHaveLength(9);
   });
 
+  it("srcdoc-button is never placed under a hidden ancestor (display:none would un-render the iframe)", () => {
+    function srcdocUnderHidden(node: import("../src/fuzz-types.js").AstNode, hiddenAbove = false): boolean {
+      if (node.type === "primitive") return node.kind === "srcdoc-button" && hiddenAbove;
+      const next = hiddenAbove || node.hidden != null;
+      return node.children.some((c) => srcdocUnderHidden(c, next));
+    }
+    for (let seed = 0; seed < 300; seed++) {
+      expect(srcdocUnderHidden(generate(seed).root)).toBe(false);
+    }
+  });
+
   it("srcdoc-button names are globally unique on a page (no collision with any other primitive)", () => {
     for (let seed = 0; seed < 300; seed++) {
       const prims = collectPrimitives(generate(seed).root);
