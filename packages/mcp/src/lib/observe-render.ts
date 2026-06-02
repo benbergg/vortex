@@ -5,7 +5,7 @@ export interface CompactElement {
   tag: string;
   role: string;
   name: string;
-  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; required?: boolean; expanded?: boolean; current?: boolean; invalid?: boolean; sort?: "ascending" | "descending" | "none" };
+  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; required?: boolean; expanded?: boolean; current?: boolean; invalid?: boolean; sort?: "ascending" | "descending" | "none"; haspopup?: string };
   // 值域控件(slider/spinbutton/progressbar/meter 等)的当前值,如 "30" / "30/100"。
   valueNow?: string;
   frameId: number;
@@ -56,6 +56,9 @@ function stateFlags(state?: CompactElement["state"]): string {
   if (state.sort === "ascending") flags.push("sort:asc");
   else if (state.sort === "descending") flags.push("sort:desc");
   else if (state.sort === "none") flags.push("sortable");
+  // aria-haspopup:点击弹出的弹层类型(menu/listbox/tree/grid/dialog)。冒号语法
+  // [haspopup:menu] 让 agent 预判点击后出现弹层(bench parser 自 AC 起容忍冒号)。
+  if (state.haspopup) flags.push(`haspopup:${state.haspopup}`);
   return flags.length ? " " + flags.map((f) => `[${f}]`).join(" ") : "";
 }
 

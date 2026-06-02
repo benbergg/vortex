@@ -90,7 +90,7 @@ interface ScannedElement {
   occludedBy?: string;
   attrs: Record<string, string>;
   /** Framework UI state derived from class / aria. @since 0.4.0 (O-8) */
-  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean; invalid?: boolean; sort?: "ascending" | "descending" | "none" };
+  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean; invalid?: boolean; sort?: "ascending" | "descending" | "none"; haspopup?: string };
   /** 值域控件(slider/spinbutton/progressbar/meter 及原生 range/number/progress)的当前值,如 "30" 或 "30/100"。@since dogfood 2026-06-02 */
   valueNow?: string;
   _sel: string;
@@ -576,6 +576,7 @@ async function scanOneFrame(
           current?: boolean;
           invalid?: boolean;
           sort?: "ascending" | "descending" | "none";
+          haspopup?: string;
         } | undefined {
           const s: {
             checked?: boolean;
@@ -587,6 +588,7 @@ async function scanOneFrame(
             current?: boolean;
             invalid?: boolean;
             sort?: "ascending" | "descending" | "none";
+            haspopup?: string;
           } = {};
           let cur: Element | null = el;
           for (let i = 0; i < 3 && cur; i++, cur = cur.parentElement) {
@@ -607,6 +609,16 @@ async function scanOneFrame(
                 s.active = true;
               }
             }
+          }
+          // AE: 该元素被某控件的 aria-activedescendant 指向 = 当前虚拟焦点(键盘
+          // 高亮项)。combobox/listbox/tree/grid 方向键导航时焦点不在该项 DOM 上,
+          // 只有触发器的 aria-activedescendant 指过来——标 [active] 让 agent 知道
+          // 「方向键当前落在哪项、Enter 会选中谁」。与 is-active/aria-pressed 同义
+          // (都表示「一组里当前激活的那个」),复用同一 flag(2026-06-02 dogfood AE)。
+          // 按元素身份匹配(集合已在各 root 内 scope-正确解析),避免跨 scope 同名
+          // id 误标。
+          if (s.active === undefined && activeDescendantEls.has(el)) {
+            s.active = true;
           }
           // 原生 checkbox/radio 的勾选态在 IDL .checked(不在 class/aria)。组件库
           // 把状态放 label.is-checked 上由上面的循环覆盖;此处补两类:裸露的原生
@@ -693,6 +705,21 @@ async function scanOneFrame(
             // 排序控件 → 标 sortable 保留可排序提示(评审 advisory)。
             s.sort = "none";
           }
+          // AA: aria-haspopup 弹层可供性。菜单按钮/拆分按钮/combobox/"更多操作"
+          // 溢出按钮点击会弹出 menu/listbox/tree/grid/dialog;agent 据此预判点击后
+          // 出现弹层、规划「点开→在弹层里选」的多步交互(否则只见一个无差别 button)。
+          // "true" 按 ARIA 等价规范化为 "menu";非法值兜底为 "menu"(haspopup 存在
+          // 即必有弹层);"false"/缺省不发。值语义判定(2026-06-02 dogfood AA)。
+          const ariaHaspopup = el.getAttribute("aria-haspopup");
+          if (ariaHaspopup != null && ariaHaspopup !== "false") {
+            s.haspopup =
+              ariaHaspopup === "listbox" ||
+              ariaHaspopup === "tree" ||
+              ariaHaspopup === "grid" ||
+              ariaHaspopup === "dialog"
+                ? ariaHaspopup
+                : "menu";
+          }
           return Object.keys(s).length > 0 ? s : undefined;
         }
 
@@ -778,6 +805,28 @@ async function scanOneFrame(
         }
 
         const nodeList = querySelectorAllDeep(ROOT_SELECTORS, document);
+
+        // AE: aria-activedescendant 指向的「虚拟焦点」目标元素集合。combobox /
+        // listbox / tree / grid 用方向键导航时,DOM 焦点停在触发器(input/容器),
+        // 当前高亮项由触发器的 aria-activedescendant 指向——该项 DOM 上既无 :focus
+        // 也常无 aria-selected,observe 静态扫描完全看不出「键盘光标落在哪项」。
+        // 预先把每个触发器的 IDREF **在其自身 root 内**解析成真元素收进 Set,
+        // getUiState 据元素身份匹配把目标标 [active](虚拟焦点)。
+        // 必须在 host.getRootNode() 内解析(而非全局按 id 字符串匹配):
+        // aria-activedescendant 是 scope 内 IDREF,跨 shadow/文档同名 id 全局匹配
+        // 会误标无关元素;按 root 解析既 scope 正确、又天然滤掉悬空引用(评审 LOW)。
+        // 用 querySelectorAllDeep 穿 open shadow 收集触发器,与主扫描一致(dogfood AE)。
+        const activeDescendantEls = new Set<Element>();
+        for (const host of querySelectorAllDeep("[aria-activedescendant]", document)) {
+          const id = host.getAttribute("aria-activedescendant");
+          if (!id) continue;
+          const root = host.getRootNode() as Document | ShadowRoot;
+          const target =
+            typeof (root as Document).getElementById === "function"
+              ? (root as Document).getElementById(id)
+              : null;
+          if (target) activeDescendantEls.add(target);
+        }
 
         // BUG-1: cursor:pointer fallback for custom interactive elements.
         // bytenew / Element Plus / Ant Design 等中文 SaaS 框架普遍用
@@ -895,7 +944,7 @@ async function scanOneFrame(
           inViewport: boolean;
           occludedBy?: string;
           attrs: Record<string, string>;
-          state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean; invalid?: boolean; sort?: "ascending" | "descending" | "none" };
+          state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean; invalid?: boolean; sort?: "ascending" | "descending" | "none"; haspopup?: string };
           /** 值域控件当前值,如 "30" 或 "30/100"(getValueInfo 严格限定值域控件)。 */
           valueNow?: string;
           _sel: string;
@@ -1270,7 +1319,7 @@ export function registerObserveHandlers(router: ActionRouter): void {
         tag: string;
         role: string;
         name: string;
-        state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean; invalid?: boolean; sort?: "ascending" | "descending" | "none" };
+        state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean; invalid?: boolean; sort?: "ascending" | "descending" | "none"; haspopup?: string };
         /** 值域控件当前值,如 "30" 或 "30/100"(getValueInfo 严格限定值域控件)。 */
         valueNow?: string;
         frameId: number;

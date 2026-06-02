@@ -152,6 +152,42 @@ describe("renderObserveCompact", () => {
     expect(out).not.toMatch(/折叠菜单" \[expanded\]/);
   });
 
+  it("aria-haspopup 渲染 [haspopup:menu]/[haspopup:listbox]/[haspopup:dialog] 标记(AA,2026-06-02 dogfood)", () => {
+    // 菜单按钮/拆分按钮/combobox 点击会弹层,agent 据此预判多步交互。冒号语法
+    // [haspopup:menu](bench parser 自 AC 起容忍冒号),保留弹层类型信息。
+    const withPopup = {
+      ...sample,
+      elements: [
+        { index: 0, tag: "div", role: "menuitem", name: "文件", state: { haspopup: "menu" }, frameId: 0 },
+        { index: 1, tag: "button", role: "button", name: "字体", state: { haspopup: "listbox", expanded: true }, frameId: 0 },
+        { index: 2, tag: "button", role: "button", name: "插入…", state: { haspopup: "dialog" }, frameId: 0 },
+        { index: 3, tag: "button", role: "button", name: "普通按钮", frameId: 0 },
+      ] as CompactElement[],
+    };
+    const out = renderObserveCompact(withPopup, null);
+    expect(out).toContain(`@e0 [menuitem] "文件" [haspopup:menu]`);
+    // 与 expanded 组合:既报弹层类型也报当前已展开。
+    expect(out).toContain(`@e1 [button] "字体" [expanded] [haspopup:listbox]`);
+    expect(out).toContain(`@e2 [button] "插入…" [haspopup:dialog]`);
+    // 无 haspopup 的普通按钮不带标记。
+    expect(out).toMatch(/@e3 \[button\] "普通按钮"\s*$/m);
+  });
+
+  it("aria-activedescendant 高亮项渲染 [active] 标记(AE,2026-06-02 dogfood)", () => {
+    // 虚拟焦点项复用既有 [active] flag(无新增语法),agent 看出方向键当前落在哪项。
+    const withActiveDesc = {
+      ...sample,
+      elements: [
+        { index: 0, tag: "li", role: "option", name: "Apple", frameId: 0 },
+        { index: 1, tag: "li", role: "option", name: "Banana", state: { active: true }, frameId: 0 },
+        { index: 2, tag: "li", role: "option", name: "Cherry", frameId: 0 },
+      ] as CompactElement[],
+    };
+    const out = renderObserveCompact(withActiveDesc, null);
+    expect(out).toContain(`@e1 [option] "Banana" [active]`);
+    expect(out).not.toMatch(/Apple" \[active\]/);
+  });
+
   it("子 frame 用 @fNeM 前缀", () => {
     const out = renderObserveCompact(sample, null);
     expect(out).toContain(`@f1e3 [textbox] "卡号"`);

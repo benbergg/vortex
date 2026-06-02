@@ -82,22 +82,28 @@ URL: u
     expect(p.rows[3].name).toBe("普通");
   });
 
-  it("容忍含冒号的排序 flag [sort:asc] 不丢行(2026-06-02 dogfood AC)", () => {
-    // observe-render 给可排序列注入 [sort:asc]/[sort:desc]/[sortable]。
-    // 旧 flag 正则 [a-z]+ 不含冒号 → [sort:asc] 让整行失配被静默丢。
+  it("容忍含冒号的 flag [sort:asc]/[haspopup:menu] 不丢行(2026-06-02 dogfood AC/AA)", () => {
+    // observe-render 给可排序列注入 [sort:asc]/[sort:desc]/[sortable](AC),给弹层
+    // 触发器注入 [haspopup:menu] 等(AA)。旧 flag 正则 [a-z]+ 不含冒号 → 整行失配
+    // 被静默丢。FLAG_RE/ROW_RE 容忍冒号后两类含冒号 flag 均正常解析。
     const text = `SnapshotId: s
 URL: u
 
 @e0 [columnheader] "姓名" [sort:asc]
 @e1 [columnheader] "年龄" [sort:desc] bbox=[1,2,3,4]
 @e2 [columnheader] "城市" [sortable]
-@e3 [columnheader] "普通"`;
+@e3 [menuitem] "文件" [haspopup:menu]
+@e4 [button] "字体" [expanded] [haspopup:listbox]
+@e5 [columnheader] "普通"`;
     const p = parseObserveSnapshot(text);
-    expect(p.rows).toHaveLength(4);
+    expect(p.rows).toHaveLength(6);
     expect(p.rows[0].flags).toEqual(["sort:asc"]);
     expect(p.rows[1].flags).toEqual(["sort:desc"]);
     expect(p.rows[1].bbox).toEqual([1, 2, 3, 4]);
     expect(p.rows[2].flags).toEqual(["sortable"]);
-    expect(p.rows[3].name).toBe("普通");
+    expect(p.rows[3].flags).toEqual(["haspopup:menu"]);
+    // 多个含冒号/普通 flag 共存仍正常分段。
+    expect(p.rows[4].flags).toEqual(["expanded", "haspopup:listbox"]);
+    expect(p.rows[5].name).toBe("普通");
   });
 });

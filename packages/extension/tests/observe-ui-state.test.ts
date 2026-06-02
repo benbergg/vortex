@@ -130,4 +130,33 @@ describe("observe UI state extraction (@since 0.4.0 O-8)", () => {
     expect(OBSERVE_SRC).toMatch(/ariaSort === "none" \|\| ariaSort === "other"/);
     expect(OBSERVE_SRC).toMatch(/s\.sort = "none"/);
   });
+
+  it("把 aria-activedescendant 指向的虚拟焦点项标 active(AE,2026-06-02 dogfood)", () => {
+    // combobox/listbox/tree/grid 方向键导航时,高亮项焦点不在该项 DOM 上,只由
+    // 触发器的 aria-activedescendant 指过来。把每个触发器的 IDREF 在其自身 root 内
+    // 解析成真元素收进 Set,目标复用既有 [active] flag(虚拟焦点 ≡「一组里当前激活
+    // 那个」),不新增 flag 语法。集合用 querySelectorAllDeep 穿 open shadow 收触发器。
+    expect(OBSERVE_SRC).toMatch(/const activeDescendantEls = new Set<Element>\(\)/);
+    expect(OBSERVE_SRC).toMatch(
+      /querySelectorAllDeep\("\[aria-activedescendant\]", document\)/,
+    );
+    // 必须在 host.getRootNode() 内解析 IDREF(scope 正确 + 滤悬空),不能全局按 id
+    // 字符串匹配(跨 shadow/文档同名 id 会误标无关元素,评审 LOW)。
+    expect(OBSERVE_SRC).toMatch(/host\.getRootNode\(\)/);
+    expect(OBSERVE_SRC).toMatch(/getElementById\(id\)/);
+    // getUiState 据元素身份命中集合 → s.active(复用,不新增 flag)。
+    expect(OBSERVE_SRC).toMatch(/activeDescendantEls\.has\(el\)/);
+  });
+
+  it("把 aria-haspopup 弹层可供性暴露为 haspopup(AA,2026-06-02 dogfood)", () => {
+    // 菜单按钮/拆分按钮/combobox 点击会弹出 menu/listbox/tree/grid/dialog,
+    // agent 据此预判弹层、规划多步交互。"true"→"menu" 规范化;非法值兜底 menu;
+    // "false"/缺省不发(值语义判定)。
+    expect(OBSERVE_SRC).toMatch(/getAttribute\("aria-haspopup"\)/);
+    expect(OBSERVE_SRC).toMatch(/ariaHaspopup != null && ariaHaspopup !== "false"/);
+    expect(OBSERVE_SRC).toMatch(/s\.haspopup =/);
+    // 白名单透传 listbox/tree/grid/dialog,其余(含 "true")规范化为 "menu"。
+    expect(OBSERVE_SRC).toMatch(/ariaHaspopup === "listbox"/);
+    expect(OBSERVE_SRC).toMatch(/:\s*"menu"/);
+  });
 });
