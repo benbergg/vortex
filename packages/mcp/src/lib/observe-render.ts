@@ -5,7 +5,7 @@ export interface CompactElement {
   tag: string;
   role: string;
   name: string;
-  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; required?: boolean };
+  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; required?: boolean; expanded?: boolean };
   frameId: number;
   // Issue #21 — visual-grounding. Optional tuple [x, y, w, h] in integer px,
   // frame-local viewport coordinates. Present only when caller passes
@@ -47,6 +47,7 @@ function stateFlags(state?: CompactElement["state"]): string {
   if (state.active) flags.push("active");
   if (state.disabled) flags.push("disabled");
   if (state.required) flags.push("required");
+  if (state.expanded) flags.push("expanded");
   return flags.length ? " " + flags.map((f) => `[${f}]`).join(" ") : "";
 }
 

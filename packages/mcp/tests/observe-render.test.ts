@@ -38,6 +38,22 @@ describe("renderObserveCompact", () => {
     expect(out).toContain(`@e2 [button] "提交" [disabled]`);
   });
 
+  it("aria-expanded=true 渲染 [expanded] 标记(T2,2026-06-02 dogfood)", () => {
+    // 折叠 / 展开态菜单按钮原本输出完全相同,agent 无法判断下拉是否已打开。
+    const withExpanded = {
+      ...sample,
+      elements: [
+        { index: 0, tag: "button", role: "button", name: "展开菜单", state: { expanded: true }, frameId: 0 },
+        { index: 1, tag: "button", role: "button", name: "折叠菜单", frameId: 0 },
+      ] as CompactElement[],
+    };
+    const out = renderObserveCompact(withExpanded, null);
+    expect(out).toContain(`@e0 [button] "展开菜单" [expanded]`);
+    // collapsed(无 expanded 状态)不打标记,避免每个闭合下拉都加噪声。
+    expect(out).toContain(`@e1 [button] "折叠菜单"`);
+    expect(out).not.toMatch(/折叠菜单" \[expanded\]/);
+  });
+
   it("子 frame 用 @fNeM 前缀", () => {
     const out = renderObserveCompact(sample, null);
     expect(out).toContain(`@f1e3 [textbox] "卡号"`);

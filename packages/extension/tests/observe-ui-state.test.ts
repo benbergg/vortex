@@ -53,7 +53,16 @@ describe("observe UI state extraction (@since 0.4.0 O-8)", () => {
   it("ScannedElement and elementsOut types include optional state field", () => {
     // 类型层把 state 暴露出来，不要让它只出现在页面内然后被 outer 丢掉
     expect(OBSERVE_SRC).toMatch(
-      /state\?:\s*\{\s*checked\?:\s*boolean[\s\S]{0,120}?disabled\?:\s*boolean\s*\}/,
+      /state\?:\s*\{\s*checked\?:\s*boolean[\s\S]{0,160}?expanded\?:\s*boolean\s*\}/,
     );
+  });
+
+  it("derives expanded from aria-expanded=true (T2,2026-06-02 dogfood)", () => {
+    // 折叠/展开态菜单按钮原本 observe 输出完全相同。只在 ="true" 时打标记,
+    // 且只查元素自身(不上溯祖先,避免无关父级展开态错配到子按钮)。
+    expect(OBSERVE_SRC).toMatch(
+      /getAttribute\("aria-expanded"\)\s*===\s*"true"/,
+    );
+    expect(OBSERVE_SRC).toMatch(/s\.expanded = true/);
   });
 });

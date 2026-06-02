@@ -90,7 +90,7 @@ interface ScannedElement {
   occludedBy?: string;
   attrs: Record<string, string>;
   /** Framework UI state derived from class / aria. @since 0.4.0 (O-8) */
-  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean };
+  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean };
   _sel: string;
 }
 
@@ -558,12 +558,14 @@ async function scanOneFrame(
           selected?: boolean;
           active?: boolean;
           disabled?: boolean;
+          expanded?: boolean;
         } | undefined {
           const s: {
             checked?: boolean;
             selected?: boolean;
             active?: boolean;
             disabled?: boolean;
+            expanded?: boolean;
           } = {};
           let cur: Element | null = el;
           for (let i = 0; i < 3 && cur; i++, cur = cur.parentElement) {
@@ -598,6 +600,15 @@ async function scanOneFrame(
             el.getAttribute("aria-disabled") === "true"
           ) {
             s.disabled = true;
+          }
+          // aria-expanded:下拉菜单 / combobox / 折叠面板 / 树节点的开合状态。
+          // 折叠与展开态的菜单按钮 observe 输出本来完全相同,agent 无法判断下拉
+          // 是否已打开(会重复点开、或开着却去别处找选项)。只在 ="true" 时发
+          // [expanded] 标记(与 checked/selected 同模式,collapsed 不发避免噪声)。
+          // 仅查元素自身——aria-expanded 按 ARIA 惯例落在触发器本身,上溯祖先会
+          // 把无关父级的展开态错配到子按钮(2026-06-02 dogfood)。
+          if (el.getAttribute("aria-expanded") === "true") {
+            s.expanded = true;
           }
           return Object.keys(s).length > 0 ? s : undefined;
         }
@@ -759,7 +770,7 @@ async function scanOneFrame(
           inViewport: boolean;
           occludedBy?: string;
           attrs: Record<string, string>;
-          state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean };
+          state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean };
           _sel: string;
         }> = [];
 
