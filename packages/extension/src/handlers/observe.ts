@@ -90,7 +90,9 @@ interface ScannedElement {
   occludedBy?: string;
   attrs: Record<string, string>;
   /** Framework UI state derived from class / aria. @since 0.4.0 (O-8) */
-  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean };
+  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean };
+  /** 值域控件(slider/spinbutton/progressbar/meter 及原生 range/number/progress)的当前值,如 "30" 或 "30/100"。@since dogfood 2026-06-02 */
+  valueNow?: string;
   _sel: string;
 }
 
@@ -293,6 +295,10 @@ async function scanOneFrame(
             if (t === "checkbox") return "checkbox";
             if (t === "radio") return "radio";
             if (t === "submit" || t === "button") return "button";
+            // range/number 是值域控件,role 精确化为 slider/spinbutton 让 agent
+            // 知道这是可调数值(配合下方 valueNow 暴露当前值,2026-06-02 dogfood)。
+            if (t === "range") return "slider";
+            if (t === "number") return "spinbutton";
             return "textbox";
           }
           if (tag === "select") return "combobox";
@@ -562,6 +568,7 @@ async function scanOneFrame(
           disabled?: boolean;
           expanded?: boolean;
           required?: boolean;
+          current?: boolean;
         } | undefined {
           const s: {
             checked?: boolean;
@@ -570,6 +577,7 @@ async function scanOneFrame(
             disabled?: boolean;
             expanded?: boolean;
             required?: boolean;
+            current?: boolean;
           } = {};
           let cur: Element | null = el;
           for (let i = 0; i < 3 && cur; i++, cur = cur.parentElement) {
@@ -624,7 +632,50 @@ async function scanOneFrame(
           ) {
             s.required = true;
           }
+          // aria-current:导航/分页/面包屑/步骤条「你在这」。任何非 "false" 的
+          // 取值(page/step/location/date/time/true)都表示当前项;agent 据此
+          // 定位「已在哪一项」避免重复导航。值语义("false"=否)而非属性存在判定
+          // (2026-06-02 dogfood)。
+          const ariaCurrent = el.getAttribute("aria-current");
+          if (ariaCurrent != null && ariaCurrent !== "false") {
+            s.current = true;
+          }
           return Object.keys(s).length > 0 ? s : undefined;
+        }
+
+        // 值域控件的当前值:slider / spinbutton / progressbar / scrollbar / meter
+        // 及原生 <input type=range|number> / <progress> / <meter>。observe 原本
+        // 只给出控件名(如 "[slider] 音量"),agent 看得到滑块却不知设到几——调它
+        // 需要先知道当前值。**严格限定值域 role/控件**,绝不对普通文本输入暴露
+        // value(那是 extract 的职责,且 password/email 等值不应进 observe)。
+        // 优先 aria-valuetext(人类可读,如 "中" / "$50"),否则 valuenow,并在
+        // 有 valuemax 时拼成 "now/max"(进度/百分比靠 max 才有意义)。返回字符串
+        // 或 undefined(2026-06-02 dogfood)。
+        const VALUE_ROLES = new Set([
+          "slider", "spinbutton", "progressbar", "scrollbar", "meter",
+        ]);
+        function getValueInfo(el: HTMLElement, role: string): string | undefined {
+          const tag = el.tagName.toLowerCase();
+          const inputType =
+            tag === "input" ? (el as HTMLInputElement).type : "";
+          const isNativeValue =
+            (tag === "input" && (inputType === "range" || inputType === "number")) ||
+            tag === "progress" ||
+            tag === "meter";
+          if (!VALUE_ROLES.has(role) && !isNativeValue) return undefined;
+          const valueText = el.getAttribute("aria-valuetext");
+          if (valueText) return valueText.slice(0, 40);
+          let now = el.getAttribute("aria-valuenow");
+          let max = el.getAttribute("aria-valuemax");
+          if ((now == null || now === "") && isNativeValue) {
+            // 原生控件:range/number 用 .value;progress/meter 用 .value/.max。
+            const v = (el as HTMLInputElement | HTMLProgressElement | HTMLMeterElement).value;
+            now = v != null ? String(v) : null;
+            const m = (el as HTMLProgressElement | HTMLMeterElement | HTMLInputElement).getAttribute("max");
+            if (m != null && m !== "") max = m;
+          }
+          if (now == null || now === "") return undefined;
+          return max != null && max !== "" ? `${now}/${max}` : `${now}`;
         }
 
         // BUG-2: filter='all' previously was a dead parameter — server.ts
@@ -784,7 +835,9 @@ async function scanOneFrame(
           inViewport: boolean;
           occludedBy?: string;
           attrs: Record<string, string>;
-          state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean };
+          state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean };
+  /** 值域控件(slider/spinbutton/progressbar/meter 及原生 range/number/progress)的当前值,如 "30" 或 "30/100"。@since dogfood 2026-06-02 */
+  valueNow?: string;
           _sel: string;
         }> = [];
 
@@ -916,6 +969,7 @@ async function scanOneFrame(
 
           // 这里的 index 是 frame 内局部 id，observer handler 侧重编全局 index
           const state = getUiState(htmlEl);
+          const valueNow = getValueInfo(htmlEl, role);
           elements.push({
             index: elements.length,
             tag: htmlEl.tagName.toLowerCase(),
@@ -932,6 +986,7 @@ async function scanOneFrame(
             occludedBy,
             attrs,
             ...(state ? { state } : {}),
+            ...(valueNow !== undefined ? { valueNow } : {}),
             _sel: buildSelector(htmlEl),
           });
         }
@@ -1124,7 +1179,9 @@ export function registerObserveHandlers(router: ActionRouter): void {
         tag: string;
         role: string;
         name: string;
-        state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean };
+        state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean };
+  /** 值域控件(slider/spinbutton/progressbar/meter 及原生 range/number/progress)的当前值,如 "30" 或 "30/100"。@since dogfood 2026-06-02 */
+  valueNow?: string;
         frameId: number;
         // Issue #21 — populated only when input.includeBoxes && e.inViewport (T4).
         bbox?: [number, number, number, number];
@@ -1195,6 +1252,7 @@ export function registerObserveHandlers(router: ActionRouter): void {
               role: e.role,
               name: e.name,
               ...(e.state ? { state: e.state } : {}),
+              ...(e.valueNow !== undefined ? { valueNow: e.valueNow } : {}),
               frameId: s.frameId,
               ...(bboxTuple ? { bbox: bboxTuple } : {}),
             });
@@ -1215,6 +1273,7 @@ export function registerObserveHandlers(router: ActionRouter): void {
               occludedBy: e.occludedBy,
               attrs: e.attrs,
               ...(e.state ? { state: e.state } : {}),
+              ...(e.valueNow !== undefined ? { valueNow: e.valueNow } : {}),
               frameId: s.frameId,
               ref,
               suggestedUsage: {

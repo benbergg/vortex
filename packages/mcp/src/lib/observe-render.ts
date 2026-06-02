@@ -5,7 +5,9 @@ export interface CompactElement {
   tag: string;
   role: string;
   name: string;
-  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; required?: boolean; expanded?: boolean };
+  state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; required?: boolean; expanded?: boolean; current?: boolean };
+  // 值域控件(slider/spinbutton/progressbar/meter 等)的当前值,如 "30" / "30/100"。
+  valueNow?: string;
   frameId: number;
   // Issue #21 — visual-grounding. Optional tuple [x, y, w, h] in integer px,
   // frame-local viewport coordinates. Present only when caller passes
@@ -48,6 +50,7 @@ function stateFlags(state?: CompactElement["state"]): string {
   if (state.disabled) flags.push("disabled");
   if (state.required) flags.push("required");
   if (state.expanded) flags.push("expanded");
+  if (state.current) flags.push("current");
   return flags.length ? " " + flags.map((f) => `[${f}]`).join(" ") : "";
 }
 
@@ -77,8 +80,11 @@ export function renderObserveCompact(
     // when either condition is missing — element line stays intact.
     const bboxSeg =
       includeBoxes && el.bbox !== undefined ? ` bbox=[${el.bbox.join(",")}]` : "";
+    // 值域控件当前值:slider/spinbutton/progressbar 等才有(observe 严格限定),
+    // 让 agent 知道控件当前设到几。放在 state flag 后、bbox 前。
+    const valueSeg = el.valueNow !== undefined ? ` value=${el.valueNow}` : "";
     lines.push(
-      `${refOf(el, snapshotHash)} [${el.role}]${name}${stateFlags(el.state)}${bboxSeg}`,
+      `${refOf(el, snapshotHash)} [${el.role}]${name}${stateFlags(el.state)}${valueSeg}${bboxSeg}`,
     );
   }
   // Frame 状态提示：1) 未扫的（cross-origin/destroyed）2) 扫描成功但 0 元素的

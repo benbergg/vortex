@@ -38,6 +38,47 @@ describe("renderObserveCompact", () => {
     expect(out).toContain(`@e2 [button] "提交" [disabled]`);
   });
 
+  it("aria-current 渲染 [current] 标记(W,2026-06-02 dogfood)", () => {
+    const withCurrent = {
+      ...sample,
+      elements: [
+        { index: 0, tag: "a", role: "link", name: "当前页", state: { current: true }, frameId: 0 },
+        { index: 1, tag: "a", role: "link", name: "其他页", frameId: 0 },
+      ] as CompactElement[],
+    };
+    const out = renderObserveCompact(withCurrent, null);
+    expect(out).toContain(`@e0 [link] "当前页" [current]`);
+    expect(out).not.toMatch(/其他页" \[current\]/);
+  });
+
+  it("值域控件渲染 value= 段(X,2026-06-02 dogfood)", () => {
+    const withValue = {
+      ...sample,
+      elements: [
+        { index: 0, tag: "div", role: "slider", name: "音量", valueNow: "30/100", frameId: 0 },
+        { index: 1, tag: "progress", role: "progressbar", name: "进度", valueNow: "70/100", frameId: 0 },
+        { index: 2, tag: "button", role: "button", name: "普通", frameId: 0 },
+      ] as CompactElement[],
+    };
+    const out = renderObserveCompact(withValue, null);
+    expect(out).toContain(`@e0 [slider] "音量" value=30/100`);
+    expect(out).toContain(`@e1 [progressbar] "进度" value=70/100`);
+    // 非值域控件不带 value 段。
+    expect(out).toContain(`@e2 [button] "普通"`);
+    expect(out).not.toMatch(/普通" value=/);
+  });
+
+  it("value= 段在 state flag 之后(X 与 W/Y 组合顺序)", () => {
+    const combo = {
+      ...sample,
+      elements: [
+        { index: 0, tag: "input", role: "spinbutton", name: "数量", state: { required: true }, valueNow: "4", frameId: 0 },
+      ] as CompactElement[],
+    };
+    const out = renderObserveCompact(combo, null);
+    expect(out).toContain(`@e0 [spinbutton] "数量" [required] value=4`);
+  });
+
   it("required 状态渲染 [required] 标记(Y,2026-06-02 dogfood)", () => {
     // observe-render 早支持 [required],本轮补上 producer(getUiState)接线。
     const withRequired = {

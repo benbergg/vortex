@@ -53,7 +53,7 @@ describe("observe UI state extraction (@since 0.4.0 O-8)", () => {
   it("ScannedElement and elementsOut types include optional state field", () => {
     // 类型层把 state 暴露出来，不要让它只出现在页面内然后被 outer 丢掉
     expect(OBSERVE_SRC).toMatch(
-      /state\?:\s*\{\s*checked\?:\s*boolean[\s\S]{0,200}?required\?:\s*boolean\s*\}/,
+      /state\?:\s*\{\s*checked\?:\s*boolean[\s\S]{0,240}?current\?:\s*boolean\s*\}/,
     );
   });
 
@@ -72,5 +72,31 @@ describe("observe UI state extraction (@since 0.4.0 O-8)", () => {
     expect(OBSERVE_SRC).toMatch(/\.required === true/);
     expect(OBSERVE_SRC).toMatch(/getAttribute\("aria-required"\)\s*===\s*"true"/);
     expect(OBSERVE_SRC).toMatch(/s\.required = true/);
+  });
+
+  it("derives current from aria-current 按值判定(W,2026-06-02 dogfood)", () => {
+    // 任何非 "false" 的 aria-current(page/step/true...)都置 current;
+    // 按值判定而非属性存在(aria-current="false" 不应误标)。
+    expect(OBSERVE_SRC).toMatch(/getAttribute\("aria-current"\)/);
+    expect(OBSERVE_SRC).toMatch(/!==\s*"false"/);
+    expect(OBSERVE_SRC).toMatch(/s\.current = true/);
+  });
+
+  it("getValueInfo 严格限定值域 role/控件,不对普通文本输入暴露 value(X)", () => {
+    // VALUE_ROLES 仅含值域角色,绝不含 textbox(否则 password/email 值会泄漏进 observe)。
+    const setMatch = OBSERVE_SRC.match(/const VALUE_ROLES = new Set\(\[([\s\S]*?)\]\)/);
+    expect(setMatch).not.toBeNull();
+    expect(setMatch?.[1]).toMatch(/"slider"/);
+    expect(setMatch?.[1]).toMatch(/"spinbutton"/);
+    expect(setMatch?.[1]).toMatch(/"progressbar"/);
+    expect(setMatch?.[1]).not.toMatch(/"textbox"/);
+    // 优先 aria-valuetext,否则 valuenow(+valuemax 拼 now/max)。
+    expect(OBSERVE_SRC).toMatch(/getAttribute\("aria-valuetext"\)/);
+    expect(OBSERVE_SRC).toMatch(/getAttribute\("aria-valuenow"\)/);
+  });
+
+  it("getRole 把原生 range→slider、number→spinbutton(X 配套)", () => {
+    expect(OBSERVE_SRC).toMatch(/t === "range"\)\s*return "slider";/);
+    expect(OBSERVE_SRC).toMatch(/t === "number"\)\s*return "spinbutton";/);
   });
 });
