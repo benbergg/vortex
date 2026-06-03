@@ -94,6 +94,31 @@ describe("#24 COMMIT handler 接线", () => {
   });
 });
 
+describe("#24 live 修 — antd v6 非合规 + react-select root", () => {
+  it("root 不潜入 target 内部找 combobox(react-select 0×0 input)", () => {
+    expect(ARIA_SRC).toMatch(/const root = \(target\.closest\(closestSelector\) \?\? target\)/);
+    expect(ARIA_SRC).not.toMatch(/target\.querySelector\(closestSelector\)/);
+  });
+  it("trigger 候选含 root 可见祖先(react-select control 无 ARIA role)", () => {
+    expect(ARIA_SRC).toMatch(/anc = root\.parentElement/);
+  });
+  it("option 识别有 antd 类名兜底(role=option 在 0 宽节点时)", () => {
+    expect(ARIA_SRC).toMatch(/ant-select-item-option/);
+    expect(ARIA_SRC).toMatch(/OPTION_FALLBACK_SEL/);
+  });
+  it("disabled/selected 兼容 aria 属性 + antd class", () => {
+    expect(ARIA_SRC).toMatch(/ant-select-item-option-disabled/);
+    expect(ARIA_SRC).toMatch(/ant-select-item-option-selected/);
+  });
+  it("optionPool 经 aria-controls 祖先作用域锁本 select(防多 select 污染)", () => {
+    expect(ARIA_SRC).toMatch(/ariaControlsScope/);
+  });
+  it("开弹层有键盘兜底:focus input + 合成 ArrowDown(react-select gating 鼠标 isTrusted)", () => {
+    expect(ARIA_SRC).toMatch(/kbTarget\?\.focus/);
+    expect(ARIA_SRC).toMatch(/new KeyboardEvent\("keydown"[\s\S]{0,80}ArrowDown/);
+  });
+});
+
 describe("#24 评审修复 — 跨库鲁棒性", () => {
   it("H4 dispatchMouseClick 补发 pointerdown/pointerup(Radix/Headless)", () => {
     expect(ARIA_SRC).toMatch(/new PointerEvent\("pointerdown"/);
