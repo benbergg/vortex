@@ -35,7 +35,8 @@ export function computeCalibration(
     // 替代旧 bbox 匹配的原因:Doubao/MiniMax 等多模态模型 bbox 在归一化坐标系
     // 不兼容 viewport 像素。代价:同 label 多元素时 recovered 计数会偏宽松
     // (任一同名 kept 行匹配也算),live 解读时知情;排他校验留 backlog。
-    if (tpMisses.some((m) => labelsMatch(m.label, r.name))) recovered++;
+    // r.name 为 null(无 accessible name)时不可能与任何 miss label 相等,直接跳过。
+    if (r.name != null && tpMisses.some((m) => labelsMatch(m.label, r.name as string))) recovered++;
   }
   return {
     fpConfirmed: fpMisses.length,
