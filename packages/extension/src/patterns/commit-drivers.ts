@@ -66,6 +66,13 @@ export const COMMIT_DRIVERS: CommitDriverSpec[] = [
     summary:
       "Element Plus <el-time-picker> (spinner panel): CDP click input to open .el-time-panel, scroll + click matching HH/MM/SS in 3 spinner columns, click OK. value: 'HH:MM:SS' string.",
   },
+  {
+    id: "generic-aria-select",
+    kind: "aria-select",
+    closestSelector: '[role="combobox"], [aria-haspopup="listbox"], [role="listbox"]',
+    summary:
+      "Generic W3C ARIA combobox/listbox commit (react-select / antd Select / MUI / Radix / Headless UI). Opens the popup, matches option(s) by visible label among [role=option] (waits for async/remote, types to filter when a search input exists, skips aria-disabled), then verifies via the combobox value display or aria-selected. value: string (single) | string[] (multiple).",
+  },
 ];
 
 export function findDriver(

@@ -1332,6 +1332,8 @@ export function registerDomHandlers(
         await loadPageSideModule(tid, frameId, "commit-checkbox-group");
       } else if (driver.kind === "select") {
         await loadPageSideModule(tid, frameId, "commit-select");
+      } else if (driver.kind === "aria-select") {
+        await loadPageSideModule(tid, frameId, "commit-aria-select");
       }
 
       const res = await nativePageQuery<{
@@ -1349,6 +1351,9 @@ export function registerDomHandlers(
           }
           if (driverId === "element-plus-select") {
             return (window as any).__vortexCommitSelect.run(sel, closestSelector, val, timeoutMs);
+          }
+          if (driverId === "generic-aria-select") {
+            return (window as any).__vortexCommitAriaSelect.run(sel, closestSelector, val, timeoutMs);
           }
           return { error: `Unknown driver id: ${driverId}`, errorCode: "INVALID_PARAMS" };
         },

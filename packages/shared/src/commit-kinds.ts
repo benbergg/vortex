@@ -16,6 +16,7 @@ export const COMMIT_KINDS = [
   "select",
   "time",
   "checkbox-group",
+  "aria-select",
 ] as const;
 
 export type CommitKind = (typeof COMMIT_KINDS)[number];

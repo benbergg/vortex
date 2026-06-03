@@ -22,6 +22,7 @@ const entries = [
   { name: "fill-reject", entry: "src/page-side/fill-reject.ts" },
   { name: "commit-checkbox-group", entry: "src/page-side/commit-drivers/checkbox-group.ts" },
   { name: "commit-select", entry: "src/page-side/commit-drivers/select.ts" },
+  { name: "commit-aria-select", entry: "src/page-side/commit-drivers/aria-select.ts" },
   { name: "dom-resolve", entry: "src/page-side/dom-resolve.ts" },
 ];
 

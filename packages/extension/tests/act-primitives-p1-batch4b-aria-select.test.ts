@@ -1,0 +1,95 @@
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { COMMIT_DRIVERS, findDriver } from "../src/patterns/commit-drivers.js";
+
+/**
+ * 回归锁:act 原语白盒审计批次 4b —— 族 I #24 通用 ARIA combobox/listbox driver。
+ * react-select / antd Select / MUI / Radix / Headless UI 都遵循 W3C ARIA APG:
+ *  trigger 开 [role="listbox"] 弹层、选项 [role="option"]、选中 aria-selected="true"。
+ * 现 commit 仅 6 个 Element Plus el-* 驱动,对现代 React 组件库零覆盖。新增 `aria-select`
+ * kind 的通用驱动:开弹层 → 定位 listbox(aria-controls/portal)→ 找 option(等异步/
+ * typeahead 过滤/跳 aria-disabled)→ verify(valueText 排除菜单子树 或 aria-selected)。
+ * page-side IIFE 不可 import,source-grep 守护;真站 live 验证(antd/react-select,报告 §28)。
+ * 2026-06-03 act 原语白盒审计。
+ */
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ARIA_SRC = readFileSync(
+  join(__dirname, "../src/page-side/commit-drivers/aria-select.ts"),
+  "utf8",
+);
+const DOM_SRC = readFileSync(join(__dirname, "../src/handlers/dom.ts"), "utf8");
+
+describe("#24 registry — aria-select driver 已注册", () => {
+  it("findDriver('aria-select') 返回 generic-aria-select", () => {
+    const d = findDriver("aria-select");
+    expect(d).toBeDefined();
+    expect(d?.id).toBe("generic-aria-select");
+  });
+  it("closestSelector 覆盖 combobox/listbox ARIA role", () => {
+    const d = findDriver("aria-select");
+    expect(d?.closestSelector).toMatch(/role="combobox"/);
+    expect(d?.closestSelector).toMatch(/role="listbox"/);
+  });
+  it("driver 有完整 id/kind/closestSelector/summary", () => {
+    const d = COMMIT_DRIVERS.find((x) => x.id === "generic-aria-select");
+    expect(d?.kind).toBe("aria-select");
+    expect((d?.summary.length ?? 0)).toBeGreaterThan(10);
+  });
+});
+
+describe("#24 page-side driver — 开弹层 + 定位 listbox", () => {
+  it("attaches to window.__vortexCommitAriaSelect", () => {
+    expect(ARIA_SRC).toMatch(/window as any\)\.__vortexCommitAriaSelect/);
+  });
+  it("点 trigger 开弹层(dispatchMouseClick)", () => {
+    expect(ARIA_SRC).toMatch(/dispatchMouseClick\(trigger\)/);
+  });
+  it("经 aria-controls/aria-owns 定位 listbox,兜底文档级扫 role=listbox", () => {
+    expect(ARIA_SRC).toMatch(/aria-controls/);
+    expect(ARIA_SRC).toMatch(/aria-owns/);
+    expect(ARIA_SRC).toMatch(/\[role="listbox"\]/);
+  });
+});
+
+describe("#24 page-side driver — 找选项(等异步 / typeahead / 跳 disabled / norm)", () => {
+  it("用 waitFor 轮询等异步选项 + 共享 deadline remaining", () => {
+    expect(ARIA_SRC).toMatch(/await waitFor\(/);
+    expect(ARIA_SRC).toMatch(/const remaining = \(\) =>/);
+  });
+  it("选项匹配过 norm 折叠空白", () => {
+    expect(ARIA_SRC).toMatch(/norm\(.*textContent/);
+  });
+  it("跳过 aria-disabled 选项", () => {
+    expect(ARIA_SRC).toMatch(/aria-disabled.*!==\s*"true"|getAttribute\("aria-disabled"\)/);
+  });
+  it("typeahead 兜底:找不到且有 input 时写值过滤", () => {
+    expect(ARIA_SRC).toMatch(/querySelector\('input/);
+    expect(ARIA_SRC).toMatch(/nativeInputValueSetter|HTMLInputElement\.prototype/);
+  });
+  it("命中文本但禁用报明确 disabled 错误", () => {
+    expect(ARIA_SRC).toMatch(/is disabled and cannot be selected/);
+  });
+});
+
+describe("#24 page-side driver — verify 回读防 silent-false-success", () => {
+  it("valueText 排除 listbox 子树避开 inline 菜单假阳", () => {
+    expect(ARIA_SRC).toMatch(/valueText/);
+    expect(ARIA_SRC).toMatch(/role.*listbox|"listbox"/);
+  });
+  it("verify 接受 aria-selected 信号", () => {
+    expect(ARIA_SRC).toMatch(/aria-selected="true"|aria-selected.*true/);
+  });
+  it("未反映报 COMMIT_FAILED stage verify", () => {
+    expect(ARIA_SRC).toMatch(/COMMIT_FAILED/);
+    expect(ARIA_SRC).toMatch(/stage:\s*"verify"/);
+  });
+});
+
+describe("#24 COMMIT handler 接线", () => {
+  it("dom.ts 为 aria-select 加载 commit-aria-select 模块 + dispatch driverId", () => {
+    expect(DOM_SRC).toMatch(/commit-aria-select/);
+    expect(DOM_SRC).toMatch(/__vortexCommitAriaSelect/);
+  });
+});

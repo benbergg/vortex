@@ -14,6 +14,7 @@ export type PageSideModule =
   | "fill-reject"
   | "commit-checkbox-group"
   | "commit-select"
+  | "commit-aria-select"
   | "dom-resolve";
 
 const loadedModules = new Map<string, true | Promise<void>>();
