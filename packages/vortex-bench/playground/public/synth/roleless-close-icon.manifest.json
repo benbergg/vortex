@@ -1,6 +1,7 @@
 {
   "fixture": "roleless-close-icon",
   "path": "/synth/roleless-close-icon.html",
+  "tier": "medium",
   "frames": "main",
   "entries": [
     { "id": "close-x", "interactive": true, "expectedName": null, "expectedRole": null, "pattern": "roleless-close-icon", "note": "无 role/aria-label 的 cursor:pointer 关闭图标,期望被收(name 不强校验,✕ 可能转 closeIcon)" }

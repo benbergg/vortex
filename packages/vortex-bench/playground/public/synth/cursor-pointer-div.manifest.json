@@ -1,6 +1,7 @@
 {
   "fixture": "cursor-pointer-div",
   "path": "/synth/cursor-pointer-div.html",
+  "tier": "medium",
   "frames": "main",
   "entries": [
     { "id": "save", "interactive": true, "expectedName": "保存", "expectedRole": null, "pattern": "cursor-pointer-div", "note": "无 role 的 cursor:pointer div" },

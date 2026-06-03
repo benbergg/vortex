@@ -1,6 +1,7 @@
 {
   "fixture": "nameless-div-noise",
   "path": "/synth/nameless-div-noise.html",
+  "tier": "medium",
   "frames": "main",
   "entries": [
     { "id": "noise-1", "interactive": false, "expectedName": null, "expectedRole": null, "pattern": "nameless-div-noise", "note": "空 tabindex div,应被过滤" },

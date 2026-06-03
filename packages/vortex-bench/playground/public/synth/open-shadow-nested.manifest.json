@@ -1,6 +1,7 @@
 {
   "fixture": "open-shadow-nested",
   "path": "/synth/open-shadow-nested.html",
+  "tier": "hard",
   "frames": "main",
   "entries": [
     { "id": "shadow-btn", "interactive": true, "expectedName": "影子按钮", "expectedRole": "button", "pattern": "open-shadow-nested", "note": "querySelectorAllDeep 应穿 open shadow;oracle rect 取宿主元素 bbox 近似" }

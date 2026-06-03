@@ -1,6 +1,7 @@
 {
   "fixture": "icon-name-priority",
   "path": "/synth/icon-name-priority.html",
+  "tier": "medium",
   "frames": "main",
   "entries": [
     { "id": "svg-title", "interactive": true, "expectedName": "关闭", "expectedRole": "button", "pattern": "icon-name-priority", "note": "svg <title> 优先于 className el-icon-close" },

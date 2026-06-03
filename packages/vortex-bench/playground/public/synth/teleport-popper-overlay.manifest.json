@@ -1,6 +1,7 @@
 {
   "fixture": "teleport-popper-overlay",
   "path": "/synth/teleport-popper-overlay.html",
+  "tier": "medium",
   "frames": "main",
   "entries": [
     { "id": "dropdown-trigger", "interactive": true, "expectedName": "下拉", "expectedRole": "button", "pattern": "teleport-popper-overlay" },

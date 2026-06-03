@@ -1,6 +1,7 @@
 {
   "fixture": "iframe-srcdoc-inherit",
   "path": "/synth/iframe-srcdoc-inherit.html",
+  "tier": "hard",
   "frames": "all-same-origin",
   "entries": [
     { "id": "main-btn", "interactive": true, "expectedName": "主框按钮", "expectedRole": "button", "pattern": "iframe-srcdoc-inherit" },
