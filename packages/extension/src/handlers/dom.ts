@@ -505,13 +505,33 @@ export function registerDomHandlers(
                 error: `Element ${sel} is outside the viewport`,
               };
             }
+            // contenteditable 不是 value-bearing 元素,fill 的原生 value setter 对它
+            // 无效;若回退 `el.value = val` 只会写一个幽灵 expando 属性并 dispatch 事件,
+            // 伪装成 success:true 实则页面无变化(silent false-success)。明确报错指引改用
+            // type action(其走 CDP Input.insertText 正确驱动 contenteditable)。
+            if (el.isContentEditable) {
+              return {
+                errorCode: "INVALID_TARGET",
+                error: `Element ${sel} is contentEditable; use action "type" instead of "fill"`,
+              };
+            }
             // === fill operation ===
-            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-              window.HTMLInputElement.prototype,
-              "value",
-            )?.set;
-            if (nativeInputValueSetter) {
-              nativeInputValueSetter.call(el, val);
+            // 走原生 value setter 是为绕过 React 受控组件覆盖的 setter,但必须按元素
+            // 实际类型取:textarea 用 HTMLTextAreaElement、input 用 HTMLInputElement。
+            // 用错类型(如对 <textarea> 调用 HTMLInputElement 的 setter)会触发浏览器
+            // 对原生访问器的品牌检查抛 "Illegal invocation"——Bing/Google 搜索框、评论框
+            // 等都是 textarea,误用 input setter 会让 fill 对整类失效。
+            const valueProto =
+              el instanceof HTMLTextAreaElement
+                ? window.HTMLTextAreaElement.prototype
+                : el instanceof HTMLInputElement
+                  ? window.HTMLInputElement.prototype
+                  : null;
+            const nativeValueSetter = valueProto
+              ? Object.getOwnPropertyDescriptor(valueProto, "value")?.set
+              : undefined;
+            if (nativeValueSetter) {
+              nativeValueSetter.call(el, val);
             } else {
               el.value = val;
             }
