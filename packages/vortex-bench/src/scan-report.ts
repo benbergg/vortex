@@ -34,6 +34,35 @@ export function renderScanMarkdown(report: ScanReport): string {
   }
   lines.push("");
 
+  // 分档召回汇总:按 tier 合并 Σmatched/Σexpected + Σnoise(FP),供分档门读基线。
+  // fixture 未带 tier 视为 medium(组件库是最常见真站形态,与 manifest 缺省一致)。
+  if (report.fixtures.length > 0) {
+    const TIER_ORDER = ["easy", "medium", "hard"] as const;
+    const byTier = new Map<
+      string,
+      { matched: number; expected: number; noise: number; count: number }
+    >();
+    for (const fx of report.fixtures) {
+      const t = fx.tier ?? "medium";
+      const acc = byTier.get(t) ?? { matched: 0, expected: 0, noise: 0, count: 0 };
+      acc.matched += fx.recall.matched;
+      acc.expected += fx.recall.expected;
+      acc.noise += fx.precision.matchedNoise;
+      acc.count += 1;
+      byTier.set(t, acc);
+    }
+    lines.push("## 分档召回汇总");
+    lines.push("");
+    lines.push("| tier | recall(Σmatched/Σexpected) | FP(Σnoise) | fixtures |");
+    lines.push("|---|---|---|---|");
+    for (const t of TIER_ORDER) {
+      const acc = byTier.get(t);
+      if (!acc) continue;
+      lines.push(`| ${t} | ${acc.matched}/${acc.expected} | ${acc.noise} | ${acc.count} |`);
+    }
+    lines.push("");
+  }
+
   // 按严重度分组的 finding
   const ranked = rankFindings(report.findings);
   if (ranked.length === 0) {

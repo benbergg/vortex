@@ -46,6 +46,7 @@ export async function scanFixture(manifest: SynthManifest, opts: ScanOptions): P
     fixture: manifest.fixture,
     pattern: manifest.entries[0]?.pattern ?? manifest.fixture,
     path: manifest.path,
+    tier: manifest.tier ?? "medium",
     recall: { matched: 0, expected: 0 },
     precision: { matchedNoise: 0, emitted: 0 },
     invariants: { inv1: false, inv2: false, inv3: false, inv4: false },

@@ -93,6 +93,8 @@ export interface FixtureScanResult {
   fixture: string;
   pattern: string;
   path: string;
+  /** 难度档(来自 manifest.tier,producer 已兜底为 medium);分档召回汇总按此分组 */
+  tier?: "easy" | "medium" | "hard";
   recall: { matched: number; expected: number };
   precision: { matchedNoise: number; emitted: number };
   invariants: { inv1: boolean; inv2: boolean; inv3: boolean; inv4: boolean };
