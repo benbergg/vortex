@@ -8,6 +8,9 @@ const KEY_CODES: Record<string, number> = {
   ArrowUp: 38, ArrowDown: 40, ArrowLeft: 37, ArrowRight: 39,
   Home: 36, End: 35, PageUp: 33, PageDown: 34,
   Control: 17, Shift: 16, Alt: 18, Meta: 91,
+  // 不可打印命名键——补全 VK 码,堵 charCodeAt(0) 对多字符名取首字符的错码(#36)。
+  Insert: 45, CapsLock: 20, NumLock: 144, ScrollLock: 145,
+  Pause: 19, PrintScreen: 44, ContextMenu: 93,
   // 字母 A-Z
   ...Object.fromEntries(
     Array.from({ length: 26 }, (_, i) => [String.fromCharCode(65 + i), 65 + i]),
@@ -25,6 +28,34 @@ const KEY_CODES: Record<string, number> = {
     Array.from({ length: 12 }, (_, i) => [`F${i + 1}`, 112 + i]),
   ),
 };
+
+// 修饰键名 → 物理码默认左侧变体(CDP code 字段语义)。
+const MODIFIER_CODES: Record<string, string> = {
+  Control: "ControlLeft", Ctrl: "ControlLeft",
+  Shift: "ShiftLeft", Alt: "AltLeft", Meta: "MetaLeft",
+};
+
+/**
+ * DOM key 值 → KeyboardEvent.code 物理码。
+ *
+ * CDP Input.dispatchKeyEvent 的 `code` 字段要的是物理码(布局无关),不是 key 值:
+ * 字母 "a"/"A" → "KeyA"、数字 "1" → "Digit1"、修饰键 "Meta" → "MetaLeft"。
+ * 旧实现 `code: key` 直传 key 值,依赖 `event.code` 的站(快捷键库常见)收不到正确
+ * 物理码 → 误判/平台错(#16/#17)。命名键(Enter/Tab/ArrowUp/F1/Insert/Space)的
+ * key 与 code 同名,原样返回。
+ *
+ * Exported for unit tests; production callers go through dispatchKey below.
+ */
+export function keyToCode(key: string): string {
+  if (/^[a-zA-Z]$/.test(key)) return "Key" + key.toUpperCase();
+  if (/^[0-9]$/.test(key)) return "Digit" + key;
+  return MODIFIER_CODES[key] ?? key;
+}
+
+/** DOM key → windowsVirtualKeyCode。单字符按大写 ASCII 取值,多字符未知名取 0(不再错码)。 */
+function keyToVk(key: string): number {
+  return KEY_CODES[key] ?? (key.length === 1 ? key.toUpperCase().charCodeAt(0) : 0);
+}
 
 // 修饰键名 → CDP modifiers 标志位
 const MODIFIERS: Record<string, number> = {
@@ -119,23 +150,24 @@ async function dispatchKey(
   key: string,
   modifiers: number,
 ): Promise<void> {
-  const code = KEY_CODES[key] ?? key.charCodeAt(0);
+  const vk = keyToVk(key);
+  const physicalCode = keyToCode(key);
 
   await debuggerMgr.sendCommand(tabId, "Input.dispatchKeyEvent", {
     type: "keyDown",
     key,
-    code: key,
-    windowsVirtualKeyCode: code,
-    nativeVirtualKeyCode: code,
+    code: physicalCode,
+    windowsVirtualKeyCode: vk,
+    nativeVirtualKeyCode: vk,
     modifiers,
   });
 
   await debuggerMgr.sendCommand(tabId, "Input.dispatchKeyEvent", {
     type: "keyUp",
     key,
-    code: key,
-    windowsVirtualKeyCode: code,
-    nativeVirtualKeyCode: code,
+    code: physicalCode,
+    windowsVirtualKeyCode: vk,
+    nativeVirtualKeyCode: vk,
     modifiers,
   });
 }
@@ -169,12 +201,11 @@ export function registerKeyboardHandlers(
       let pressed = 0;
       for (const m of modifierKeys) {
         pressed |= MODIFIERS[m];
-        const mcode = KEY_CODES[m] ?? 0;
         await debuggerMgr.sendCommand(tid, "Input.dispatchKeyEvent", {
           type: "keyDown",
           key: m,
-          code: m,
-          windowsVirtualKeyCode: mcode,
+          code: keyToCode(m),
+          windowsVirtualKeyCode: keyToVk(m),
           modifiers: pressed,
         });
       }
@@ -182,12 +213,11 @@ export function registerKeyboardHandlers(
       for (let i = modifierKeys.length - 1; i >= 0; i--) {
         const m = modifierKeys[i];
         pressed &= ~MODIFIERS[m];
-        const mcode = KEY_CODES[m] ?? 0;
         await debuggerMgr.sendCommand(tid, "Input.dispatchKeyEvent", {
           type: "keyUp",
           key: m,
-          code: m,
-          windowsVirtualKeyCode: mcode,
+          code: keyToCode(m),
+          windowsVirtualKeyCode: keyToVk(m),
           modifiers: pressed,
         });
       }
@@ -216,10 +246,9 @@ export function registerKeyboardHandlers(
 
       // 按下修饰键
       for (const k of modifierKeys) {
-        const code = KEY_CODES[k] ?? 0;
         await debuggerMgr.sendCommand(tid, "Input.dispatchKeyEvent", {
-          type: "keyDown", key: k, code: k,
-          windowsVirtualKeyCode: code, modifiers,
+          type: "keyDown", key: k, code: keyToCode(k),
+          windowsVirtualKeyCode: keyToVk(k), modifiers,
         });
       }
 
@@ -230,10 +259,9 @@ export function registerKeyboardHandlers(
 
       // 释放修饰键（逆序）
       for (const k of [...modifierKeys].reverse()) {
-        const code = KEY_CODES[k] ?? 0;
         await debuggerMgr.sendCommand(tid, "Input.dispatchKeyEvent", {
-          type: "keyUp", key: k, code: k,
-          windowsVirtualKeyCode: code, modifiers: 0,
+          type: "keyUp", key: k, code: keyToCode(k),
+          windowsVirtualKeyCode: keyToVk(k), modifiers: 0,
         });
       }
 

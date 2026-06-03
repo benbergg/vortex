@@ -38,6 +38,21 @@ import { queryDeep, queryAllDeep, deepElementFromPoint } from "./shadow-walk.js"
         return null;
       }
     },
+    // 单一 disabled 判定，镜像门 actionability.isEnabled(aria-disabled + 原生 disabled
+    // + fieldset[disabled])。CLICK/TYPE/FILL inline 探测与 cdp.ts useRealMouse 探测旧版
+    // 只判 .disabled,漏 aria-disabled,与门不一致(探测放行→门拦,或 div[role=textbox]
+    // aria-disabled 探测漏判)。收敛到此处保证探测==门(#26/#29)。
+    isEnabled: (el: Element): boolean => {
+      try {
+        if (!(el instanceof HTMLElement)) return true;
+        if (el.getAttribute("aria-disabled") === "true") return false;
+        if ((el as HTMLInputElement).disabled === true) return false;
+        if (el.closest("fieldset[disabled]")) return false;
+        return true;
+      } catch {
+        return true;
+      }
+    },
   };
 })();
 export {};

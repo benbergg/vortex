@@ -110,6 +110,10 @@ export function registerDomHandlers(
       await waitActionable(tid, frameId, selector, { timeout: (args.timeout as number | undefined) ?? 5000 });
 
       if (useRealMouse) {
+        // 预加载 dom-resolve,使 cdpClickElement 的 page-side 探测能经
+        // __vortexDomResolve 穿 open shadow + 走门同款 isEnabled——与同步路径一致,
+        // 堵 shadow-internal ref 假阴 ELEMENT_NOT_FOUND(#14)。
+        await loadPageSideModule(tid, frameId, "dom-resolve");
         return await cdpClickElement(debuggerMgr, tid, frameId, selector);
       }
 
@@ -133,7 +137,9 @@ export function registerDomHandlers(
               };
             }
             const el = els[0] as HTMLElement;
-            if ((el as HTMLInputElement).disabled === true) {
+            // 探测 disabled 走门同款 isEnabled(含 aria-disabled),与 actionability 门一致,
+            // 旧版只判 .disabled 漏 aria-disabled div[role=textbox] 等(#26/#29)。
+            if (!(window as any).__vortexDomResolve.isEnabled(el)) {
               return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
             }
             const rect0 = el.getBoundingClientRect();
@@ -336,7 +342,8 @@ export function registerDomHandlers(
             };
           }
           const el = els[0] as HTMLElement;
-          if ((el as HTMLInputElement).disabled === true) {
+          // 探测 disabled 走门同款 isEnabled(含 aria-disabled),与 CLICK/FILL 一致(#26)。
+          if (!(window as any).__vortexDomResolve.isEnabled(el)) {
             return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
           }
           const rect = el.getBoundingClientRect();
@@ -541,7 +548,8 @@ export function registerDomHandlers(
               };
             }
             const el = els[0] as HTMLInputElement;
-            if (el.disabled === true) {
+            // 探测 disabled 走门同款 isEnabled(含 aria-disabled),与 CLICK/TYPE 一致(#26)。
+            if (!(window as any).__vortexDomResolve.isEnabled(el)) {
               return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
             }
             const rect = el.getBoundingClientRect();

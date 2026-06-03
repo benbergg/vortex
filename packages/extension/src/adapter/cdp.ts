@@ -64,7 +64,14 @@ export async function cdpClickElement(
     (sel: string) => {
       try {
         // === 探测 ===
-        const els = document.querySelectorAll(sel);
+        // 与门(dom.ts CLICK 同步路径)一致:经 __vortexDomResolve.queryAllDeep 穿 open
+        // shadow,而非旧 light-DOM querySelectorAll——否则 shadow-internal ref 在此假阴
+        // ELEMENT_NOT_FOUND,门却能解析,两路不一致(#14)。caller 已预加载 dom-resolve;
+        // 万一未就绪(注入失败)回退 light-DOM,不崩。
+        const resolve = (window as any).__vortexDomResolve;
+        const els: Element[] = resolve
+          ? (resolve.queryAllDeep(sel) as Element[])
+          : Array.from(document.querySelectorAll(sel));
         if (els.length === 0) {
           return { errorCode: "ELEMENT_NOT_FOUND", error: `Element not found: ${sel}` };
         }
@@ -76,7 +83,11 @@ export async function cdpClickElement(
           };
         }
         const el = els[0] as HTMLElement;
-        if ((el as HTMLInputElement).disabled === true) {
+        // disabled 判定走门同款 isEnabled(含 aria-disabled),旧版只判 .disabled(#29)。
+        const enabled = resolve
+          ? resolve.isEnabled(el)
+          : (el as HTMLInputElement).disabled !== true;
+        if (!enabled) {
           return { errorCode: "ELEMENT_DISABLED", error: `Element ${sel} is disabled` };
         }
         const rect0 = el.getBoundingClientRect();
@@ -91,8 +102,11 @@ export async function cdpClickElement(
         const rect = el.getBoundingClientRect();
         const cxInner = rect.left + rect.width / 2;
         const cyInner = rect.top + rect.height / 2;
-        // occlusion 检查
-        const topEl = document.elementFromPoint(cxInner, cyInner);
+        // occlusion 检查:用穿 shadow 的 deepElementFromPoint,与门一致——对 shadow-internal
+        // 元素 document.elementFromPoint 返回 shadow host 会误判 ELEMENT_OCCLUDED(#14)。
+        const topEl = resolve
+          ? (resolve.deepElementFromPoint(cxInner, cyInner) as Element | null)
+          : document.elementFromPoint(cxInner, cyInner);
         // 复合输入控件(Element Plus el-select 等)把可见显示层(placeholder /
         // selected-item)作为兄弟节点叠在透明真控件之上。hit-test 命中显示层兄弟——
         // 既非 target 也非其后代——但它非交互且与 target 同处一个交互 widget 容器
