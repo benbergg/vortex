@@ -291,7 +291,15 @@ async function scanOneFrame(
 
         function getRole(el: Element): string {
           const explicit = el.getAttribute("role");
-          if (explicit) return explicit;
+          if (explicit) {
+            // ARIA role 是空格分隔的「回退角色列表」,浏览器取首个有效 token
+            // (如 Wikipedia 可排序表头 role="columnheader button" → columnheader)。
+            // 取首个 token 近似该规则(作者惯例把主角色置首),避免把整串含空格的
+            // 多 token 当畸形 role 输出 [columnheader button](2026-06-03 Wikipedia
+            // dogfood)。role 仅空格时 first 为空,回落到下方隐式 role 推导。
+            const first = explicit.trim().split(/\s+/)[0];
+            if (first) return first;
+          }
           const tag = el.tagName.toLowerCase();
           if (tag === "a" && el.hasAttribute("href")) return "link";
           if (tag === "button") return "button";
