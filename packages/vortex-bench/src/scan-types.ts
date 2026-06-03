@@ -30,6 +30,9 @@ export interface SynthManifest {
   source?: string;
   /** #2:提议稿未确认标记;scan 跳过 _proposed:true 的 manifest */
   _proposed?: boolean;
+  /** 难度档:easy=标准语义 HTML;medium=组件库(最常见真站形态);
+   *  hard=iframe/shadow/canvas/虚拟列表。缺省视为 medium。分档门按此聚合。 */
+  tier?: "easy" | "medium" | "hard";
   entries: ManifestEntry[];
 }
 
