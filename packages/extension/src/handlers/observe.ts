@@ -513,6 +513,23 @@ async function scanOneFrame(
             const ctrl = el.querySelector("input, select, textarea");
             const ctrlAria = ctrl?.getAttribute("aria-label");
             if (ctrlAria) return normName(ctrlAria);
+            // 包裹式 <label>(由 label:has(input[type=radio/checkbox]) 收的组件库
+            // 控件,如 Element Plus el-radio/el-checkbox)的 textContent 就是该控件
+            // 的可及名(HTML <label> 语义 + ARIA name-from-content)。e506fb9 把
+            // radio/checkbox input(带 tabindex=0)纳入交互池后,下方 isContainer
+            // 会因 label 含 input[tabindex] 后代而判其为「噪声容器」返空 → 名留空被
+            // BUG-3 丢弃,而 input 自身又被 surrogate 门(opacity:0)跳过 → 整个
+            // 选项控件隐形(spa-route-residue 漏选项 A/B/C、el-transfer 漏 checkbox)。
+            // <label> 是有定义语义的标签元素(关联唯一 labelable 控件),其文本有界
+            // 且就是控件名,不属 isContainer 针对的 focus-wrapper 噪声,故先于
+            // isContainer 用 label 自身文本兜住(2026-06-03 bench 回归)。
+            const wrapsCheckRadio = el.querySelector(
+              "input[type=checkbox], input[type=radio]",
+            );
+            if (wrapsCheckRadio) {
+              const labelText = normName(el.textContent);
+              if (labelText) return labelText;
+            }
           }
           // AJ: 有交互后代的元素是**容器**,其 textContent 是子控件文本的拼接
           // (噪声),非自身标签——不作名源。典型:focus 管理用的 `<div tabindex=0>`

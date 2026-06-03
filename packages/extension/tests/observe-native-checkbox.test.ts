@@ -63,4 +63,28 @@ describe("observe native checkbox/radio visibility (AB,2026-06-02 dogfood)", () 
     // AB 修复后裸 input 可见,其名靠 label[for] 解析——确保该路径仍在
     expect(OBSERVE_SRC).toMatch(/label\[for="\$\{id\}"\]/);
   });
+
+  // 2026-06-03 bench 回归:e506fb9 把 radio/checkbox input(tabindex=0)纳入交互池
+  // 后,包裹式 <label class="el-radio"> 因含 input[tabindex] 后代被 AJ isContainer
+  // 判为噪声容器返空名 → 被 BUG-3 丢弃,而 input 自身又被 surrogate 门(opacity:0)
+  // 跳过 → 整个 radio/checkbox 控件隐形(spa-route-residue/el-radio-group 漏选项、
+  // el-transfer 漏 checkbox)。修复:LABEL 分支在 isContainer 前,对包裹 checkbox/
+  // radio 的 label 用其自身 textContent(name-from-content)兜住。
+  it("包裹式 <label> 含 checkbox/radio 时用 textContent 兜名(先于 isContainer 噪声容器返空)", () => {
+    // LABEL 分支内、aria-label 兜底之后,新增 wrapsCheckRadio name-from-content
+    expect(OBSERVE_SRC).toMatch(
+      /wrapsCheckRadio\s*=\s*el\.querySelector\(\s*["']input\[type=checkbox\], input\[type=radio\]["']/,
+    );
+    expect(OBSERVE_SRC).toMatch(
+      /if \(wrapsCheckRadio\)[\s\S]{0,120}normName\(el\.textContent\)[\s\S]{0,60}return labelText/,
+    );
+  });
+
+  it("name-from-content 兜底必须在 isContainer 返空之前(否则被噪声容器逻辑抢先丢弃)", () => {
+    const wrapIdx = OBSERVE_SRC.indexOf("const wrapsCheckRadio");
+    const containerEmptyIdx = OBSERVE_SRC.indexOf('if (isContainer) return "";');
+    expect(wrapIdx).toBeGreaterThan(0);
+    expect(containerEmptyIdx).toBeGreaterThan(0);
+    expect(wrapIdx).toBeLessThan(containerEmptyIdx);
+  });
 });
