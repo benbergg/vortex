@@ -53,6 +53,18 @@ export function classifyFailure(err: unknown): NonNullable<CaseMetrics["failureC
   return "unknown";
 }
 
+/**
+ * B 层 case 三态结局(评测门 P2.2)。优雅降级(evaluate 兜底)是软扣分非硬失败:
+ * agent 完成了任务,只是 observe 看不到只能 JS 兜底 → pass-degraded(eval 门据此
+ * 既不放过、也不误杀)。passed=false 一律 fail(兜底与否无关)。
+ */
+export function classifyCaseOutcome(
+  m: Pick<CaseMetrics, "passed" | "fallbackToEvaluate">,
+): "pass" | "pass-degraded" | "fail" {
+  if (!m.passed) return "fail";
+  return m.fallbackToEvaluate > 0 ? "pass-degraded" : "pass";
+}
+
 export async function runCase(def: CaseDefinition, opts: RunCaseOptions): Promise<CaseMetrics> {
   const mcp = await createMcpConnection({
     command: process.execPath,
@@ -165,6 +177,7 @@ function buildMetrics(
   if (reason !== undefined) m.failureReason = reason;
   if (failureClass !== undefined) m.failureClass = failureClass;
   if (Object.keys(customMetrics).length > 0) m.customMetrics = { ...customMetrics };
+  if (def.tier !== undefined) m.tier = def.tier; // 评测门 P2.2:透传难度档供 eval 分档聚合
   return m;
 }
 
