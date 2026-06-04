@@ -28,6 +28,20 @@ export function extractEvalJson<T = unknown>(res: unknown): T {
   return JSON.parse(text) as T;
 }
 
+/**
+ * 从 observe 快照文本里按 accessible name 找 ref(支持 v0.8 hashed ref:
+ * @eN / @fNeM / @<hash>:eN / @<hash>:fNeM)。observe 的 ref 每次运行变,
+ * case 不能硬编码,须 observe→findRef→act。范式来自 shadow-dom-counter.case.ts。
+ */
+export function findRef(snapshot: string, name: string): string | null {
+  const re = new RegExp(`(@(?:[a-f0-9]{4}:)?(?:f\\d+)?e\\d+)\\s+\\[[^\\]]+\\]\\s+"([^"]*?)"`, "g");
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(snapshot)) !== null) {
+    if (m[2].trim() === name) return m[1];
+  }
+  return null;
+}
+
 /** 读取 [data-testid="result"] 的可见文本 */
 export async function readResult(ctx: CaseContext): Promise<string> {
   const res = await ctx.call("vortex_extract", {

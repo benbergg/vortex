@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>open shadow click</title></head>
+<body>
+<h1>open shadow 点击(observe→act→extract 标记)</h1>
+<!-- open shadow:observe 应经 querySelectorAllDeep 穿入;act-via-ref 应触发真 handler。 -->
+<div id="host"></div>
+<p data-testid="result">idle</p>
+<script>
+  const sr = document.getElementById("host").attachShadow({ mode: "open" });
+  sr.innerHTML = '<button id="obtn" style="padding:8px">open shadow 按钮</button>';
+  sr.querySelector("#obtn").addEventListener("click", () => {
+    document.querySelector("[data-testid=result]").textContent = "open-clicked";
+  });
+</script>
+</body></html>

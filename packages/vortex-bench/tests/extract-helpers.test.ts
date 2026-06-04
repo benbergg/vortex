@@ -6,6 +6,7 @@ import {
   assertExtractContainsAll,
   assertExtractNumericBand,
   assertExtractNotContains,
+  findRef,
 } from "../cases/_helpers.js";
 import type { CaseContext } from "../src/types.js";
 
@@ -86,6 +87,27 @@ describe("assertExtractNumericBand", () => {
     await expect(
       assertExtractNumericBand(ctx, "#stars", 240000, 1000),
     ).rejects.toThrow();
+  });
+});
+
+describe("findRef（按 accessible name 从 observe 快照取 ref）", () => {
+  const snap = [
+    "SnapshotId: snap_x",
+    '@e985:e0 [button] "open shadow 按钮"',
+    '@7336:f354e1 [button] "iframe 同源按钮"',
+    '@e0 [link] "纯 ref 无 hash"',
+  ].join("\n");
+  it("hashed ref 命中", () => {
+    expect(findRef(snap, "open shadow 按钮")).toBe("@e985:e0");
+  });
+  it("跨帧 hashed ref(含 fN 段)命中", () => {
+    expect(findRef(snap, "iframe 同源按钮")).toBe("@7336:f354e1");
+  });
+  it("无 hash 的纯 ref 命中", () => {
+    expect(findRef(snap, "纯 ref 无 hash")).toBe("@e0");
+  });
+  it("名字不存在 → null", () => {
+    expect(findRef(snap, "不存在的按钮")).toBeNull();
   });
 });
 
