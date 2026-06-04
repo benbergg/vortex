@@ -37,6 +37,17 @@ describe("observe UI state extraction (@since 0.4.0 O-8)", () => {
     expect(OBSERVE_SRC).toMatch(/aria-pressed/);
   });
 
+  it("aria-checked/selected/pressed 仅读元素自身(i===0),不上溯祖先误归子控件", () => {
+    // LIVE 确认(2026-06-04 审计):<div role=option aria-selected=true><button>
+    // 的子 button 误带 [selected]。is-* 组件类约定可落包裹祖先(Element Plus),
+    // 但 ARIA 这些布尔态按规范在角色元素自身,上溯祖先会把容器状态错配给内部子
+    // 控件。aria-* 读取须受 self(i===0)门控。
+    expect(OBSERVE_SRC).toMatch(/const selfAria = i === 0/);
+    expect(OBSERVE_SRC).toMatch(/selfAria && cur\.getAttribute\("aria-checked"\)/);
+    expect(OBSERVE_SRC).toMatch(/selfAria && cur\.getAttribute\("aria-selected"\)/);
+    expect(OBSERVE_SRC).toMatch(/selfAria && cur\.getAttribute\("aria-pressed"\)/);
+  });
+
   it("derives disabled from :disabled pseudo (covers fieldset cascade) OR aria-disabled", () => {
     // 用 :disabled 伪类而非 IDL .disabled,以覆盖 <fieldset disabled> 级联禁用
     // 的子控件(IDL .disabled 仍为 false,2026-06-02 dogfood)。

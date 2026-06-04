@@ -714,18 +714,24 @@ async function scanOneFrame(
           for (let i = 0; i < 3 && cur; i++, cur = cur.parentElement) {
             const cls =
               typeof cur.className === "string" ? cur.className : "";
+            // is-* 组件类约定可落在包裹祖先(Element Plus 把 is-checked 放 wrapper
+            // label,故跨祖先查);但 ARIA aria-checked/selected/pressed 按规范落在
+            // 角色元素自身,上溯祖先会把容器(role=option aria-selected)状态误归
+            // 内部子控件(<button> 误带 [selected])。aria-* 仅在 i===0(el 自身)读
+            // (2026-06-04 审计 LIVE 确认)。
+            const selfAria = i === 0;
             if (s.checked === undefined) {
-              if (cls.includes("is-checked") || cur.getAttribute("aria-checked") === "true") {
+              if (cls.includes("is-checked") || (selfAria && cur.getAttribute("aria-checked") === "true")) {
                 s.checked = true;
               }
             }
             if (s.selected === undefined) {
-              if (cls.includes("is-selected") || cur.getAttribute("aria-selected") === "true") {
+              if (cls.includes("is-selected") || (selfAria && cur.getAttribute("aria-selected") === "true")) {
                 s.selected = true;
               }
             }
             if (s.active === undefined) {
-              if (cls.includes("is-active") || cur.getAttribute("aria-pressed") === "true") {
+              if (cls.includes("is-active") || (selfAria && cur.getAttribute("aria-pressed") === "true")) {
                 s.active = true;
               }
             }
