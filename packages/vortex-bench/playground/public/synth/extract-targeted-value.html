@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>extract 定向单值</title></head>
+<body>
+<h1>定向单值提取(含干扰兄弟节点)</h1>
+<!-- 镜像 Stagehand extract_aigrant_targeted/_2:targeted extract 应只取 target 文本,
+     不把兄弟节点(干扰公司名)带出来。 -->
+<ul>
+  <li class="company">OpusClip</li>
+  <li class="company" data-testid="target-company">Coframe</li>
+  <li class="company">Anysphere</li>
+</ul>
+</body></html>

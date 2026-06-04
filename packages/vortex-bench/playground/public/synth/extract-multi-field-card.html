@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>extract 多字段单条</title></head>
+<body>
+<h1>多字段单条提取(地址/电话/传真)</h1>
+<!-- 镜像 Stagehand extract_baptist_health:每字段一个 target,逐字段取文本比对。
+     vortex extract 确定性返回 DOM 原文,故用 exact(规范化吸收空白噪声)。 -->
+<div data-testid="clinic-card">
+  <div data-testid="addr">123 Main Street,  Suite 400</div>
+  <div data-testid="phone">(555) 123-4567</div>
+  <div data-testid="fax">(555) 123-4568</div>
+</div>
+</body></html>
