@@ -440,6 +440,23 @@ async function scanOneFrame(
           return "";
         }
 
+        // controlRoleFromClass 内联副本(注入体不能 import control-naming.ts,改一处须同步)。
+        // 终末 token 规则:class 按 BEM/连字符切词,末位 ∈ {checkbox,radio,switch,toggle}
+        // → 规范 role 名。给无 role/无 name 的自定义控件(vxe-cell--checkbox)兜底命名。
+        const controlRoleFromClass = (el: Element): string => {
+          const cls =
+            el.className && typeof el.className === "string" ? el.className : "";
+          for (const c of cls.split(/\s+/).filter(Boolean)) {
+            const tokens = c.split(/--|__|-/).filter(Boolean);
+            const last = tokens[tokens.length - 1]?.toLowerCase();
+            // 关键词集与 control-naming.ts 的 CONTROL_KEYWORDS 同步:checkbox/radio/switch/toggle
+            if (last && (last === "checkbox" || last === "radio" || last === "switch" || last === "toggle")) {
+              return last === "toggle" ? "switch" : last;
+            }
+          }
+          return "";
+        };
+
         // Name extraction uses textContent (not innerText) to bypass CSS
         // `text-overflow: ellipsis` truncation — innerText returns the
         // rendered visible text, which on `white-space:nowrap; overflow:hidden`
@@ -578,9 +595,13 @@ async function scanOneFrame(
           // 仅 svg/img 子且无文本无 title 时，从 className 兜底（如 `_closeIcon_1ygkr_39` → `closeIcon`）
           const fromIcon = iconNameFromClass(el);
           if (fromIcon) return fromIcon;
-          // 末位:CSS 字体图标按钮(bi-/fa-/glyphicon-,::before 字形无 inner svg/img,
-          // 如 Monaco `<button class="bi-gear">`)。isContainer 已在上方返空,此处只
-          // 给 leaf 图标按钮补名;不碰 cursor:pointer 入池门,规避 round-12 幽灵续命。
+          // 控件类(无 role/无 name 的 vxe-cell--checkbox 等)按终末 token 取角色名。
+          // 接在 svg/img 类名之后、字体图标之前:控件语义强于泛图标名。
+          const ctrlRole = controlRoleFromClass(el);
+          if (ctrlRole) return ctrlRole;
+          // 末位:CSS 字体图标按钮(bi-/fa-/glyphicon-/vxe-icon-/van-icon-,::before 字形
+          // 无 inner svg/img)。isContainer 已在上方返空,此处只给 leaf 图标按钮补名;
+          // 不碰 cursor:pointer 入池门,规避 round-12 幽灵续命。
           return iconFontName(el);
         }
 
@@ -1131,7 +1152,9 @@ async function scanOneFrame(
           const ariaProbe = (el.getAttribute("aria-label") || "").trim();
           // probe 决定 candidate 是否入 cursorPointerExtras。文字/aria-label 都空
           // 时尝试 icon-only fallback（CSS Modules 类名兜底，如 close/icon button）。
-          const probe = ariaProbe || textProbe || iconNameFromClass(el);
+          // controlRoleFromClass:给无 role/无 name 的控件类(vxe-cell--checkbox)入池信号。
+          // **不**加 iconFontName——round-12 约束(装饰字体图标不得进门),它只留显示路径。
+          const probe = ariaProbe || textProbe || iconNameFromClass(el) || controlRoleFromClass(el);
           // Require a name to avoid noise from purely decorative
           // cursor:pointer wrappers (e.g. close-button icons handled by
           // event delegation but visually rendered as bare divs).
