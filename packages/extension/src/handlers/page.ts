@@ -147,10 +147,18 @@ export function registerPageHandlers(router: ActionRouter, debuggerMgr: Debugger
       const innerCap = Math.min(outerTimeout, NAVIGATE_LOAD_TIMEOUT_MS);
       const navStart = Date.now();
       // NAV-1:domcontentloaded 的 DCL 监听器须在 tabs.update 之前挂上——DCL 事件可能在
-      // 导航提交后极快 fire,晚挂会漏掉而干等到超时。其余 waitUntil 在 update 后再等。
+      // 导航提交后极快 fire,晚挂会漏掉而干等到超时。
       const dclPromise =
         waitForLoad && waitUntil === "domcontentloaded"
           ? waitForDomReady(tid, innerCap)
+          : null;
+      // NAV-1b:load/networkidle 的 tab 'complete' 监听器同样须在 tabs.update 之前挂——
+      // hash/同文档导航近乎瞬时 complete,监听器晚挂会漏掉瞬时 'complete' 而干等满 25s
+      // (竞态偶发,2026-06-04 插桩确诊 load 模式 55ms↔25047ms 抖动)。对齐 dclPromise 的
+      // NAV-1 修复;此前 load 路径在 update 后才挂 waitForTabLoad,是默认路径漏修的死角。
+      const loadPromise =
+        waitForLoad && waitUntil !== "domcontentloaded"
+          ? waitForTabLoad(tid, innerCap)
           : null;
       await chrome.tabs.update(tid, { url });
       let degraded = false;
@@ -164,8 +172,8 @@ export function registerPageHandlers(router: ActionRouter, debuggerMgr: Debugger
         // load / networkidle 走 waitForTabLoad（等 tab 'complete'）；超时时若 DOM 已就绪
         // 则优雅降级返回（degraded: true），仅 DOM 仍 loading 才 throw。内部 load 等待 cap
         // 在 NAVIGATE_LOAD_TIMEOUT_MS（< 传输超时），确保降级响应能回到 caller。
-        const loadWait = innerCap;
-        ({ degraded } = await waitForTabLoad(tid, loadWait));
+        // loadPromise 已在 update 前挂好监听消除 hash 竞态(NAV-1b)。
+        ({ degraded } = await loadPromise!);
         if (waitUntil === "networkidle") {
           // NAV-3:idle 超时用剩余预算(innerCap - load 已耗),而非硬编码 5000 叠加在
           // load 之上 → load 慢站(~25s)+ idle 5s ≈ 30s 吃光传输 margin(flaky)。
