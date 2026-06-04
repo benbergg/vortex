@@ -973,6 +973,24 @@ async function scanOneFrame(
           return acc;
         }
 
+        // document.elementFromPoint 对 shadow-internal 元素返回其 shadow host(composed
+        // 树顶,命中重定向到 shadow 边界)。逐级下钻 open shadow root 的 elementFromPoint
+        // 得到真实命中元素,使下方遮挡判定对 shadow 内可见元素成立——否则 host !== htmlEl
+        // 且 host.contains(htmlEl) 不穿 shadow,三条件全成立误标 visible:false(OBS-1)。
+        // 与 shadow-walk.ts:deepElementFromPoint 同语义,observe 扫描自含故内联(同
+        // querySelectorAllDeep)。
+        function deepElementFromPoint(cx: number, cy: number): Element | null {
+          let el = document.elementFromPoint(cx, cy);
+          let depth = 0;
+          while (el && (el as HTMLElement).shadowRoot && depth < SHADOW_WALK_MAX_DEPTH) {
+            const inner = (el as HTMLElement).shadowRoot!.elementFromPoint(cx, cy);
+            if (!inner || inner === el) break;
+            el = inner;
+            depth++;
+          }
+          return el;
+        }
+
         const nodeList = querySelectorAllDeep(ROOT_SELECTORS, document);
 
         // AE: aria-activedescendant 指向的「虚拟焦点」目标元素集合。combobox /
@@ -1018,6 +1036,32 @@ async function scanOneFrame(
         const docRoot = document.documentElement;
         const docBody = document.body;
         const cursorPointerExtras: Element[] = [];
+        // 框架(React/Vue3)点击处理器探测——见 page-side/framework-handlers.ts(可单测真源,
+        // 改一处须同步)。React 把 onClick 挂 `__reactProps$<后缀>`;Vue3 把 @click invoker
+        // 存 `_vei.onClick`。裸 <div onClick>(cursor:auto、无 role/[onclick])靠此识别,
+        // 是比继承来的 cursor:pointer 更确凿的入池信号(2026-06-04 淘宝评价区
+        // 「查看全部评价」ShowButton /「切换大图模式」switchBtnWrap 真漏)。
+        const hasFrameworkClick = (node: any): boolean => {
+          for (const k of Object.keys(node)) {
+            if (k.charCodeAt(0) === 95 && k.startsWith("__reactProps$")) {
+              const p = node[k];
+              if (
+                p &&
+                typeof p === "object" &&
+                (typeof p.onClick === "function" || typeof p.onClickCapture === "function")
+              )
+                return true;
+            }
+          }
+          const vei = node._vei;
+          if (vei && typeof vei === "object") {
+            for (const ck of ["onClick", "onClickCapture"]) {
+              const inv = vei[ck];
+              if (typeof inv === "function" || (inv && typeof inv.value === "function")) return true;
+            }
+          }
+          return false;
+        };
         for (const el of Array.from(fallbackPool)) {
           if (cursorPointerExtras.length >= FALLBACK_CAP) break;
           if (interactiveSet.has(el)) continue;
@@ -1053,7 +1097,27 @@ async function scanOneFrame(
           if (hasInteractiveAncestor) continue;
           const htmlEl = el as HTMLElement;
           if (htmlEl.offsetWidth === 0 || htmlEl.offsetHeight === 0) continue;
-          if (getComputedStyle(htmlEl).cursor !== "pointer") continue;
+          // 入池信号:cursor:pointer(常见但继承可疑)或框架确凿绑定的 onClick。
+          // 后者更强,覆盖 cursor:auto 的 React/Vue 裸 div 按钮(2026-06-04 淘宝评价区
+          // 真漏「查看全部评价」「切换大图模式」)。下游 require-name + 含交互后代/祖先
+          // skip + 择叶 全部复用,噪声治理不变。
+          if (getComputedStyle(htmlEl).cursor !== "pointer") {
+            if (!hasFrameworkClick(el)) continue;
+            // framework onClick 常挂在事件委托的**容器**层;若其内部已有更细的
+            // cursor:pointer 子项(如多个 SKU 选项),让位给子项各自入池——否则下方
+            // 择叶会因容器文字最长而保留容器,把多个真选项合并成一个不可操作的大块
+            // (2026-06-04 淘宝 SKU 选择区回归)。仅加严 framework-onClick 路径,
+            // cursor:pointer 入池路径不变。
+            const finerDesc = el.querySelectorAll("*");
+            let hasFinerPointer = false;
+            for (let di = 0; di < finerDesc.length && di < 200; di++) {
+              if (getComputedStyle(finerDesc[di] as HTMLElement).cursor === "pointer") {
+                hasFinerPointer = true;
+                break;
+              }
+            }
+            if (hasFinerPointer) continue;
+          }
           // Use textContent for the gate check — innerText forces layout
           // and we only need the gate decision here. The accessible name
           // for output goes through getAccessibleName later, which already
@@ -1217,7 +1281,7 @@ async function scanOneFrame(
               0,
               Math.min(window.innerHeight - 1, rect.top + rect.height / 2),
             );
-            const topEl = document.elementFromPoint(cx, cy);
+            const topEl = deepElementFromPoint(cx, cy);
             // 复合输入控件(Element Plus el-select 等)把可见显示层作为兄弟节点叠在
             // 透明真控件之上。hit-test 命中显示层兄弟时,若它非交互且与 htmlEl 同处
             // 一个交互 widget 容器(htmlEl 最近交互祖先 contains hit),是同 widget
