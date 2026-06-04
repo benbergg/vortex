@@ -56,10 +56,22 @@ export async function assertResultContains(ctx: CaseContext, expected: string): 
 // 标准锚"从正确目标取到的文本是否含 ground-truth 事实"。target 为静态内容时无需重试；
 // 异步加载的 case 应先 ctx.call("vortex_wait_for", ...) 再断言。
 
-/** 取指定 target 的可见文本（include:["text"]）。 */
+/**
+ * 取指定 target 的可见文本（include:["text"]）。
+ * vortex_extract 返回 **JSON 编码** 的值（单元素 → `"Coframe"` 带引号；多元素 → 数组/对象）。
+ * 解析还原成裸字符串供 exact/fuzzy 相等判定；解析为非字符串（数组/对象）或解析失败则保留原文
+ * （containsAll/numericBand 走子串/抽数字，原文亦可）。2026-06-04 live 验收坐实此 unwrap 必需。
+ */
 async function extractTargetText(ctx: CaseContext, target: string): Promise<string> {
   const res = await ctx.call("vortex_extract", { target, include: ["text"] });
-  return extractText(res);
+  const raw = extractText(res);
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "string") return parsed;
+  } catch {
+    // 非 JSON（旧形态/纯文本）→ 用原文
+  }
+  return raw;
 }
 
 /** 提取文本规范化后 == expected（fuzzy 给定阈值则走 Jaro-Winkler ≥ 阈值）。 */

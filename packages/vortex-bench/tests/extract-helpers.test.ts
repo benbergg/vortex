@@ -9,14 +9,19 @@ import {
 } from "../cases/_helpers.js";
 import type { CaseContext } from "../src/types.js";
 
-/** 构造最小 mock ctx：call 返回固定文本，assert 失败即 throw（仿 runCase AssertionError）。 */
+/**
+ * 构造最小 mock ctx：call 返回固定文本，assert 失败即 throw（仿 runCase AssertionError）。
+ * 关键：vortex_extract 真实返回 **JSON 编码** 的值（单元素 → `"Coframe"` 带引号），
+ * 故 mock 用 JSON.stringify 还原真实形态——helper 须先 unwrap 才能正确 exactMatch。
+ * （2026-06-04 live 验收坐实：mock 用裸文本会漏掉这个 bug。）
+ */
 function mockCtx(text: string): { ctx: CaseContext; calls: { name: string; args: Record<string, unknown> }[] } {
   const calls: { name: string; args: Record<string, unknown> }[] = [];
   const ctx = {
     playgroundUrl: "http://x",
     async call(name: string, args: Record<string, unknown>) {
       calls.push({ name, args });
-      return { content: [{ type: "text", text }] };
+      return { content: [{ type: "text", text: JSON.stringify(text) }] };
     },
     async fallbackEvaluate() {
       return {};
