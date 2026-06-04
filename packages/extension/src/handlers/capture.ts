@@ -5,6 +5,7 @@ import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget, ensureFrameAttached } from "../lib/tab-utils.js";
 import { getIframeOffset } from "../lib/iframe-offset.js";
+import { resolveTarget } from "../lib/resolve-target.js";
 
 // GIF 录制状态
 interface GifSession {
@@ -16,8 +17,14 @@ interface GifSession {
 
 let activeGifSession: GifSession | null = null;
 
-// fullPage 截图的高度上限（超过会返回空图）
+// fullPage 截图的高度上限（CDP 单帧能力上限，超过则裁到此高度）
 const MAX_FULLPAGE_HEIGHT = 8000;
+
+interface CaptureResult {
+  dataUrl: string;
+  /** fullPage 内容超过 MAX_FULLPAGE_HEIGHT 被裁断时填充，告知调用方下半部分丢失 */
+  truncation?: { contentHeight: number; capturedHeight: number };
+}
 
 /**
  * 基于 CDP Page.captureScreenshot 的截图实现。
@@ -34,7 +41,7 @@ async function captureTab(
     clip?: { x: number; y: number; width: number; height: number };
     deviceScaleFactor?: 1 | 2;
   } = {},
-): Promise<string> {
+): Promise<CaptureResult> {
   const { format = "png", quality, fullPage = false, clip, deviceScaleFactor } = options;
 
   await debuggerMgr.enableDomain(tabId, "Page");
@@ -50,6 +57,7 @@ async function captureTab(
     });
   }
 
+  let truncation: CaptureResult["truncation"];
   try {
     const params: any = {
       format,
@@ -61,16 +69,20 @@ async function captureTab(
     } else if (fullPage) {
       const metrics = await debuggerMgr.sendCommand(tabId, "Page.getLayoutMetrics") as any;
       const contentSize = metrics.cssContentSize ?? metrics.contentSize;
+      const capturedHeight = Math.min(contentSize.height, MAX_FULLPAGE_HEIGHT);
+      if (contentSize.height > MAX_FULLPAGE_HEIGHT) {
+        truncation = { contentHeight: contentSize.height, capturedHeight };
+      }
       params.clip = {
         x: 0,
         y: 0,
         width: contentSize.width,
-        height: Math.min(contentSize.height, MAX_FULLPAGE_HEIGHT),
+        height: capturedHeight,
         scale: 1,
       };
     }
     const result = await debuggerMgr.sendCommand(tabId, "Page.captureScreenshot", params) as { data: string };
-    return `data:image/${format};base64,${result.data}`;
+    return { dataUrl: `data:image/${format};base64,${result.data}`, truncation };
   } finally {
     if (needsDprOverride) {
       // 设计文档 §3.5 + 决策 6: reset 失败让异常向上抛,bench sweep 应 abort
@@ -129,7 +141,7 @@ export function registerCaptureHandlers(
         effectiveClip = await computeFrameClip(tid, frameId);
       }
 
-      const dataUrl = await captureTab(debuggerMgr, tid, { format, quality, fullPage, clip: effectiveClip, deviceScaleFactor });
+      const { dataUrl, truncation } = await captureTab(debuggerMgr, tid, { format, quality, fullPage, clip: effectiveClip, deviceScaleFactor });
 
       return {
         dataUrl,
@@ -138,15 +150,19 @@ export function registerCaptureHandlers(
         ...(deviceScaleFactor != null ? { deviceScaleFactor } : {}),
         ...(frameId != null ? { frameId } : {}),
         fullPage: !!fullPage,
+        ...(truncation
+          ? { truncated: true, contentHeight: truncation.contentHeight, capturedHeight: truncation.capturedHeight }
+          : {}),
         timestamp: Date.now(),
       };
     },
 
     [CaptureActions.ELEMENT]: async (args, tabId) => {
-      const selector = args.selector as string;
-      if (!selector) throw vtxError(VtxErrorCode.INVALID_PARAMS, "Missing required param: selector");
-      const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
-      const frameId = args.frameId as number | undefined;
+      // 复用 resolveTarget:支持 selector 或 @ref(index+snapshotId),与 DOM 类 handler 一致
+      const __t = resolveTarget(args);
+      const selector = __t.selector;
+      const tid = await getActiveTabId(__t.boundTabId ?? (args.tabId as number | undefined) ?? tabId);
+      const frameId = __t.boundFrameId ?? (args.frameId as number | undefined);
       if (frameId != null) await ensureFrameAttached(tid, frameId);
       const format = (args.format as "png" | "jpeg") ?? "png";
       const quality = args.quality as number | undefined;
@@ -169,11 +185,21 @@ export function registerCaptureHandlers(
       if (rectRes?.error) throw vtxError(rectRes.error.startsWith("Element not found:") ? VtxErrorCode.ELEMENT_NOT_FOUND : VtxErrorCode.JS_EXECUTION_ERROR, rectRes.error, { selector });
       const rect = rectRes.result;
 
+      // 零尺寸元素（display:none / 隐藏 / 0×0 box）无法截图:优雅报 NOT_VISIBLE,
+      // 而非把下游 CDP 的 "Cannot take screenshot with 0 width" 裸错粗归为 JS_EXECUTION_ERROR。
+      if (rect.width === 0 || rect.height === 0) {
+        throw vtxError(
+          VtxErrorCode.NOT_VISIBLE,
+          `Element ${selector} has zero dimensions (hidden / display:none / 0×0 box), cannot screenshot`,
+          { selector },
+        );
+      }
+
       // 2. iframe 坐标偏移（复用共享工具）
       const { x: offsetX, y: offsetY } = await getIframeOffset(tid, frameId);
 
       // 3. CDP 裁剪截图
-      const dataUrl = await captureTab(debuggerMgr, tid, {
+      const { dataUrl } = await captureTab(debuggerMgr, tid, {
         format,
         quality,
         clip: {
@@ -213,7 +239,7 @@ export function registerCaptureHandlers(
         interval: setInterval(async () => {
           if (!activeGifSession) return;
           try {
-            const dataUrl = await captureTab(debuggerMgr, activeGifSession.tabId, { format: "png" });
+            const { dataUrl } = await captureTab(debuggerMgr, activeGifSession.tabId, { format: "png" });
             activeGifSession.frames.push(dataUrl);
           } catch (err) {
             console.error("[capture] gif frame error:", err);
@@ -227,7 +253,7 @@ export function registerCaptureHandlers(
     [CaptureActions.GIF_FRAME]: async () => {
       if (!activeGifSession) throw vtxError(VtxErrorCode.INVALID_PARAMS, "No GIF recording in progress", { extras: { state: "not_recording" } }, { hint: "Call vortex_capture_gif_start first." });
 
-      const dataUrl = await captureTab(debuggerMgr, activeGifSession.tabId, { format: "png" });
+      const { dataUrl } = await captureTab(debuggerMgr, activeGifSession.tabId, { format: "png" });
       activeGifSession.frames.push(dataUrl);
 
       return { frameCount: activeGifSession.frames.length };

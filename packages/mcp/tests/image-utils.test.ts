@@ -8,6 +8,7 @@ import {
   getImageSize,
   estimateImageBytes,
   ensureTmpDir,
+  fullPageTruncationWarning,
 } from "../src/lib/image-utils.js";
 
 const TMP_DIR = join(tmpdir(), "vortex-screenshots");
@@ -106,5 +107,21 @@ describe("ensureTmpDir", () => {
 
   it("creates directory if it does not exist", () => {
     expect(() => ensureTmpDir()).not.toThrow();
+  });
+});
+
+// CAP-1(批次1): fullPage 截断标志必须到达 agent(server 渲染只回图片会丢弃裸字段)
+describe("fullPageTruncationWarning", () => {
+  it("returns null when not truncated", () => {
+    expect(fullPageTruncationWarning({})).toBeNull();
+    expect(fullPageTruncationWarning({ truncated: false })).toBeNull();
+  });
+
+  it("returns a warning string carrying content + captured heights when truncated", () => {
+    const w = fullPageTruncationWarning({ truncated: true, contentHeight: 12000, capturedHeight: 8000 });
+    expect(w).toBeTruthy();
+    expect(w).toContain("12000");
+    expect(w).toContain("8000");
+    expect(w!.toLowerCase()).toContain("truncat");
   });
 });

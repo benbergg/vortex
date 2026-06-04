@@ -47,6 +47,7 @@ import {
   saveBase64Image,
   getImageSize,
   estimateImageBytes,
+  fullPageTruncationWarning,
 } from "./lib/image-utils.js";
 import { eventStore } from "./lib/event-store.js";
 import { VtxError, DEFAULT_ERROR_META, type VtxEventLevel, type VtxErrorCode } from "@bytenew/vortex-shared";
@@ -463,6 +464,11 @@ export async function handleCallTool(
             ? "file"
             : "inline";
 
+        // CAP-1: fullPage 被裁断时,截断信息须显式 surface(图片块本身不带元数据)
+        const truncWarning = fullPageTruncationWarning(result as {
+          truncated?: boolean; contentHeight?: number; capturedHeight?: number;
+        });
+
         if (mode === "file") {
           const prefix = action.replace(/\./g, "-");
           const { path, bytes: savedBytes } = saveBase64Image(result.dataUrl, prefix);
@@ -473,6 +479,9 @@ export async function handleCallTool(
               width,
               height,
               bytes: savedBytes,
+              ...(result.truncated
+                ? { truncated: true, contentHeight: result.contentHeight, capturedHeight: result.capturedHeight }
+                : {}),
               note: "Image saved to file to conserve tokens. Use the Read tool with the savedTo path to view it.",
             }, null, 2),
           }]);
@@ -481,11 +490,10 @@ export async function handleCallTool(
         // inline 模式
         const m = result.dataUrl.match(/^data:image\/(\w+);base64,(.+)$/);
         if (m) {
-          return withEvents([{
-            type: "image" as const,
-            data: m[2],
-            mimeType: `image/${m[1]}`,
-          }]);
+          const items: ContentItem[] = [];
+          if (truncWarning) items.push({ type: "text" as const, text: truncWarning });
+          items.push({ type: "image" as const, data: m[2], mimeType: `image/${m[1]}` });
+          return withEvents(items);
         }
       }
     }

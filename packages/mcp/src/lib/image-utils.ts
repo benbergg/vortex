@@ -67,3 +67,17 @@ export function estimateImageBytes(dataUrl: string): number {
   if (!match) return 0;
   return Math.floor(match[1].length * 0.75);
 }
+
+/**
+ * fullPage 截图被 CDP 单帧高度上限裁断时,生成给 agent 的警告文案。
+ * 截图响应渲染只回图片块会丢弃裸字段(CAP-1),故截断信息须显式作为 text 块 surface。
+ * 未截断返回 null。
+ */
+export function fullPageTruncationWarning(result: {
+  truncated?: boolean;
+  contentHeight?: number;
+  capturedHeight?: number;
+}): string | null {
+  if (!result.truncated) return null;
+  return `⚠️ fullPage screenshot truncated: page content is ${result.contentHeight}px tall but only the top ${result.capturedHeight}px were captured (CDP single-frame cap). The lower portion is missing — capture in vertical segments (scroll + screenshot) or target a specific element via vortex_screenshot({target}).`;
+}
