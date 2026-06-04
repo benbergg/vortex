@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { gateEval, type EvalBaseline } from "../src/runner/eval.js";
+import { gateEval, deriveBaseline, type EvalBaseline } from "../src/runner/eval.js";
 import type { EvalTierSummary } from "../src/runner/eval.js";
 
 /**
@@ -62,5 +62,15 @@ describe("eval --gate 数据驱动分档门 (P3.3)", () => {
   it("current 缺某基线档 → 该档不评(观察期新档不阻断)", () => {
     const r = gateEval([], baseline);
     expect(r.pass).toBe(true);
+  });
+
+  it("deriveBaseline 从实测推地板:gateEval(实测, derive(实测)) 必 pass", () => {
+    const current: EvalTierSummary[] = [
+      tier({ tier: "medium", recallMatched: 8, recallExpected: 10, taskPass: 7, taskDegraded: 1, taskFail: 2, caseCount: 10 }),
+    ];
+    const derived = deriveBaseline(current);
+    expect(derived.tiers[0].minRecallPct).toBeCloseTo(0.8);
+    // 自比对:实测正好等于地板 → 不低于 → pass(无 failure)
+    expect(gateEval(current, derived).pass).toBe(true);
   });
 });

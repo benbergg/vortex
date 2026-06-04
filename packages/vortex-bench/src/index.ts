@@ -17,6 +17,8 @@ import type { BenchReport, CaseDefinition, CaseMetrics } from "./types.js";
 import { scanFixture } from "./runner/scan.js";
 import { renderScanMarkdown, rankFindings } from "./scan-report.js";
 import type { FixtureScanResult, ScanReport, SynthManifest } from "./scan-types.js";
+import { runEval, gateEval, deriveBaseline, type EvalBaseline } from "./runner/eval.js";
+import { renderEvalMarkdown } from "./eval-report.js";
 import { captureSnapshot } from "./runner/snapshot.js";
 import { probeFixture } from "./runner/robustness.js";
 import { probeLive, type LiveTarget } from "./runner/robustness-live.js";
@@ -69,6 +71,9 @@ Commands:
   fuzz --seeds N         生成 N 个 seed 跑 observe-正确性 fuzzing(默认 50)
   fuzz --seed S          只跑单个 seed S(复现)
   fuzz --no-promote      不沉淀,只报告
+  eval [--all]           评测门:A 层(scan synth)+ B 层(tier-tagged case)分档汇总
+  eval --gate            额外比对 reports/eval-baseline.json,低于档阈值 exit 1
+  eval --save-baseline   把本次实测推成基线写盘(ratchet 地板)
   --help                 显示帮助
 
 Env:
@@ -88,6 +93,8 @@ const ROBUSTNESS_REPORTS_DIR = resolve(REPORTS_DIR, "robustness");
 const ROBUSTNESS_LIVE_REPORTS_DIR = resolve(REPORTS_DIR, "robustness-live");
 const JUDGE_REPORTS_DIR = resolve(REPORTS_DIR, "judge");
 const FUZZ_REPORTS_DIR = resolve(REPORTS_DIR, "fuzz");
+const EVAL_REPORTS_DIR = resolve(REPORTS_DIR, "eval");
+const EVAL_BASELINE_PATH = resolve(REPORTS_DIR, "eval-baseline.json");
 
 function resolveMcpBin(): string {
   if (process.env.VORTEX_MCP_BIN) return resolve(process.env.VORTEX_MCP_BIN);
@@ -703,6 +710,78 @@ async function cmdFuzz(args: string[]): Promise<number> {
   return 0;
 }
 
+// 评测门统一命令:跑 A 层(scan synth 语料)+ B 层(tier-tagged case)→ 分档汇总。
+//   eval [--all]        跑全语料 + 全 tier-tagged case,出报告
+//   eval --gate         额外比对 reports/eval-baseline.json,低于档阈值 exit 1
+//   eval --save-baseline  把本次实测推成基线写盘(ratchet 地板)
+// 需 Chrome 桥(localhost:6800 + playground)。
+async function cmdEval(args: string[]): Promise<number> {
+  const doGate = args.includes("--gate");
+  const saveBaseline = args.includes("--save-baseline");
+  const mcpBin = resolveMcpBin();
+  const url = playgroundUrl();
+
+  // A 层语料:全部非 _proposed 的 synth manifest
+  const manifestNames = await listSynthManifests();
+  const manifests: SynthManifest[] = [];
+  for (const n of manifestNames) {
+    const m = await loadManifest(n).catch(() => null);
+    if (m && !isProposed(m)) manifests.push(m);
+  }
+  // B 层语料:带 tier 的 case(无 tier 的工具管线类排除)
+  const caseNames = await listCaseNames();
+  const cases: CaseDefinition[] = [];
+  for (const n of caseNames) {
+    const def = await loadCase(n).catch(() => null);
+    if (def && def.tier != null) cases.push(def);
+  }
+  process.stdout.write(
+    `[vortex-bench] eval: ${manifests.length} fixture (A层) + ${cases.length} tier-tagged case (B层)\n`,
+  );
+
+  const result = await runEval({
+    mcpBin, playgroundUrl: url, manifests, cases,
+    generatedAt: new Date().toISOString(),
+  });
+
+  const md = renderEvalMarkdown(result);
+  process.stdout.write("\n" + md + "\n");
+  await mkdir(EVAL_REPORTS_DIR, { recursive: true });
+  const ts = result.generatedAt.replace(/[:.]/g, "-");
+  await writeFile(resolve(EVAL_REPORTS_DIR, `${ts}.json`), JSON.stringify(result, null, 2));
+  await writeFile(resolve(EVAL_REPORTS_DIR, `${ts}.md`), md);
+
+  if (saveBaseline) {
+    const base = deriveBaseline(result.tiers);
+    await writeFile(EVAL_BASELINE_PATH, JSON.stringify(base, null, 2));
+    process.stdout.write(`[vortex-bench] 写入 eval 基线: ${EVAL_BASELINE_PATH}\n`);
+  }
+
+  if (doGate) {
+    let baseline: EvalBaseline;
+    try {
+      baseline = JSON.parse(await readFile(EVAL_BASELINE_PATH, "utf-8")) as EvalBaseline;
+    } catch {
+      process.stderr.write(
+        `[vortex-bench] 无 eval 基线(${EVAL_BASELINE_PATH});先跑 'eval --save-baseline' 建基线\n`,
+      );
+      return 1;
+    }
+    const gate = gateEval(result.tiers, baseline);
+    for (const imp of gate.improvements) {
+      process.stdout.write(`[vortex-bench] ↑ ${imp.tier}: ${imp.reason}(可 --save-baseline 提升)\n`);
+    }
+    if (!gate.pass) {
+      for (const f of gate.failures) {
+        process.stderr.write(`[vortex-bench] ✗ GATE FAIL ${f.tier}: ${f.reason}\n`);
+      }
+      return 1;
+    }
+    process.stdout.write("[vortex-bench] ✓ eval --gate PASS\n");
+  }
+  return 0;
+}
+
 async function main(): Promise<number> {
   const [, , cmd, ...rest] = process.argv;
   if (!cmd || cmd === "--help" || cmd === "-h") {
@@ -728,6 +807,8 @@ async function main(): Promise<number> {
       return cmdJudge(rest);
     case "fuzz":
       return cmdFuzz(rest);
+    case "eval":
+      return cmdEval(rest);
     default:
       process.stderr.write(`[vortex-bench] 未知命令: ${cmd}\n\n${USAGE}`);
       return 1;

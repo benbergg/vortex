@@ -146,6 +146,20 @@ export function gateEval(current: EvalTierSummary[], baseline: EvalBaseline): Ga
   return { pass: failures.length === 0, failures, improvements };
 }
 
+/**
+ * 从实测分档结果推基线(ratchet 地板):每档下限=当前实测的 recall%/task 分。
+ * 用于首次建基线或显式提升基线(`eval --save-baseline`)。
+ */
+export function deriveBaseline(tiers: EvalTierSummary[]): EvalBaseline {
+  return {
+    tiers: tiers.map((t) => ({
+      tier: t.tier,
+      minRecallPct: t.recallExpected > 0 ? t.recallMatched / t.recallExpected : 0,
+      minTaskScore: taskScore(t),
+    })),
+  };
+}
+
 export interface RunEvalOptions {
   mcpBin: string;
   playgroundUrl: string;
