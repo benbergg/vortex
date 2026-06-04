@@ -50,7 +50,7 @@ function queryAllDeepImpl(
   return acc;
 }
 
-// 元素 disabled 判定:aria-disabled + 原生 disabled + fieldset[disabled]。
+// 元素 disabled 判定:aria-disabled + 原生 disabled + fieldset[disabled] + inert 子树。
 // 单一真源,供 actionability 门(isEnabled)与 dom-resolve 探测(__vortexDomResolve.isEnabled)
 // 共用——避免门/探测各持一份逻辑漂移(批次 5 族 H 的根:探测 vs 门语义不一致)。
 export function isEnabledElement(el: Element): boolean {
@@ -59,6 +59,10 @@ export function isEnabledElement(el: Element): boolean {
     if (el.getAttribute("aria-disabled") === "true") return false;
     if ((el as HTMLInputElement).disabled === true) return false;
     if (el.closest("fieldset[disabled]")) return false;
+    // inert 子树:元素及后代不可聚焦/不可点(浏览器层禁用交互),但 checkVisibility
+    // 默认不计 inert → act 点击静默无效。同 fieldset[disabled] 级联,判非交互让门/
+    // 探测一致报 DISABLED 而非静默挂超时(2026-06-04 审计)。
+    if (el.closest("[inert]")) return false;
     return true;
   } catch {
     return true;
