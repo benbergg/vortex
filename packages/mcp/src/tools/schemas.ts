@@ -1,6 +1,6 @@
 // packages/mcp/src/tools/schemas.ts
 
-import { COMMIT_KINDS } from "@bytenew/vortex-shared";
+import { COMMIT_KINDS } from "@vortex-browser/shared";
 
 /**
  * MCP 2025-03-26+ tool annotations. Optional behavioural hints that

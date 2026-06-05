@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { VtxErrorCode } from "@bytenew/vortex-shared";
-import type { NmRequest } from "@bytenew/vortex-shared";
+import { VtxErrorCode } from "@vortex-browser/shared";
+import type { NmRequest } from "@vortex-browser/shared";
 import { ActionRouter } from "../src/lib/router.js";
 import {
   registerMutationHandlers,

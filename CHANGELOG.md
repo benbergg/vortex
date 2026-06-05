@@ -60,12 +60,12 @@ _新工作进入此段；ship 时改为版本号 + 日期。_
 
 - **Visual grounding (`includeBoxes`)** (`packages/mcp/src/tools/schemas-public.ts`, `packages/mcp/src/tools/schemas.ts`, `packages/mcp/src/lib/observe-render.ts`, `packages/mcp/src/server.ts`, `packages/extension/src/handlers/observe.ts`). `vortex_observe` accepts an optional `includeBoxes: boolean` (default `false`); when `true`, each visible element line in the compact output gains ` bbox=[x,y,w,h]` — integer px, frame-local viewport coordinates, **tuple form** (not `{x,y,w,h}` keyed) to save ~6 tokens per element. Per-frame `# frame N offset=[x,y]` meta lines are emitted for every scanned non-main frame so callers compose top-page coords as `(el.bbox.x + frame.offset.x, el.bbox.y + frame.offset.y)`. Off-screen and zero-area elements omit the `bbox=` segment while keeping the element line intact. Default-off keeps the wire format byte-identical to v0.8 sub-project A.
 
-  **Measured budget** (`pnpm -F @bytenew/vortex-bench bench compare-boxes --all`, 38 baseline cases, 24 observed, 2026-05-14):
+  **Measured budget** (`pnpm -F @vortex-browser/bench bench compare-boxes --all`, 38 baseline cases, 24 observed, 2026-05-14):
   median ratio = **1.503**, p95 = **1.590**, max = **1.599**, cases > 1.20 = 22, cases > 1.40 = 18, cases > 1.60 = 0. SPEC R6 ceiling was revised mid-flight from ≤ 1.20 (issue #21 a-priori estimate, never benchmarked) to ≤ 1.60 (data-driven). Gate verdict against revised ceiling: **PASS**. The bbox segment ` bbox=[x,y,w,h]` is structurally ~24 B per element, comparable to the element line itself (~25 B), so per-line cost approaches +96% and the cohort floor sits at ~1.50 even with the tightest tuple+integer encoding. Absolute output stays sub-10 KB per call across the entire cohort. Wire-format compression deferred to v0.9 backlog. Bench artifact: `packages/vortex-bench/reports/boxes-budget-2026-05-14T02-27-59-565Z.json`.
 
   **Why**: closes issue #21 (P0). Hybrid grounding — a11y ref for actuation + bbox to a vision model for verification — is the 2026 SOTA pattern (MS playwright-mcp, Anthropic Computer Use, browser-use all emit pixel rects). vortex stays ref-driven for actuation; bbox is emitted for the caller's vision side only. The extension already computed per-element `getBoundingClientRect()` for internal click-center math; this change merely surfaces that data through the compact path under an explicit opt-in to protect token budget.
 
-- **Public surface: 4 backlog tools promoted** (`packages/mcp/src/tools/schemas-public.ts`). `vortex_evaluate` / `vortex_mouse_drag` / `vortex_file_upload` / `vortex_fill` move from internal-only to public (11 → 15 public tools). `vortex_evaluate` and `vortex_file_upload` carry MCP `annotations.destructiveHint` + `openWorldHint` so LLM clients can gate them with stricter approval prompts. `vortex_fill.kind` enum now exposes `time` alongside the existing five kinds — the runtime driver already shipped in v0.4, only the public schema had hidden it. `COMMIT_KINDS` is the single source of truth in `@bytenew/vortex-shared`; the I15 invariant test locks public schema enum, internal schema enum, and extension `commit-drivers` array to the shared array to prevent silent drift.
+- **Public surface: 4 backlog tools promoted** (`packages/mcp/src/tools/schemas-public.ts`). `vortex_evaluate` / `vortex_mouse_drag` / `vortex_file_upload` / `vortex_fill` move from internal-only to public (11 → 15 public tools). `vortex_evaluate` and `vortex_file_upload` carry MCP `annotations.destructiveHint` + `openWorldHint` so LLM clients can gate them with stricter approval prompts. `vortex_fill.kind` enum now exposes `time` alongside the existing five kinds — the runtime driver already shipped in v0.4, only the public schema had hidden it. `COMMIT_KINDS` is the single source of truth in `@vortex-browser/shared`; the I15 invariant test locks public schema enum, internal schema enum, and extension `commit-drivers` array to the shared array to prevent silent drift.
 
   **Closes v0.7.x backlog (5 items)**: `el-slider-drag` (needed `vortex_mouse_drag`) · `el-upload` (needed `vortex_file_upload`) · `el-date-picker-daterange` + `el-date-picker-datetimerange` (needed `vortex_fill` with `kind` enum exposed at L4) · `latency-p50` (needed `vortex_evaluate`). All five bench cases statically verified to call v0.8 public tools only; e2e validation deferred to v0.8 ship preflight. 11 bench cases migrated from `vortex_act({action:"fill", ...})` to direct `vortex_fill` calls.
 
@@ -282,7 +282,7 @@ vortex 完胜场景：el-button row action 1 shot click、`[checked]/[selected]`
 
 #### 自动迁移工具（PR #5）
 
-- 新增 `@bytenew/vortex-migrate` CLI（jscodeshift codemod backend）
+- 新增 `@vortex-browser/migrate` CLI（jscodeshift codemod backend）
 - 覆盖 36 v0.5 atom：6 保持名 + 16 改写 + 1 删除（`vortex_ping`）+ 13 warn-only
 - 默认 dry-run；`--write` 应用；`--json` 机器可读摘要；`--ignore` / `--ext` 自定义扫描
 - 间接调用（变量名传入工具名）emit `<indirect>` warning，需手工迁移
@@ -290,7 +290,7 @@ vortex 完胜场景：el-button row action 1 shot click、`[checked]/[selected]`
 ### 🔧 Internal
 
 - **`dom.ts` 总计减 -64%**：2233（v0.5）→ 1312（PR #1）→ 895（PR #2）→ ≤ 800（PR #4 拆 datetimerange page-side fallback 完成）
-- 新 packages：`@bytenew/vortex-migrate`
+- 新 packages：`@vortex-browser/migrate`
 - spec 文档：5 个 layer spec（L1-L5）落 obsidian Knowledge Library；slim spec 实验（L3/L4/L5 共 1255 行 vs L1/L2 4805 行 = -74%）
 - bench 基线：`baselines/v0.5.json` 锁定（27 cases，CDP P50 = 3289 ms / Native P50 = 5 ms）+ dogfood 5 任务定义在 `cases/dogfood/`
 
@@ -377,7 +377,7 @@ vortex 完胜场景：el-button row action 1 shot click、`[checked]/[selected]`
 ### 🛠 自动迁移
 
 ```bash
-npm install -g @bytenew/vortex-migrate@^0.6
+npm install -g @vortex-browser/migrate@^0.6
 vortex-migrate ./src           # dry run
 vortex-migrate ./src --write   # apply
 vortex-migrate ./src --json    # machine-readable summary

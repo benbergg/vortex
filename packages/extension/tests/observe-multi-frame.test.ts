@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { NmRequest } from "@bytenew/vortex-shared";
-import { VtxErrorCode } from "@bytenew/vortex-shared";
+import type { NmRequest } from "@vortex-browser/shared";
+import { VtxErrorCode } from "@vortex-browser/shared";
 import { ActionRouter } from "../src/lib/router.js";
 import { registerObserveHandlers } from "../src/handlers/observe.js";
 import { getSnapshotEntry } from "../src/lib/snapshot-store.js";

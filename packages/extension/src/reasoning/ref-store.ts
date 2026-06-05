@@ -1,7 +1,7 @@
 // L3: RefStore — @e<N> ↔ descriptor 映射 + stale 重定位。
 // spec: vortex重构-L3-spec.md §2.3
 
-import { vtxError, VtxErrorCode } from "@bytenew/vortex-shared";
+import { vtxError, VtxErrorCode } from "@vortex-browser/shared";
 import type { Descriptor, RefEntry } from "./types.js";
 import type { DebuggerLike } from "./ax-snapshot.js";
 import { captureAXSnapshot } from "./ax-snapshot.js";

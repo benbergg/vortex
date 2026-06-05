@@ -1,5 +1,5 @@
 {
-  "name": "@bytenew/vortex-shared",
+  "name": "@vortex-browser/shared",
   "version": "0.8.0",
   "type": "module",
   "main": "dist/index.js",

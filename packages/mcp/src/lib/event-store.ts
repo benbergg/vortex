@@ -1,4 +1,4 @@
-import type { VtxEvent, VtxEventLevel } from "@bytenew/vortex-shared";
+import type { VtxEvent, VtxEventLevel } from "@vortex-browser/shared";
 
 interface Subscription {
   id: string;

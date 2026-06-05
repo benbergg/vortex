@@ -1,4 +1,4 @@
-import { TabActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { TabActions, VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 
 export function registerTabHandlers(router: ActionRouter): void {

@@ -1,5 +1,5 @@
 {
-  "name": "@bytenew/vortex-cli",
+  "name": "@vortex-browser/cli",
   "version": "0.8.0",
   "type": "module",
   "bin": {
@@ -14,7 +14,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@bytenew/vortex-shared": "workspace:*",
+    "@vortex-browser/shared": "workspace:*",
     "commander": "^13.0.0",
     "ws": "^8.18.0"
   },

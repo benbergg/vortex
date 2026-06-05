@@ -12,18 +12,18 @@ LLM (Claude Code / 自写客户端)
     │ MCP / HTTP / WS
     ▼
 ┌─────────────────────────┐
-│  @bytenew/vortex-mcp    │  MCP server（stdio）
-│  @bytenew/vortex-cli    │  命令行
+│  @vortex-browser/mcp    │  MCP server（stdio）
+│  @vortex-browser/cli    │  命令行
 └────────────┬────────────┘
              │  ws / http
              ▼
 ┌─────────────────────────┐
-│  @bytenew/vortex-server │  本地桥接
+│  @vortex-browser/server │  本地桥接
 └────────────┬────────────┘
              │  Native Messaging (stdio)
              ▼
 ┌─────────────────────────┐
-│ @bytenew/vortex-extension│ Chrome 扩展（MV3）
+│ @vortex-browser/extension│ Chrome 扩展（MV3）
 └─────────────────────────┘
              │
              ▼
@@ -34,11 +34,11 @@ LLM (Claude Code / 自写客户端)
 
 | 包 | 作用 | README |
 |----|------|--------|
-| [`@bytenew/vortex-shared`](packages/shared) | 共享类型 / action 名 / 错误码 | [README](packages/shared/README.md) |
-| [`@bytenew/vortex-extension`](packages/extension) | Chrome 扩展（MV3）— 真正执行浏览器操作 | [README](packages/extension/README.md) |
-| [`@bytenew/vortex-server`](packages/server) | 本地桥接服务（NM ↔ HTTP/WS） | [README](packages/server/README.md) |
-| [`@bytenew/vortex-cli`](packages/cli) | 命令行客户端 — 终端直调 action | [README](packages/cli/README.md) |
-| [`@bytenew/vortex-mcp`](packages/mcp) | MCP server — 接 Claude Code 等 LLM 工具 | [README](packages/mcp/README.md) |
+| [`@vortex-browser/shared`](packages/shared) | 共享类型 / action 名 / 错误码 | [README](packages/shared/README.md) |
+| [`@vortex-browser/extension`](packages/extension) | Chrome 扩展（MV3）— 真正执行浏览器操作 | [README](packages/extension/README.md) |
+| [`@vortex-browser/server`](packages/server) | 本地桥接服务（NM ↔ HTTP/WS） | [README](packages/server/README.md) |
+| [`@vortex-browser/cli`](packages/cli) | 命令行客户端 — 终端直调 action | [README](packages/cli/README.md) |
+| [`@vortex-browser/mcp`](packages/mcp) | MCP server — 接 Claude Code 等 LLM 工具 | [README](packages/mcp/README.md) |
 
 完整设计：[`docs/DESIGN.md`](docs/DESIGN.md)（架构图、协议、关键设计决策、安全模型、路线图）。
 
@@ -46,7 +46,7 @@ LLM (Claude Code / 自写客户端)
 
 ```bash
 # 1. 装 server
-npm i -g @bytenew/vortex-server
+npm i -g @vortex-browser/server
 
 # 2. 装扩展（dev 模式）
 git clone <this-repo> && cd vortex
@@ -56,7 +56,7 @@ pnpm install && pnpm -r build
 # 3. 装 NM host（让扩展能拉起 server，详见 server README）
 
 # 4. 注册到 Claude Code
-claude mcp add vortex --scope user -- npx -y @bytenew/vortex-mcp
+claude mcp add vortex --scope user -- npx -y @vortex-browser/mcp
 ```
 
 打开 Claude Code 后让它调 `mcp__vortex__vortex_tab_create`，应能创建一个新标签页。
@@ -81,8 +81,8 @@ claude mcp add vortex --scope user -- npx -y @bytenew/vortex-mcp
 v0.6 收敛工具面 36 → 11，是一次破坏性变更。
 
 - **迁移指南**：[`docs/v0.5-to-v0.6-migration.md`](docs/v0.5-to-v0.6-migration.md)
-- **自动迁移工具**：`npx @bytenew/vortex-migrate ./src`（dry-run 默认，`--write` 应用）
-- **暂不迁移**：可继续锁版本到 `@bytenew/vortex-mcp@^0.5`，[`v0.5.x` LTS 维护分支](https://github.com/benbergg/vortex/tree/v0.5.x)在 v0.6.0 起至少维护两个月（仅 critical bug fix）
+- **自动迁移工具**：`npx @vortex-browser/migrate ./src`（dry-run 默认，`--write` 应用）
+- **暂不迁移**：可继续锁版本到 `@vortex-browser/mcp@^0.5`，[`v0.5.x` LTS 维护分支](https://github.com/benbergg/vortex/tree/v0.5.x)在 v0.6.0 起至少维护两个月（仅 critical bug fix）
 
 ## 开发
 

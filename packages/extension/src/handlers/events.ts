@@ -1,7 +1,7 @@
 // Event 管道的 action handler：目前只有 events.drain（主动 flush dispatcher）。
 // 订阅态在 MCP 侧维护（__mcp_events_subscribe__），extension 只负责 emit + flush。
 
-import { EventsActions } from "@bytenew/vortex-shared";
+import { EventsActions } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { EventDispatcher } from "../events/dispatcher.js";
 

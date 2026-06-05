@@ -1,4 +1,4 @@
-import { DiagnosticsActions } from "@bytenew/vortex-shared";
+import { DiagnosticsActions } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 
 // 扩展版本：build 时由 vite define 注入；未注入则回退到 "unknown"

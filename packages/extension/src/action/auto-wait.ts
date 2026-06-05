@@ -4,7 +4,7 @@
 // Default timeout 5000ms; each reason has its own retry interval (per spec §2 table).
 // On timeout exhaustion, throws vtxError(TIMEOUT) with extras.lastReason carrying the last failure code.
 
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import {
   checkActionability,
   type ActionabilityFailure,

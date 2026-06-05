@@ -1,5 +1,5 @@
 {
-  "name": "@bytenew/vortex-extension",
+  "name": "@vortex-browser/extension",
   "version": "0.8.0",
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
     "depcruise:graph": "depcruise --config .dependency-cruiser.cjs --output-type dot src | dot -T svg > dep-graph.svg"
   },
   "dependencies": {
-    "@bytenew/vortex-shared": "workspace:*"
+    "@vortex-browser/shared": "workspace:*"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.0.0-beta.28",

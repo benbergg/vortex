@@ -5,7 +5,7 @@
 // is omitted entirely from the payload.
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { NmRequest } from "@bytenew/vortex-shared";
+import type { NmRequest } from "@vortex-browser/shared";
 import { ActionRouter } from "../src/lib/router.js";
 import { registerObserveHandlers } from "../src/handlers/observe.js";
 

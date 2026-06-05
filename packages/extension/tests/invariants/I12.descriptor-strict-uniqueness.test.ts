@@ -2,7 +2,7 @@
 // spec: vortex重构-L3-spec.md §2.2
 
 import { describe, it, expect } from "vitest";
-import { VtxErrorCode } from "@bytenew/vortex-shared";
+import { VtxErrorCode } from "@vortex-browser/shared";
 import { resolveDescriptor } from "../../src/reasoning/descriptor.js";
 import type { AXSnapshot } from "../../src/reasoning/types.js";
 import { interactiveNode, makeDebuggerMock } from "../fixtures/ax-tree.js";

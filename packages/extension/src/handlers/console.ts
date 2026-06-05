@@ -1,6 +1,6 @@
 // packages/extension/src/handlers/console.ts
 
-import { ConsoleActions, VtxErrorCode, vtxError, VtxEventType } from "@bytenew/vortex-shared";
+import { ConsoleActions, VtxErrorCode, vtxError, VtxEventType } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import type { NativeMessagingClient } from "../lib/native-messaging.js";

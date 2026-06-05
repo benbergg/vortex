@@ -1,5 +1,5 @@
 {
-  "name": "@bytenew/vortex-server",
+  "name": "@vortex-browser/server",
   "version": "0.8.0",
   "type": "module",
   "main": "dist/src/index.js",
@@ -18,7 +18,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@bytenew/vortex-shared": "workspace:*",
+    "@vortex-browser/shared": "workspace:*",
     "commander": "^13.0.0",
     "express": "^4.21.0",
     "ws": "^8.18.0"

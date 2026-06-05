@@ -10,7 +10,7 @@ importers:
 
   packages/cli:
     dependencies:
-      '@bytenew/vortex-shared':
+      '@vortex-browser/shared':
         specifier: workspace:*
         version: link:../shared
       commander:
@@ -29,7 +29,7 @@ importers:
 
   packages/extension:
     dependencies:
-      '@bytenew/vortex-shared':
+      '@vortex-browser/shared':
         specifier: workspace:*
         version: link:../shared
     devDependencies:
@@ -57,12 +57,12 @@ importers:
 
   packages/mcp:
     dependencies:
-      '@bytenew/vortex-shared':
-        specifier: workspace:*
-        version: link:../shared
       '@modelcontextprotocol/sdk':
         specifier: ^1.27.0
         version: 1.29.0(zod@4.3.6)
+      '@vortex-browser/shared':
+        specifier: workspace:*
+        version: link:../shared
       ws:
         specifier: ^8.18.0
         version: 8.20.0
@@ -79,7 +79,7 @@ importers:
 
   packages/server:
     dependencies:
-      '@bytenew/vortex-shared':
+      '@vortex-browser/shared':
         specifier: workspace:*
         version: link:../shared
       commander:
@@ -116,12 +116,12 @@ importers:
 
   packages/vortex-bench:
     dependencies:
-      '@bytenew/vortex-shared':
-        specifier: workspace:*
-        version: link:../shared
       '@modelcontextprotocol/sdk':
         specifier: ^1.27.0
         version: 1.29.0(zod@4.3.6)
+      '@vortex-browser/shared':
+        specifier: workspace:*
+        version: link:../shared
     devDependencies:
       '@types/node':
         specifier: ^20.0.0

@@ -1,4 +1,4 @@
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import { getSnapshotEntry } from "./snapshot-store.js";
 
 /**

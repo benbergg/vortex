@@ -1,5 +1,5 @@
 {
-  "name": "@bytenew/vortex-mcp",
+  "name": "@vortex-browser/mcp",
   "version": "0.8.0",
   "type": "module",
   "bin": {
@@ -15,7 +15,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@bytenew/vortex-shared": "workspace:*",
+    "@vortex-browser/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.27.0",
     "ws": "^8.18.0"
   },

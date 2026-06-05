@@ -1,4 +1,4 @@
-import { ContentActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { ContentActions, VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 import { getActiveTabId, buildExecuteTarget, ensureFrameAttached } from "../lib/tab-utils.js";
 import { resolveTargetOptional } from "../lib/resolve-target.js";

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import type { VtxEvent } from "@bytenew/vortex-shared";
+import type { VtxEvent } from "@vortex-browser/shared";
 import { EventStore } from "../src/lib/event-store.js";
 
 function mkEvent(

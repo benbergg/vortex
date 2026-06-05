@@ -7,7 +7,7 @@
 //
 // Drag is CDP-only: if CDP unavailable, throws DRAG_REQUIRES_CDP without fallback.
 
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import { pageQuery as nativePageQuery } from "../adapter/native.js";
 import { clickBBox as cdpClickBBox } from "../adapter/cdp.js";
 import { capabilityDetector } from "../adapter/detector.js";

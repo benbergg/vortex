@@ -1,5 +1,5 @@
-import type { NmMessageFromExtension, NmMessageFromServer, VtxRequest, VtxResponse, VtxEvent } from "@bytenew/vortex-shared";
-import { VtxErrorCode } from "@bytenew/vortex-shared";
+import type { NmMessageFromExtension, NmMessageFromServer, VtxRequest, VtxResponse, VtxEvent } from "@vortex-browser/shared";
+import { VtxErrorCode } from "@vortex-browser/shared";
 import type { SessionManager } from "./session.js";
 import { writeNmMessage } from "./native-messaging.js";
 

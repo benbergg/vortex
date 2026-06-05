@@ -1,5 +1,5 @@
 {
-  "name": "@bytenew/vortex-bench",
+  "name": "@vortex-browser/bench",
   "version": "0.8.0",
   "private": true,
   "type": "module",
@@ -20,7 +20,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@bytenew/vortex-shared": "workspace:*",
+    "@vortex-browser/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.27.0"
   },
   "devDependencies": {

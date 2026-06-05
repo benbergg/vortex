@@ -1,6 +1,6 @@
 // Issue #21 — SPEC R2/R3/R4/R5 + AC#2/#3/#4.
 // Renderer-side contract for the includeBoxes opt-in. Companion to
-// observe-includeboxes.test.ts in @bytenew/vortex-extension which
+// observe-includeboxes.test.ts in @vortex-browser/extension which
 // exercises the payload-emission gate one layer up.
 
 import { describe, it, expect } from "vitest";

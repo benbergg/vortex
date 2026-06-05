@@ -1,6 +1,6 @@
 // packages/extension/src/handlers/storage.ts
 
-import { StorageActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { StorageActions, VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 
 async function getActiveTabId(tabId?: number): Promise<number> {

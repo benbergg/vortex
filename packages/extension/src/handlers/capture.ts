@@ -1,6 +1,6 @@
 // packages/extension/src/handlers/capture.ts
 
-import { CaptureActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { CaptureActions, VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, buildExecuteTarget, ensureFrameAttached } from "../lib/tab-utils.js";

@@ -1,4 +1,4 @@
-import { KeyboardActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { KeyboardActions, VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 

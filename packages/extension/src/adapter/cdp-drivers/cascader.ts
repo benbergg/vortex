@@ -4,7 +4,7 @@
 // 触发区（.el-cascader）对 untrusted click 不响应，但面板内 .el-cascader-node__label
 // 用 page-side .click() 可以逐级展开。混合：worker CDP 开 panel + page JS 走 path。
 
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { DebuggerManager } from "../../lib/debugger-manager.js";
 import { getIframeOffset } from "../../lib/iframe-offset.js";
 import { pageQuery as nativePageQuery } from "../native.js";

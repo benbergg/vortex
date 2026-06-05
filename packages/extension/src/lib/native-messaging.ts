@@ -1,4 +1,4 @@
-import type { NmMessageFromExtension, NmMessageFromServer } from "@bytenew/vortex-shared";
+import type { NmMessageFromExtension, NmMessageFromServer } from "@vortex-browser/shared";
 
 const NM_HOST_NAME = "com.bytenew.vortex";
 const KEEPALIVE_ALARM = "vortex-keepalive";

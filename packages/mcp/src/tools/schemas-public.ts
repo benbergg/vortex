@@ -17,7 +17,7 @@
 // public description strings stay terse (≤ 60 char per I15) so ref-syntax
 // guidance is carried by the internal `schemas.ts` tool descriptions.
 
-import { COMMIT_KINDS } from "@bytenew/vortex-shared";
+import { COMMIT_KINDS } from "@vortex-browser/shared";
 import type { ToolDef } from "./schemas.js";
 
 const tabFields = {

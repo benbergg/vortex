@@ -1,4 +1,4 @@
-import { DomActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { DomActions, VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 import { getActiveTabId } from "../lib/tab-utils.js";
 

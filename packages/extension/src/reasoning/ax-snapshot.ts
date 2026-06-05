@@ -1,7 +1,7 @@
 // L3: a11y snapshot 采集（CDP Accessibility.getFullAXTree + filter）。
 // spec: vortex重构-L3-spec.md §2.1
 
-import { vtxError, VtxErrorCode } from "@bytenew/vortex-shared";
+import { vtxError, VtxErrorCode } from "@vortex-browser/shared";
 import type { AXNode, AXSnapshot, CDPAXNode } from "./types.js";
 import { sha16 } from "./descriptor.js";
 

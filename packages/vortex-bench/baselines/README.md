@@ -8,7 +8,7 @@
 
 ## 新增 baseline 流程
 
-1. 在目标版本 release tag 上跑 `pnpm --filter @bytenew/vortex-bench bench run --all`
+1. 在目标版本 release tag 上跑 `pnpm --filter @vortex-browser/bench bench run --all`
 2. `cp packages/vortex-bench/reports/latest.json packages/vortex-bench/baselines/v<version>.json`
 3. 上表追加一行（版本 / 时间 / commit）
 4. commit：`chore(bench): lock v<version> baseline @<commit>`

@@ -1,4 +1,4 @@
-# @bytenew/vortex-extension
+# @vortex-browser/extension
 
 Vortex Chrome 扩展（Manifest V3）。承载所有浏览器侧能力，通过 Native Messaging 与 `vortex-server` 通信，由 server 把 action 请求路由到对应 handler。
 
@@ -28,7 +28,7 @@ src/
     └── frames.ts          # frames.list / find
 ```
 
-action 名定义在 `@bytenew/vortex-shared`，handler 在此实现。新增 action 时两边都要改。
+action 名定义在 `@vortex-browser/shared`，handler 在此实现。新增 action 时两边都要改。
 
 ## 构建
 
@@ -61,4 +61,4 @@ NM host manifest 安装见 [`packages/server/README.md`](../server/README.md#nat
 
 ## 协议
 
-所有线缆消息形态（NmRequest/NmResponse/VtxRequest/VtxResponse）见 `@bytenew/vortex-shared/protocol.ts`。错误用 `VtxErrorCode` 标准化分类。
+所有线缆消息形态（NmRequest/NmResponse/VtxRequest/VtxResponse）见 `@vortex-browser/shared/protocol.ts`。错误用 `VtxErrorCode` 标准化分类。

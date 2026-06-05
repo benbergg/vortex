@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { MessageRouter } from "../src/message-router.js";
-import { VtxErrorCode } from "@bytenew/vortex-shared";
-import type { VtxRequest } from "@bytenew/vortex-shared";
+import { VtxErrorCode } from "@vortex-browser/shared";
+import type { VtxRequest } from "@vortex-browser/shared";
 
 /**
  * 白盒审计批次 5 族 P — 桥接生命周期。

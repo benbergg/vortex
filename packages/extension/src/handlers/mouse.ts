@@ -1,4 +1,4 @@
-import { MouseActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { MouseActions, VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { getActiveTabId, ensureFrameAttached } from "../lib/tab-utils.js";
