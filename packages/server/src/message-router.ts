@@ -2,6 +2,7 @@ import type { NmMessageFromExtension, NmMessageFromServer, VtxRequest, VtxRespon
 import { VtxErrorCode } from "@vortex-browser/shared";
 import type { SessionManager } from "./session.js";
 import { writeNmMessage } from "./native-messaging.js";
+import { detectTrustedMode } from "./trusted-mode.js";
 
 interface PendingRequest {
   vtxRequest: VtxRequest;
@@ -97,6 +98,15 @@ export class MessageRouter {
       tabId: vtxReq.tabId,
     };
 
+    // flag-自适应:dom.click 带上当前 Chrome 是否 trusted(带 flag 启动),
+    // 供扩展 CLICK handler 决定走 CDP trusted 还是合成路径。仅 click,避免污染全部请求。
+    if (vtxReq.action === "dom.click") {
+      (nmReq as { args: Record<string, unknown> }).args = {
+        ...(nmReq.args as Record<string, unknown>),
+        trustedMode: detectTrustedMode(),
+      };
+    }
+
     const timeout = setTimeout(() => {
       this.handleTimeout(requestId, vtxReq);
     }, this.REQUEST_TIMEOUT_MS);
@@ -144,6 +154,15 @@ export class MessageRouter {
         requestId,
         tabId: vtxReq.tabId,
       };
+
+      // flag-自适应:dom.click 带上当前 Chrome 是否 trusted(带 flag 启动),
+      // 供扩展 CLICK handler 决定走 CDP trusted 还是合成路径。仅 click,避免污染全部请求。
+      if (vtxReq.action === "dom.click") {
+        (nmReq as { args: Record<string, unknown> }).args = {
+          ...(nmReq.args as Record<string, unknown>),
+          trustedMode: detectTrustedMode(),
+        };
+      }
 
       const timeout = setTimeout(() => {
         this.pending.delete(requestId);
