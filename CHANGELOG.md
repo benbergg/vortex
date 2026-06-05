@@ -47,6 +47,28 @@ _新工作进入此段；ship 时改为版本号 + 日期。_
 
 ---
 
+## [1.0.0] - 2026-06-05
+
+### 💥 Breaking changes
+
+- **npm 包 scope 重命名：`@bytenew/vortex-*` → `@vortex-browser/*`**。所有公开发布包均采用新 scope：`@vortex-browser/shared`、`@vortex-browser/mcp`、`@vortex-browser/cli`、`@vortex-browser/server`。原 `@bytenew/vortex-*` 不再发布；迁移时替换 `package.json` 中的包名与 `import` 路径即可，API 接口不变。
+
+- **Native Messaging host 名重命名：`com.bytenew.vortex` → `com.vortexbrowser.host`**。注册 manifest JSON 文件名及 `name` 字段均已更新。现有用户需重新运行安装脚本（`scripts/install.sh`）以注册新 host 名；旧 host 名不再响应。
+
+### ✨ Added
+
+- **首次公开 npm 发布**（`@vortex-browser/shared`、`@vortex-browser/mcp`、`@vortex-browser/cli`、`@vortex-browser/server`，MIT 许可）。包从私有 `@bytenew` scope 迁移至公开 `@vortex-browser` scope，任何人可通过 `npm install @vortex-browser/mcp` 安装使用。
+
+- **一键安装脚本 `scripts/install.sh`**（`scripts/install.sh`、`docs/INSTALL.md`）。执行后自动完成：下载 Chrome 扩展、注册 Native Messaging host（`com.vortexbrowser.host`）、写入 host manifest 到系统目录（macOS / Linux）、配置 `~/.vortex/` 目录。`docs/INSTALL.md` 提供分步说明与常见问题排查指引。
+
+- **README 改写为英文，差异化产品定位**（`README.md`）。相较同类工具（playwright-mcp、Stagehand）明确 vortex 的定位：基于 Chrome Extension 的 agent-native 浏览器控制层，提供 MCP + CLI 双接入面、紧凑 a11y observe 输出、跨 frame / open shadow DOM 穿透、以及白盒审计驱动的原语正确性保证。
+
+### 🔄 Backward compatibility
+
+- 功能 API（`vortex_observe` / `vortex_act` / `vortex_extract` 等 15 个公开工具）与 v0.8.x 保持完全向后兼容；本版本的 breaking change 仅限包名与 host 名。
+
+---
+
 ## [0.8.0] - 2026-05-19
 
 ### 💥 Breaking changes
