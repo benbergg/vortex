@@ -1,98 +1,95 @@
 # Vortex
 
-让 LLM 直接驱动你正在用的本地 Chrome — 一套面向 AI Agent 的浏览器自动化协议与工具链。
+> Let your AI agent drive your **real, logged-in Chrome** — not a headless clone.
 
-不是另一个 Playwright（无头、独立浏览器），而是接管**用户已登录的真实浏览器会话**，做 Cookie/插件/历史都在的真实操作，适合：抓登录后才能看到的内容、跑日常 Web 任务、半监督的 RPA。
+Browser automation built for LLM agents (MCP / HTTP / WS). Unlike Playwright/Puppeteer (headless, isolated browsers) or browser-use (spins up its own session), Vortex **takes over the Chrome you're already logged into** — cookies, extensions, history all intact. Scrape behind-login content, run daily web tasks, do semi-supervised RPA.
 
-## 架构
+![demo](docs/assets/demo.gif)
+
+## Why Vortex (vs alternatives)
+
+| | Vortex | Playwright / Puppeteer | browser-use |
+|---|---|---|---|
+| Real logged-in session | ✅ your actual Chrome | ❌ fresh context | ❌ own browser |
+| Built for LLM agents | ✅ MCP-native | ⚠️ general | ✅ |
+| Bench coverage | ✅ 50/50 public-tool | n/a | n/a |
+
+## Quick start (Claude Code)
+
+```bash
+claude mcp add vortex --scope user -- npx -y @vortex-browser/mcp
+```
+
+Then install the Chrome extension + native host — see [install guide](docs/INSTALL.md).
+
+---
+
+## Architecture
 
 ```
-LLM (Claude Code / 自写客户端)
+LLM (Claude Code / custom client)
     │
     │ MCP / HTTP / WS
     ▼
 ┌─────────────────────────┐
-│  @vortex-browser/mcp    │  MCP server（stdio）
-│  @vortex-browser/cli    │  命令行
+│  @vortex-browser/mcp    │  MCP server (stdio)
+│  @vortex-browser/cli    │  CLI client
 └────────────┬────────────┘
              │  ws / http
              ▼
 ┌─────────────────────────┐
-│  @vortex-browser/server │  本地桥接
+│  @vortex-browser/server │  local bridge
 └────────────┬────────────┘
              │  Native Messaging (stdio)
              ▼
 ┌─────────────────────────┐
-│ @vortex-browser/extension│ Chrome 扩展（MV3）
+│ @vortex-browser/extension│ Chrome extension (MV3)
 └─────────────────────────┘
              │
              ▼
-       真实 Chrome 页面
+       Real Chrome page
 ```
 
-## 子项目
+## Packages
 
-| 包 | 作用 | README |
-|----|------|--------|
-| [`@vortex-browser/shared`](packages/shared) | 共享类型 / action 名 / 错误码 | [README](packages/shared/README.md) |
-| [`@vortex-browser/extension`](packages/extension) | Chrome 扩展（MV3）— 真正执行浏览器操作 | [README](packages/extension/README.md) |
-| [`@vortex-browser/server`](packages/server) | 本地桥接服务（NM ↔ HTTP/WS） | [README](packages/server/README.md) |
-| [`@vortex-browser/cli`](packages/cli) | 命令行客户端 — 终端直调 action | [README](packages/cli/README.md) |
-| [`@vortex-browser/mcp`](packages/mcp) | MCP server — 接 Claude Code 等 LLM 工具 | [README](packages/mcp/README.md) |
+| Package | Purpose | README |
+|---------|---------|--------|
+| [`@vortex-browser/shared`](packages/shared) | Shared types / action names / error codes | [README](packages/shared/README.md) |
+| [`@vortex-browser/extension`](packages/extension) | Chrome extension (MV3) — executes browser actions | [README](packages/extension/README.md) |
+| [`@vortex-browser/server`](packages/server) | Local bridge service (NM ↔ HTTP/WS) | [README](packages/server/README.md) |
+| [`@vortex-browser/cli`](packages/cli) | CLI client — invoke actions from the terminal | [README](packages/cli/README.md) |
+| [`@vortex-browser/mcp`](packages/mcp) | MCP server — connects Claude Code and other LLM tools | [README](packages/mcp/README.md) |
 
-完整设计：[`docs/DESIGN.md`](docs/DESIGN.md)（架构图、协议、关键设计决策、安全模型、路线图）。
+Full design: [`docs/DESIGN.md`](docs/DESIGN.md) (architecture diagrams, protocol, key design decisions, security model, roadmap).
 
-## 快速上手（接 Claude Code）
+## Tool surface (11 tools)
 
-```bash
-# 1. 装 server
-npm i -g @vortex-browser/server
+Three verbs + eight atomic primitives:
 
-# 2. 装扩展（dev 模式）
-git clone <this-repo> && cd vortex
-pnpm install && pnpm -r build
-# Chrome 扩展页 → 加载 packages/extension/dist/
-
-# 3. 装 NM host（让扩展能拉起 server，详见 server README）
-
-# 4. 注册到 Claude Code
-claude mcp add vortex --scope user -- npx -y @vortex-browser/mcp
-```
-
-打开 Claude Code 后让它调 `mcp__vortex__vortex_tab_create`，应能创建一个新标签页。
-
-## 能力一览（**11 个工具**，v0.6 起）
-
-三动词 + 八基础原子：
-
-| 类型 | 工具 |
+| Type | Tool |
 |------|------|
-| 写操作 | `vortex_act`（click / fill / type / select / scroll / hover 合一） |
-| 读结构 | `vortex_extract`（HTML / text / 引用 ref 等） |
-| 探查 | `vortex_observe`（候选元素 + assigned ref） |
-| 导航 | `vortex_navigate` / `vortex_tab_create` / `vortex_tab_close` |
-| 截图 / 等待 | `vortex_screenshot` / `vortex_wait_for` |
-| 输入 / 调试 / 存储 | `vortex_press` / `vortex_debug_read` / `vortex_storage` |
+| Write | `vortex_act` (click / fill / type / select / scroll / hover — unified) |
+| Read structure | `vortex_extract` (HTML / text / ref references, etc.) |
+| Inspect | `vortex_observe` (candidate elements + assigned refs) |
+| Navigate | `vortex_navigate` / `vortex_tab_create` / `vortex_tab_close` |
+| Screenshot / Wait | `vortex_screenshot` / `vortex_wait_for` |
+| Input / Debug / Storage | `vortex_press` / `vortex_debug_read` / `vortex_storage` |
 
-详见 [`packages/mcp/README.md`](packages/mcp/README.md)。
+See [`packages/mcp/README.md`](packages/mcp/README.md) for full tool documentation.
 
-## v0.5 → v0.6 升级
+## Full installation
 
-v0.6 收敛工具面 36 → 11，是一次破坏性变更。
+For step-by-step setup (extension, native host, server), see [docs/INSTALL.md](docs/INSTALL.md).
 
-- **迁移指南**：[`docs/v0.5-to-v0.6-migration.md`](docs/v0.5-to-v0.6-migration.md)
-- **自动迁移工具**：`npx @vortex-browser/migrate ./src`（dry-run 默认，`--write` 应用）
-- **暂不迁移**：可继续锁版本到 `@vortex-browser/mcp@^0.5`，[`v0.5.x` LTS 维护分支](https://github.com/benbergg/vortex/tree/v0.5.x)在 v0.6.0 起至少维护两个月（仅 critical bug fix）
-
-## 开发
+## Development
 
 ```bash
 pnpm install
-pnpm -r build              # 全量构建
-pnpm --filter <pkg> dev    # 单包 watch
+pnpm -r build              # full build
+pnpm --filter <pkg> dev    # single package watch mode
 ```
 
-每个子包 README 有独立的调试/构建指引。
+Each sub-package README has its own debug/build instructions.
 
 ## License
 
