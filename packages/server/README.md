@@ -58,9 +58,9 @@ Chrome 通过 NM host manifest 找到 `native-host.sh`：
 ```bash
 # macOS
 mkdir -p "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
-cat > "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.bytenew.vortex.json" <<EOF
+cat > "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.vortexbrowser.host.json" <<EOF
 {
-  "name": "com.bytenew.vortex",
+  "name": "com.vortexbrowser.host",
   "description": "Vortex NM host",
   "path": "$(npm root -g)/@vortex-browser/server/native-host.sh",
   "type": "stdio",

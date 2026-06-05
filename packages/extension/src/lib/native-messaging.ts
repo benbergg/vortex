@@ -1,6 +1,6 @@
 import type { NmMessageFromExtension, NmMessageFromServer } from "@vortex-browser/shared";
 
-const NM_HOST_NAME = "com.bytenew.vortex";
+const NM_HOST_NAME = "com.vortexbrowser.host";
 const KEEPALIVE_ALARM = "vortex-keepalive";
 
 type OnMessageCallback = (msg: NmMessageFromServer) => void;

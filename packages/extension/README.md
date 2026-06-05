@@ -48,7 +48,7 @@ pnpm dev             # vite build --watch（监听源码变更，扩展页面手
 
 ## Native Messaging 配对
 
-扩展启动时通过 `chrome.runtime.connectNative("com.bytenew.vortex")` 连上 `vortex-server` 的 stdio。
+扩展启动时通过 `chrome.runtime.connectNative("com.vortexbrowser.host")` 连上 `vortex-server` 的 stdio。
 
 NM host manifest 安装见 [`packages/server/README.md`](../server/README.md#native-messaging-host-安装)。
 没有 server 进程时扩展功能仍可用（仅 background.ts 的 NM 监听报错），但所有 vortex 工具会失败。

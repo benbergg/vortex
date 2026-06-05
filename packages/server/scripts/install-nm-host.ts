@@ -4,7 +4,7 @@ import { homedir, platform } from "os";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const NM_HOST_NAME = "com.bytenew.vortex";
+const NM_HOST_NAME = "com.vortexbrowser.host";
 const EXTENSION_ID = process.argv[2];
 
 if (!EXTENSION_ID) {
