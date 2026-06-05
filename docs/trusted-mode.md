@@ -14,4 +14,10 @@ vortex 默认用合成事件点击(无黄条,覆盖多数站)。少数站(如淘
 启动后 server 经 `ps` 检测到 flag,`vortex_act(click)` 自动走 CDP trusted。
 不带 flag 启动则回退现状(合成 + submit-intent),无黄条、覆盖多数站。
 
-> P2 将提供扩展内「重启进入 trusted 模式」一键入口,免手动命令。
+## 一键进入(P2)
+
+点 Chrome 工具栏 vortex 图标打开 popup → 「重启进入 trusted 模式」→ 再次点击确认。
+Chrome 会自动关闭所有标签页并带 flag 重启(可经「恢复标签页」找回),随后扩展自动重连、
+`vortex_act(click)` 即走 trusted。失败时 popup 会提示回退手动命令(见上)。
+
+> macOS only;Windows/Linux 留后续。
