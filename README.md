@@ -4,6 +4,8 @@
 
 Browser automation built for LLM agents (MCP / HTTP / WS). Unlike Playwright/Puppeteer (headless, isolated browsers) or browser-use (spins up its own session), Vortex **takes over the Chrome you're already logged into** — cookies, extensions, history all intact. Scrape behind-login content, run daily web tasks, do semi-supervised RPA.
 
+English | [简体中文](README.zh-CN.md)
+
 ![demo](docs/assets/demo.gif)
 
 ## Why Vortex (vs alternatives)
@@ -14,13 +16,77 @@ Browser automation built for LLM agents (MCP / HTTP / WS). Unlike Playwright/Pup
 | Built for LLM agents | ✅ MCP-native | ⚠️ general | ✅ |
 | Bench coverage | ✅ 50/50 public-tool | n/a | n/a |
 
-## Quick start (Claude Code)
+## How it works
 
+Vortex has **three components**, but you only install two:
+
+```
+AI client (Claude Code / Cursor / any MCP client)
+    │
+    │  MCP stdio  (no install needed — npx pulls it on demand)
+    ▼
+@vortex-browser/mcp          ← launched automatically by your AI client
+    │
+    │  ws://localhost:6800/ws
+    ▼
+@vortex-browser/server       ← installed on your machine; auto-started by Chrome
+    │                           via Native Messaging — you never run it manually
+    │  Native Messaging (stdio, host: com.vortexbrowser.host)
+    ▼
+Chrome extension (MV3)       ← installed in your Chrome
+    │
+    ▼
+Your real, logged-in Chrome page
+```
+
+**Key points:**
+- **You only install 2 things:** the Chrome extension + `@vortex-browser/server`.
+- **`@vortex-browser/mcp` installs itself** — your AI client runs `npx -y @vortex-browser/mcp` automatically; nothing to install.
+- **The server starts itself** — when the extension activates, Chrome launches it via Native Messaging. You never run `vortex-server` manually.
+- **Installation order matters:** load the extension first to get its ID, then register the native host with that ID.
+
+## Quick start
+
+Full step-by-step guide: **[docs/INSTALL.md](docs/INSTALL.md)**
+
+```bash
+# Step 1 — install the server globally
+npm i -g @vortex-browser/server
+
+# Step 2 — build & load the extension in Chrome (see INSTALL.md)
+#           copy the extension ID shown in chrome://extensions/
+
+# Step 3 — register the native host
+vortex-server install <your-extension-id>
+
+# Step 4 — add to your AI client (Claude Code example)
+claude mcp add vortex --scope user -- npx -y @vortex-browser/mcp
+```
+
+### Connect your AI client
+
+**Claude Code**
 ```bash
 claude mcp add vortex --scope user -- npx -y @vortex-browser/mcp
 ```
 
-Then install the Chrome extension + native host — see [install guide](docs/INSTALL.md).
+**Cursor** — add to `~/.cursor/mcp.json` or `.cursor/mcp.json` in your project:
+```json
+{
+  "mcpServers": {
+    "vortex": { "command": "npx", "args": ["-y", "@vortex-browser/mcp"] }
+  }
+}
+```
+
+**Claude Desktop / other MCP clients** — use the same stdio command in their MCP config:
+```json
+{ "command": "npx", "args": ["-y", "@vortex-browser/mcp"] }
+```
+
+**Any other MCP-compatible client** — any client that supports MCP stdio transport works with the command above.
+
+> Set `VORTEX_PORT=<port>` to change the server port (default: `6800`).
 
 ---
 
@@ -72,10 +138,6 @@ Full design: [`docs/DESIGN.md`](docs/DESIGN.md) (architecture diagrams, protocol
 | Advanced | `vortex_evaluate` (run JS) · `vortex_file_upload` · `vortex_storage` · `vortex_debug_read` |
 
 See [`packages/mcp/README.md`](packages/mcp/README.md) for full tool documentation.
-
-## Full installation
-
-For step-by-step setup (extension, native host, server), see [docs/INSTALL.md](docs/INSTALL.md).
 
 ## Development
 
