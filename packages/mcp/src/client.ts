@@ -1,6 +1,6 @@
 import WebSocket from "ws";
-import type { VtxEvent, VtxRequest, VtxResponse } from "@bytenew/vortex-shared";
-import { VtxEventType } from "@bytenew/vortex-shared";
+import type { VtxEvent, VtxRequest, VtxResponse } from "@vortex-browser/shared";
+import { VtxEventType } from "@vortex-browser/shared";
 import { eventStore } from "./lib/event-store.js";
 
 interface PendingRequest {

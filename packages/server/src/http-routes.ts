@@ -1,6 +1,6 @@
 import { Router, json } from "express";
-import type { VtxRequest } from "@bytenew/vortex-shared";
-import { VtxErrorCode } from "@bytenew/vortex-shared";
+import type { VtxRequest } from "@vortex-browser/shared";
+import { VtxErrorCode } from "@vortex-browser/shared";
 import type { MessageRouter } from "./message-router.js";
 
 export function createHttpRoutes(router: MessageRouter): Router {

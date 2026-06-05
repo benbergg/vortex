@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { NmRequest } from "@bytenew/vortex-shared";
+import type { NmRequest } from "@vortex-browser/shared";
 import { ActionRouter } from "../src/lib/router.js";
 // network.ts 有模块级 state（subscribedTabs/tabConfigs），跨测试要用 vi.resetModules 后动态 import
 let registerNetworkHandlers: typeof import("../src/handlers/network.js")["registerNetworkHandlers"];

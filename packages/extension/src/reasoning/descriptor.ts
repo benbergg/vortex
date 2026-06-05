@@ -1,7 +1,7 @@
 // L3: descriptor 三级消解（role+name → text → CSS）。
 // spec: vortex重构-L3-spec.md §2.2
 
-import { vtxError, VtxErrorCode } from "@bytenew/vortex-shared";
+import { vtxError, VtxErrorCode } from "@vortex-browser/shared";
 import type { AXNode, AXSnapshot, Descriptor } from "./types.js";
 import type { DebuggerLike } from "./ax-snapshot.js";
 

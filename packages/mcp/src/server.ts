@@ -51,7 +51,7 @@ import {
   fullPageTruncationWarning,
 } from "./lib/image-utils.js";
 import { eventStore } from "./lib/event-store.js";
-import { VtxError, DEFAULT_ERROR_META, type VtxEventLevel, type VtxErrorCode } from "@bytenew/vortex-shared";
+import { VtxError, DEFAULT_ERROR_META, type VtxEventLevel, type VtxErrorCode } from "@vortex-browser/shared";
 
 type ContentItem =
   | { type: "text"; text: string }
@@ -306,7 +306,7 @@ export async function handleCallTool(
         isError: true,
         content: [{
           type: "text" as const,
-          text: `vortex-server unreachable at localhost:${PORT}.\n${err.message}\n\nTo start: cd /path/to/vortex && pnpm --filter @bytenew/vortex-server start`,
+          text: `vortex-server unreachable at localhost:${PORT}.\n${err.message}\n\nTo start: cd /path/to/vortex && pnpm --filter @vortex-browser/server start`,
         }],
       };
     }
@@ -528,7 +528,7 @@ export async function handleCallTool(
     if (msg.includes("ECONNREFUSED") || msg.includes("Failed to connect")) {
       friendly =
         `vortex-server is not running at localhost:${PORT}.\n` +
-        `To start: cd /path/to/vortex && pnpm --filter @bytenew/vortex-server start\n\n` +
+        `To start: cd /path/to/vortex && pnpm --filter @vortex-browser/server start\n\n` +
         `Once it's running, retry your last tool call.\n\n` +
         `Original error: ${msg}`;
     } else if (msg.includes("Timeout")) {

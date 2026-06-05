@@ -1,7 +1,7 @@
 import { writeFileSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError } from "@vortex-browser/shared";
 
 const TMP_DIR = join(tmpdir(), "vortex-screenshots");
 let sessionCounter = 0;

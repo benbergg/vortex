@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { NmRequest } from "@bytenew/vortex-shared";
+import type { NmRequest } from "@vortex-browser/shared";
 import { ActionRouter } from "../src/lib/router.js";
 import { registerCaptureHandlers } from "../src/handlers/capture.js";
 

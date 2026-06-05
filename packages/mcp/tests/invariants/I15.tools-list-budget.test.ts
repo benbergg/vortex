@@ -11,7 +11,7 @@
 // description 也要点出此能力以引导 LLM 使用。同样优先 cap 微调而非压缩字符。
 
 import { describe, it, expect } from "vitest";
-import { COMMIT_KINDS } from "@bytenew/vortex-shared";
+import { COMMIT_KINDS } from "@vortex-browser/shared";
 import { getToolDefs, getInternalToolDef } from "../../src/tools/registry.js";
 
 describe("I15: tools/list budget + count + internalized grep", () => {
@@ -105,7 +105,7 @@ describe("I15: tools/list budget + count + internalized grep", () => {
 });
 
 // v0.8 H-7 fix: `vortex_fill.kind` 在三处 schema 与 extension commit-drivers
-// 的 CommitKind 之间必须严格一致。把 COMMIT_KINDS 拆到 @bytenew/vortex-shared
+// 的 CommitKind 之间必须严格一致。把 COMMIT_KINDS 拆到 @vortex-browser/shared
 // 作为单一真值源后，下面三条测试 lock 公开/内部 schema 与 shared 数组一致，
 // 任何一边私自加值/减值都会断在 CI。
 describe("H-7: vortex_fill.kind enum stays in sync with shared COMMIT_KINDS", () => {

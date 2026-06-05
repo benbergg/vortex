@@ -1,4 +1,4 @@
-# @bytenew/vortex-shared
+# @vortex-browser/shared
 
 Vortex 单子项目共享的类型与协议常量。**纯类型 / 常量包，无运行时副作用**。所有上游（extension / server / cli / mcp）都从这里导入，避免协议分裂。
 
@@ -18,7 +18,7 @@ import {
   PageActions, DomActions,
   type VtxRequest, type VtxResponse,
   VtxErrorCode,
-} from "@bytenew/vortex-shared";
+} from "@vortex-browser/shared";
 
 const req: VtxRequest = {
   id: "x",
@@ -40,4 +40,4 @@ pnpm build       # tsc 一次
 pnpm dev         # tsc --watch
 ```
 
-下游包通过 workspace 协议引用：`"@bytenew/vortex-shared": "workspace:*"`，改动后无需 publish 即生效。
+下游包通过 workspace 协议引用：`"@vortex-browser/shared": "workspace:*"`，改动后无需 publish 即生效。

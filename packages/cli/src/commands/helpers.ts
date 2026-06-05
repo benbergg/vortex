@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import { sendRequest, subscribe } from "../client.js";
 import { printResponse, printEvent, exitWithError } from "../output.js";
-import type { VtxEvent } from "@bytenew/vortex-shared";
+import type { VtxEvent } from "@vortex-browser/shared";
 
 export function getGlobalOpts(cmd: Command) {
   let root = cmd;

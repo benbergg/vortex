@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Vortex",
-  "description": "Browser automation core engine",
+  "description": "Let your AI agent drive your real, logged-in Chrome — browser automation for LLMs via MCP.",
   "version": "0.5.0",
   "permissions": [
     "nativeMessaging",

@@ -1,6 +1,6 @@
 // packages/extension/src/handlers/file.ts
 
-import { FileActions, VtxErrorCode, vtxError, VtxEventType } from "@bytenew/vortex-shared";
+import { FileActions, VtxErrorCode, vtxError, VtxEventType } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { NativeMessagingClient } from "../lib/native-messaging.js";
 import type { EventDispatcher } from "../events/dispatcher.js";

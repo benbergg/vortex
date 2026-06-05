@@ -1,5 +1,5 @@
-import type { NmRequest, NmResponse } from "@bytenew/vortex-shared";
-import { VtxError, VtxErrorCode, DEFAULT_ERROR_META } from "@bytenew/vortex-shared";
+import type { NmRequest, NmResponse } from "@vortex-browser/shared";
+import { VtxError, VtxErrorCode, DEFAULT_ERROR_META } from "@vortex-browser/shared";
 
 type Handler = (args: Record<string, unknown>, tabId?: number) => Promise<unknown>;
 

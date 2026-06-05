@@ -1,4 +1,4 @@
-import type { NmMessageFromExtension, NmMessageFromServer } from "@bytenew/vortex-shared";
+import type { NmMessageFromExtension, NmMessageFromServer } from "@vortex-browser/shared";
 
 export class NativeMessagingReader {
   private buffer = Buffer.alloc(0);

@@ -1,4 +1,4 @@
-import { PageActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { PageActions, VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 import type { DebuggerManager } from "../lib/debugger-manager.js";
 import { buildExecuteTarget, ensureFrameAttached } from "../lib/tab-utils.js";

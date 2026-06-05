@@ -2,7 +2,7 @@ import {
   VtxEventType,
   eventLevelOf,
   type VtxEventLevel,
-} from "@bytenew/vortex-shared";
+} from "@vortex-browser/shared";
 import type { NativeMessagingClient } from "../lib/native-messaging.js";
 
 interface EmitOpts {

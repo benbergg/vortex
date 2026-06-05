@@ -6,7 +6,7 @@
 // 本测试锁定新行为：probe 命中 shadow 元素（不再 OPEN_SHADOW / NOT_ATTACHED）。
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { VtxErrorCode } from "@bytenew/vortex-shared";
+import { VtxErrorCode } from "@vortex-browser/shared";
 import { setupActionabilityEnv } from "./helpers/actionability-test-setup.js";
 
 vi.mock("../src/adapter/page-side-loader.js", () => ({

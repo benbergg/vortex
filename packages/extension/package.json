@@ -1,6 +1,6 @@
 {
-  "name": "@bytenew/vortex-extension",
-  "version": "0.8.0",
+  "name": "@vortex-browser/extension",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "build": "vite build && node scripts/build-page-side.mjs",
@@ -13,7 +13,7 @@
     "depcruise:graph": "depcruise --config .dependency-cruiser.cjs --output-type dot src | dot -T svg > dep-graph.svg"
   },
   "dependencies": {
-    "@bytenew/vortex-shared": "workspace:*"
+    "@vortex-browser/shared": "workspace:*"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.0.0-beta.28",
@@ -23,5 +23,6 @@
     "typescript": "^5.7.0",
     "vite": "^6.0.0",
     "vitest": "^2.1.0"
-  }
+  },
+  "license": "MIT"
 }

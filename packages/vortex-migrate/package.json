@@ -1,6 +1,6 @@
 {
-  "name": "@bytenew/vortex-migrate",
-  "version": "0.8.0",
+  "name": "@vortex-browser/migrate",
+  "version": "1.0.0",
   "description": "Codemod CLI: rewrite v0.5 vortex_* tool calls to v0.6 11-tool surface.",
   "type": "module",
   "main": "dist/src/index.js",
@@ -8,7 +8,9 @@
   "bin": {
     "vortex-migrate": "dist/bin/vortex-migrate.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
@@ -24,5 +26,7 @@
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
-  }
+  },
+  "license": "MIT",
+  "private": true
 }

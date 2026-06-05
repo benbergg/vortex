@@ -6,7 +6,7 @@
 // UI 看着有动作（day cell 能选中）但 v-model 不更新。只有 CDP
 // Input.dispatchMouseEvent 产生的 isTrusted=true 事件能完整驱动。
 
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { DebuggerManager } from "../../lib/debugger-manager.js";
 import { getIframeOffset } from "../../lib/iframe-offset.js";
 import { pageQuery as nativePageQuery } from "../native.js";

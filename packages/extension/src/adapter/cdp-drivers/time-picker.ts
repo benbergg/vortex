@@ -5,7 +5,7 @@
 // 2) 三列 spinner 各自 scrollIntoView 目标 li → CDP click
 // 3) CDP click "OK"，等 panel close，verify input.value
 
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { DebuggerManager } from "../../lib/debugger-manager.js";
 import { getIframeOffset } from "../../lib/iframe-offset.js";
 import { pageQuery as nativePageQuery } from "../native.js";

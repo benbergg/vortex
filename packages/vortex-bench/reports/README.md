@@ -15,15 +15,15 @@ Whenever you add / remove cases or change a public tool's surface, `baseline.jso
 
 ```bash
 # 1) Bring up the playground server (in another shell)
-pnpm -F @bytenew/vortex-bench playground
+pnpm -F @vortex-browser/bench playground
 
 # 2) Load packages/extension/dist as an unpacked Chrome extension and
 #    make sure native-host.sh is wired into your NM host config.
 #    See packages/server/README.md for the one-time setup.
 
 # 3) From the repo root, run the full bench and promote it
-pnpm -F @bytenew/vortex-bench bench:baseline                        # single-shot
-pnpm -F @bytenew/vortex-bench bench run --all --repeats 3 && \
+pnpm -F @vortex-browser/bench bench:baseline                        # single-shot
+pnpm -F @vortex-browser/bench bench run --all --repeats 3 && \
   cp packages/vortex-bench/reports/latest.json \
      packages/vortex-bench/reports/baseline.json                    # recommended
 ```
@@ -34,7 +34,7 @@ pnpm -F @bytenew/vortex-bench bench run --all --repeats 3 && \
 
 ```bash
 mv reports/baseline.json reports/archive/baseline-vX.Y-Ncases-$(date +%F).json
-pnpm -F @bytenew/vortex-bench bench run --all --repeats 3
+pnpm -F @vortex-browser/bench bench run --all --repeats 3
 cp reports/latest.json reports/baseline.json
 ```
 

@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import type { VtxRequest, VtxResponse, VtxEvent } from "@bytenew/vortex-shared";
+import type { VtxRequest, VtxResponse, VtxEvent } from "@vortex-browser/shared";
 
 export interface ClientOptions {
   port: number;

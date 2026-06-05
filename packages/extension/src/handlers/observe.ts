@@ -1,4 +1,4 @@
-import { ObserveActions, VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { ObserveActions, VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { ActionRouter } from "../lib/router.js";
 import { getActiveTabId, buildExecuteTarget, ensureFrameAttached } from "../lib/tab-utils.js";
 import { getIframeOffset } from "../lib/iframe-offset.js";

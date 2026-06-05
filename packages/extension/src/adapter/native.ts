@@ -1,7 +1,7 @@
 // L1 Native Adapter：chrome.tabs / scripting / storage 包装。
 // 见 ../handlers/dom.ts 内现有调用，PR #1 各 task 逐步迁入本文件。
 
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError } from "@vortex-browser/shared";
 import type { NativeAdapter } from "./types.js";
 import { buildExecuteTarget } from "../lib/tab-utils.js";
 

@@ -1,4 +1,4 @@
-# @bytenew/vortex-extension
+# @vortex-browser/extension
 
 Vortex Chrome 扩展（Manifest V3）。承载所有浏览器侧能力，通过 Native Messaging 与 `vortex-server` 通信，由 server 把 action 请求路由到对应 handler。
 
@@ -28,7 +28,7 @@ src/
     └── frames.ts          # frames.list / find
 ```
 
-action 名定义在 `@bytenew/vortex-shared`，handler 在此实现。新增 action 时两边都要改。
+action 名定义在 `@vortex-browser/shared`，handler 在此实现。新增 action 时两边都要改。
 
 ## 构建
 
@@ -48,7 +48,7 @@ pnpm dev             # vite build --watch（监听源码变更，扩展页面手
 
 ## Native Messaging 配对
 
-扩展启动时通过 `chrome.runtime.connectNative("com.bytenew.vortex")` 连上 `vortex-server` 的 stdio。
+扩展启动时通过 `chrome.runtime.connectNative("com.vortexbrowser.host")` 连上 `vortex-server` 的 stdio。
 
 NM host manifest 安装见 [`packages/server/README.md`](../server/README.md#native-messaging-host-安装)。
 没有 server 进程时扩展功能仍可用（仅 background.ts 的 NM 监听报错），但所有 vortex 工具会失败。
@@ -61,4 +61,4 @@ NM host manifest 安装见 [`packages/server/README.md`](../server/README.md#nat
 
 ## 协议
 
-所有线缆消息形态（NmRequest/NmResponse/VtxRequest/VtxResponse）见 `@bytenew/vortex-shared/protocol.ts`。错误用 `VtxErrorCode` 标准化分类。
+所有线缆消息形态（NmRequest/NmResponse/VtxRequest/VtxResponse）见 `@vortex-browser/shared/protocol.ts`。错误用 `VtxErrorCode` 标准化分类。

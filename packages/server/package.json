@@ -1,6 +1,6 @@
 {
-  "name": "@bytenew/vortex-server",
-  "version": "0.8.0",
+  "name": "@vortex-browser/server",
+  "version": "1.0.0",
   "type": "module",
   "main": "dist/src/index.js",
   "types": "dist/src/index.d.ts",
@@ -18,7 +18,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@bytenew/vortex-shared": "workspace:*",
+    "@vortex-browser/shared": "workspace:*",
     "commander": "^13.0.0",
     "express": "^4.21.0",
     "ws": "^8.18.0"
@@ -28,5 +28,24 @@
     "@types/ws": "^8.5.0",
     "typescript": "^5.7.0",
     "vitest": "^2.1.0"
+  },
+  "license": "MIT",
+  "description": "Local bridge server for Vortex (Native Messaging ↔ HTTP/WS).",
+  "keywords": [
+    "browser-automation",
+    "ai-agents",
+    "mcp",
+    "chrome-extension",
+    "llm",
+    "puppeteer-alternative",
+    "playwright-alternative"
+  ],
+  "homepage": "https://github.com/benbergg/vortex-browser",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/benbergg/vortex-browser.git"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

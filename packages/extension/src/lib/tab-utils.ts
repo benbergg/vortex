@@ -1,4 +1,4 @@
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError } from "@vortex-browser/shared";
 
 export async function getActiveTabId(tabId?: number): Promise<number> {
   if (tabId) return tabId;

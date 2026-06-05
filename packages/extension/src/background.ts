@@ -1,5 +1,5 @@
-import type { NmRequest } from "@bytenew/vortex-shared";
-import { VtxEventType } from "@bytenew/vortex-shared";
+import type { NmRequest } from "@vortex-browser/shared";
+import { VtxEventType } from "@vortex-browser/shared";
 import { NativeMessagingClient } from "./lib/native-messaging.js";
 import { ActionRouter } from "./lib/router.js";
 import { DebuggerManager } from "./lib/debugger-manager.js";

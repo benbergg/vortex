@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { VtxResponse } from "@bytenew/vortex-shared";
+import type { VtxResponse } from "@vortex-browser/shared";
 
 const TRANSIENT_PATTERNS = [
   "Cannot access contents",

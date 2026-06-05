@@ -1,6 +1,6 @@
 // packages/mcp/src/lib/ref-parser.ts
 
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError } from "@vortex-browser/shared";
 
 // v0.8 dual-format window telemetry. Bare refs `@eN` / `@fNeM` are accepted
 // for backward compat but slated for removal in v0.9; track in-session usage

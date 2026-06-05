@@ -1,4 +1,4 @@
-# @bytenew/vortex-bench
+# @vortex-browser/bench
 
 vortex 工具链的 **mechanical bench** —— 通过 Element Plus playground + TypeScript 断言脚本，零 LLM 成本地回归测试 vortex MCP 工具。
 
@@ -41,14 +41,14 @@ packages/vortex-bench/
 
 ```bash
 # 1. 起 playground（独立终端长跑）
-pnpm -F @bytenew/vortex-bench playground        # localhost:5173
+pnpm -F @vortex-browser/bench playground        # localhost:5173
 
 # 2. 跑 case（另一终端）
-pnpm -F @bytenew/vortex-bench bench run el-dropdown
-pnpm -F @bytenew/vortex-bench bench run --all
-pnpm -F @bytenew/vortex-bench bench run --all --repeats 3  # median + majority-pass
-pnpm -F @bytenew/vortex-bench bench diff        # 和 baseline.json 比
-pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 baseline
+pnpm -F @vortex-browser/bench bench run el-dropdown
+pnpm -F @vortex-browser/bench bench run --all
+pnpm -F @vortex-browser/bench bench run --all --repeats 3  # median + majority-pass
+pnpm -F @vortex-browser/bench bench diff        # 和 baseline.json 比
+pnpm -F @vortex-browser/bench bench baseline    # 把当前结果写成新 baseline
 ```
 
 `--repeats N` 让每个 case 跑 N 次后聚合：numeric 字段取 median，`passed` 走 majority-pass（`passRate ≥ 0.5`，平票算 pass），report 多出 `n=N pass=X.XX` 列暴露 flakiness。N=1（默认）保持向后兼容的单跑行为，输出字节不变。
@@ -149,7 +149,7 @@ pnpm -F @bytenew/vortex-bench bench baseline    # 把当前结果写成新 basel
 
 ```bash
 # 开发流：改 vortex → 跑 bench → 看 diff
-pnpm -F @bytenew/vortex-bench playground   # 独立终端
+pnpm -F @vortex-browser/bench playground   # 独立终端
 pnpm bench run --all                       # 跑全部 case → latest.json
 pnpm bench diff                            # 和 baseline.json 比
 

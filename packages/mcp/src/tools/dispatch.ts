@@ -2,7 +2,7 @@
 // 新工具名 → extension action + 参数 reshape。
 // 与 server.ts 解耦，便于单元测试。
 
-import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";
+import { VtxErrorCode, vtxError } from "@vortex-browser/shared";
 
 /**
  * MCP client 会把 untyped `value:{}` schema 的「对象/数组」实参序列化成 JSON

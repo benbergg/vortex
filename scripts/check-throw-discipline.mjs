@@ -3,7 +3,7 @@
  * 错误抛出规范检查（替代 ESLint custom rule）
  *
  * 规则：handlers / lib 层禁止 `throw new Error(...)`，应使用
- * `@bytenew/vortex-shared` 的 vtxError() 构造结构化错误：
+ * `@vortex-browser/shared` 的 vtxError() 构造结构化错误：
  *
  *   throw vtxError(VtxErrorCode.XXX, "msg", { context });
  *
@@ -76,7 +76,7 @@ if (violations.length > 0) {
     console.error(`    ${v.content}`);
   }
   console.error(`\n改造方式：`);
-  console.error(`  import { VtxErrorCode, vtxError } from "@bytenew/vortex-shared";`);
+  console.error(`  import { VtxErrorCode, vtxError } from "@vortex-browser/shared";`);
   console.error(`  throw vtxError(VtxErrorCode.XXX, "msg", { selector, tabId });\n`);
   process.exit(1);
 }

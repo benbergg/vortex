@@ -1,7 +1,7 @@
 import { WebSocketServer, type WebSocket } from "ws";
 import type { Server } from "http";
-import type { VtxRequest } from "@bytenew/vortex-shared";
-import { VtxErrorCode } from "@bytenew/vortex-shared";
+import type { VtxRequest } from "@vortex-browser/shared";
+import { VtxErrorCode } from "@vortex-browser/shared";
 import type { SessionManager } from "./session.js";
 import type { MessageRouter } from "./message-router.js";
 

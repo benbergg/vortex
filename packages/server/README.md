@@ -1,15 +1,15 @@
-# @bytenew/vortex-server
+# @vortex-browser/server
 
 Vortex 桥接服务。一边是 Chrome 扩展（Native Messaging stdio），一边是本地客户端：
-- **MCP server**（`@bytenew/vortex-mcp`）通过本地 WebSocket
-- **CLI**（`@bytenew/vortex-cli`）通过本地 HTTP
+- **MCP server**（`@vortex-browser/mcp`）通过本地 WebSocket
+- **CLI**（`@vortex-browser/cli`）通过本地 HTTP
 
 ## 安装
 
 ```bash
-npm i -g @bytenew/vortex-server
+npm i -g @vortex-browser/server
 # 或在仓库内
-pnpm --filter @bytenew/vortex-server build
+pnpm --filter @vortex-browser/server build
 ```
 
 ## 启动
@@ -58,11 +58,11 @@ Chrome 通过 NM host manifest 找到 `native-host.sh`：
 ```bash
 # macOS
 mkdir -p "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts"
-cat > "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.bytenew.vortex.json" <<EOF
+cat > "$HOME/Library/Application Support/Google/Chrome/NativeMessagingHosts/com.vortexbrowser.host.json" <<EOF
 {
-  "name": "com.bytenew.vortex",
+  "name": "com.vortexbrowser.host",
   "description": "Vortex NM host",
-  "path": "$(npm root -g)/@bytenew/vortex-server/native-host.sh",
+  "path": "$(npm root -g)/@vortex-browser/server/native-host.sh",
   "type": "stdio",
   "allowed_origins": ["chrome-extension://<EXTENSION_ID>/"]
 }

@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { VtxError, VtxErrorCode } from "@bytenew/vortex-shared";
-import { vtxError } from "@bytenew/vortex-shared";
+import { VtxError, VtxErrorCode } from "@vortex-browser/shared";
+import { vtxError } from "@vortex-browser/shared";
 import { ActionRouter } from "../src/lib/router.js";
-import type { NmRequest } from "@bytenew/vortex-shared";
+import type { NmRequest } from "@vortex-browser/shared";
 
 function mkReq(tool: string, args: Record<string, unknown> = {}): NmRequest {
   return {
