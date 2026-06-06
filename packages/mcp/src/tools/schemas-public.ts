@@ -234,6 +234,7 @@ export const PUBLIC_TOOLS: ToolDef[] = [
         op: { enum: ["get", "set", "session-get", "session-set", "cookies-get", "list-keys", "list-all"] },
         key: { type: "string" },
         value: {},
+        maxLength: { type: "number", default: 10240 },  // BUG-002: ms default 10KB
         ...tabFields,
       },
       required: ["op"],

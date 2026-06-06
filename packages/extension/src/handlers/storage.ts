@@ -120,12 +120,27 @@ export function registerStorageHandlers(router: ActionRouter): void {
     [StorageActions.GET_LOCAL_STORAGE]: async (args, tabId) => {
       const key = args.key as string | undefined;
       const mode = (args.mode as "keys" | "all" | undefined) ?? null;
+      // BUG-002: maxLength validation (对齐 B3-7 extract maxLength)
+      const maxLength = (args.maxLength as number | undefined) ?? 10240;
+      if (!Number.isInteger(maxLength) || maxLength < 1 || maxLength > 5242880) {
+        throw vtxError(VtxErrorCode.INVALID_PARAMS,
+          `maxLength must be an integer in [1, 5242880]; got ${maxLength}`);
+      }
       const tid = await getActiveTabId((args.tabId as number | undefined) ?? tabId);
       const results = await chrome.scripting.executeScript({
         target: { tabId: tid },
-        func: (k: string | null, m: "keys" | "all" | null) => {
+        func: (k: string | null, m: "keys" | "all" | null, ml: number) => {
+          const lim = ml || 10240;  // 兜底:防御性默认
+          const truncate = (s: string) => {
+            if (s.length <= lim) return s;
+            return s.slice(0, lim) + "\n\n[VORTEX_TRUNCATED original=" + s.length + " limit=" + lim + "] Call vortex_observe first for a structured index on large pages.";
+          };
           try {
-            if (k) return { result: localStorage.getItem(k) };
+            if (k !== null) {
+              const v = localStorage.getItem(k);
+              if (v == null) return { result: null };
+              return { result: truncate(v) };  // BUG-002: 截断单大 key
+            }
             // B3-2 v3.3 (V2): m 不为空走摘要(内联,不能调模块级 summarizeStorage——
             // 序列化丢作用域)。逻辑须与模块级 summarizeStorage 同步。
             if (m) {
@@ -139,22 +154,23 @@ export function registerStorageHandlers(router: ActionRouter): void {
                 for (const kk of keys) valueLengths[kk] = (localStorage.getItem(kk) ?? "").length;
                 return { result: { keys, totalKeys: keys.length, valueLengths } };
               }
+              // BUG-002: 截断 list-all 的 values
               const values: Record<string, string> = {};
-              for (const kk of keys) values[kk] = localStorage.getItem(kk) ?? "";
+              for (const kk of keys) values[kk] = truncate(localStorage.getItem(kk) ?? "");
               return { result: { keys, totalKeys: keys.length, values } };
             }
             // 旧契约:不传 key + 不传 mode → 仍返 Record<string,string> 全量(不破)
             const all: Record<string, string> = {};
             for (let i = 0; i < localStorage.length; i++) {
               const kk = localStorage.key(i);
-              if (kk) all[kk] = localStorage.getItem(kk) ?? "";
+              if (kk) all[kk] = truncate(localStorage.getItem(kk) ?? "");  // BUG-002
             }
             return { result: all };
           } catch (err) {
             return { error: err instanceof Error ? err.message : String(err) };
           }
         },
-        args: [key ?? null, mode],
+        args: [key ?? null, mode, maxLength],
         world: "MAIN",
       });
       const res = results[0]?.result as { result?: unknown; error?: string };

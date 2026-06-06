@@ -282,10 +282,11 @@ export function dispatchNewTool(
       return { action, params: next };
     }
     case "vortex_storage": {
-      const { op, key, value, ...rest } = params;
+      const { op, key, value, maxLength, ...rest } = params;  // BUG-002: maxLength
       const next: Record<string, unknown> = { ...rest };
       if (key !== undefined) next.key = key;
       if (value !== undefined) next.value = value;
+      if (maxLength !== undefined) next.maxLength = maxLength;  // BUG-002
       switch (op) {
         case "get":
           return { action: "storage.getLocalStorage", params: next };
@@ -299,10 +300,11 @@ export function dispatchNewTool(
           return { action: "storage.getCookies", params: next };
         // B3-2 v3.3 (V2):list-keys / list-all 走 storage.getLocalStorage 并带 mode,
         // handler page-side func 内联摘要逻辑(不传 values 体积;list-all 显式 opt-in)。
+        // BUG-002:list-all 也传 maxLength 让 caller 控 values 截断上限。
         case "list-keys":
-          return { action: "storage.getLocalStorage", params: { mode: "keys" } };
+          return { action: "storage.getLocalStorage", params: maxLength !== undefined ? { mode: "keys", maxLength } : { mode: "keys" } };
         case "list-all":
-          return { action: "storage.getLocalStorage", params: { mode: "all" } };
+          return { action: "storage.getLocalStorage", params: maxLength !== undefined ? { mode: "all", maxLength } : { mode: "all" } };
         default:
           throw vtxError(
             VtxErrorCode.INVALID_PARAMS,
