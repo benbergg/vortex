@@ -191,9 +191,15 @@ describe("I16: dispatch routing for 11 public tools", () => {
       expect(r?.params.limit).toBe(50);
     });
 
-    it("source=network → network.getLogs", () => {
-      const r = dispatchNewTool("vortex_debug_read", { source: "network" });
+    it("source=network + pattern → network.getLogs (B3-8: pattern required)", () => {
+      const r = dispatchNewTool("vortex_debug_read", { source: "network", pattern: "/api/" });
       expect(r?.action).toBe("network.getLogs");
+      expect(r?.params.pattern).toBe("/api/");
+    });
+
+    it("source=network 无 pattern → 抛 INVALID_PARAMS (B3-8 防护)", () => {
+      expect(() => dispatchNewTool("vortex_debug_read", { source: "network" }))
+        .toThrowError(/pattern.*required/i);
     });
   });
 

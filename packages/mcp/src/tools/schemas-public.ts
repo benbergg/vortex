@@ -185,7 +185,7 @@ export const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "vortex_debug_read",
     action: "L4.debug_read",
-    description: "Read console or network logs.",
+    description: "Read console (no pattern) or network (pattern REQUIRED).",
     schema: {
       type: "object",
       properties: {

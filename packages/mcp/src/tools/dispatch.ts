@@ -259,6 +259,23 @@ export function dispatchNewTool(
     case "vortex_debug_read": {
       const { source, filter, tail, ...rest } = params;
       const next: Record<string, unknown> = { ...rest };
+      // B3-8: network source 必须有 pattern (top-level 或 filter.pattern), 避免 5000 条 dump
+      // console source 不受约束 (console.getLogs 无 pattern 概念)
+      if (source === "network") {
+        const topPattern = typeof rest.pattern === "string" ? rest.pattern.trim() : "";
+        const filterPattern =
+          filter && typeof filter === "object" && typeof (filter as any).pattern === "string"
+            ? ((filter as any).pattern as string).trim()
+            : "";
+        if (!topPattern && !filterPattern) {
+          throw vtxError(
+            VtxErrorCode.INVALID_PARAMS,
+            "vortex_debug_read source=network: pattern is required " +
+              "(pass top-level 'pattern' or 'filter.pattern', e.g. '/api/'). " +
+              "Use a substring to avoid the 5000-entry hard cap from blowing the response.",
+          );
+        }
+      }
       if (filter && typeof filter === "object") Object.assign(next, filter);
       if (tail !== undefined) next.limit = tail;
       const action = source === "network" ? "network.getLogs" : "console.getLogs";
