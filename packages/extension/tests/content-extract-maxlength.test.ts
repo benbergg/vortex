@@ -1,8 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import type { NmRequest } from "@vortex-browser/shared";
 import { truncateWithTextTrailer } from "../src/lib/truncate.js";
+import { ActionRouter } from "../src/lib/router.js";
+import { registerContentHandlers } from "../src/handlers/content.js";
 
 /**
  * TDD: vortex_extract 加 maxLength 截断参数 (B3-7, v3.1 P2).
@@ -76,10 +79,82 @@ describe("truncateWithTextTrailer 纯函数真测 (B3-7 复核要求)", () => {
     expect(r).not.toMatch(/^[a-z]/);  // 不应以 "hello" 开头
   });
 
-  it("回归保护: 现有 128KB 默认 (maxBytes 不传 maxLength) 不破", () => {
-    // 模拟现有调用: 128KB 默认, 100KB 文本不应截断
+  it("maxBytes 显式 128KB 时放宽: 100KB 文本不截断", () => {
+    // 显式传 maxBytes=131072 时, 100KB 文本不应截断(向后兼容)
     const text = "z".repeat(100 * 1024);
     const r = truncateWithTextTrailer(text, 131072);  // 128KB
     expect(r).toBe(text);  // 不超限, 不截断
+  });
+});
+
+/**
+ * handler 真实行为测试(填补 v3.1 复核盲点):mock executeScript 返回超长串,
+ * 经 router 走真实 GET_TEXT handler, 断言"默认/override"的实际截断行为。
+ * 这能抓住此前的死代码缺陷——effectiveLimit 误读 args.maxLength ?? maxBytes(128KB),
+ * 导致省略 maxLength 时默认 10KB 从未生效(纯函数/regex 测试都抓不到)。
+ */
+function mkReq(tool: string, args: Record<string, unknown> = {}, tabId = 42): NmRequest {
+  return { type: "tool_request", tool, args, requestId: "r-1", tabId };
+}
+
+describe("vortex_extract maxLength handler 真实行为 (B3-7, v3.1 复核)", () => {
+  let router: ActionRouter;
+  // 区分两类 executeScript 调用: loadPageSideModule 用 files(忽略返回), GET_TEXT 用 func+args
+  function stubChrome(longText: string) {
+    const executeScript = vi.fn().mockImplementation((opts: Record<string, unknown>) => {
+      if (Array.isArray((opts as { files?: unknown }).files)) return Promise.resolve([]);
+      return Promise.resolve([{ result: { result: longText } }]);
+    });
+    vi.stubGlobal("chrome", {
+      tabs: { query: vi.fn().mockResolvedValue([{ id: 42, active: true }]) },
+      scripting: { executeScript },
+    });
+  }
+
+  beforeEach(() => {
+    router = new ActionRouter();
+    registerContentHandlers(router);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("省略 maxLength → 默认截到 10240 (此前死代码 bug: 误用 128KB)", async () => {
+    stubChrome("a".repeat(50000));
+    const resp = await router.dispatch(mkReq("content.getText", {}));
+    expect(resp.error).toBeUndefined();
+    const out = resp.result as string;
+    // 截到 10240 + trailer(~150), 远小于原 50000; 含截断标记 limit=10240
+    expect(out.length).toBeLessThan(10240 + 300);
+    expect(out).toMatch(/\[VORTEX_TRUNCATED original=50000 limit=10240\]/);
+  });
+
+  it("显式 maxLength=1024 → 截到 1024", async () => {
+    stubChrome("b".repeat(50000));
+    const resp = await router.dispatch(mkReq("content.getText", { maxLength: 1024 }));
+    const out = resp.result as string;
+    expect(out).toMatch(/\[VORTEX_TRUNCATED original=50000 limit=1024\]/);
+  });
+
+  it("maxBytes 向后兼容: 显式 131072 → 50000 文本不截断", async () => {
+    stubChrome("c".repeat(50000));
+    const resp = await router.dispatch(mkReq("content.getText", { maxBytes: 131072 }));
+    expect(resp.result).toBe("c".repeat(50000));
+  });
+
+  it("maxLength 优先于 maxBytes: maxLength=1024 + maxBytes=131072 → 截到 1024", async () => {
+    stubChrome("d".repeat(50000));
+    const resp = await router.dispatch(mkReq("content.getText", { maxLength: 1024, maxBytes: 131072 }));
+    expect(resp.result as string).toMatch(/limit=1024\]/);
+  });
+
+  it("maxLength 越界(0)抛 INVALID_PARAMS", async () => {
+    stubChrome("e".repeat(100));
+    const resp = await router.dispatch(mkReq("content.getText", { maxLength: 0 }));
+    expect(resp.error?.code ?? resp.error).toMatch(/INVALID_PARAMS/);
+  });
+
+  it("maxBytes 越界(<4096)抛 INVALID_PARAMS", async () => {
+    stubChrome("f".repeat(100));
+    const resp = await router.dispatch(mkReq("content.getText", { maxBytes: 100 }));
+    expect(resp.error?.code ?? resp.error).toMatch(/INVALID_PARAMS|maxBytes/);
   });
 });
