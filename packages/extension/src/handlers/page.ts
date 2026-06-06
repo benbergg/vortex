@@ -121,6 +121,47 @@ export { waitForDomReady };
 // 注：用户把 VORTEX_TIMEOUT_MS 调到 <25s 时仍可能被传输层先截断——属显式短预算选择。
 const NAVIGATE_LOAD_TIMEOUT_MS = 25_000;
 
+/**
+ * CDP 历史导航:替代 chrome.tabs.goBack / goForward。
+ *
+ * chrome.tabs.goBack/goForward 受 Chrome history-manipulation intervention
+ * 影响——扩展通过 chrome.tabs.update 发起(无页面内用户手势)的导航 entry 会被
+ * 标记为「在 back/forward UI 中跳过」,导致 goBack 报原生错误 "Cannot find a
+ * next page in history",即便 window.history 仍可后退(vortex_navigate 建立的
+ * 历史尤其踩此坑,2026-06-06 e2e 确诊:同一 tab 同栈同位置,页面级 history.back()
+ * 成功而扩展级 chrome.tabs.goBack 失败)。改用 CDP Page.getNavigationHistory +
+ * Page.navigateToHistoryEntry 按 entryId 精确导航,绕过 UI-skip。delta=-1 后退、
+ * +1 前进。已在栈底/顶时抛 NO_EFFECT —— 而非裸 Error 冒泡被 router 兜底成
+ * JS_EXECUTION_ERROR + 误导的「调整 selector」hint。
+ */
+export async function navigateHistory(
+  debuggerMgr: DebuggerManager,
+  tid: number,
+  delta: -1 | 1,
+): Promise<void> {
+  await debuggerMgr.attach(tid);
+  const { currentIndex, entries } = (await debuggerMgr.sendCommand(
+    tid,
+    "Page.getNavigationHistory",
+  )) as { currentIndex: number; entries: Array<{ id: number }> };
+  const targetIndex = currentIndex + delta;
+  if (targetIndex < 0 || targetIndex >= entries.length) {
+    throw vtxError(
+      VtxErrorCode.NO_EFFECT,
+      delta < 0
+        ? "Already at the oldest entry in history; cannot go back."
+        : "Already at the newest entry in history; cannot go forward.",
+      undefined,
+      {
+        hint: "No browser-history entry in that direction. Load a page directly with vortex_navigate(url).",
+      },
+    );
+  }
+  await debuggerMgr.sendCommand(tid, "Page.navigateToHistoryEntry", {
+    entryId: entries[targetIndex].id,
+  });
+}
+
 export function registerPageHandlers(router: ActionRouter, debuggerMgr: DebuggerManager): void {
   router.registerAll({
     [PageActions.NAVIGATE]: async (args, tabId) => {
@@ -211,7 +252,7 @@ export function registerPageHandlers(router: ActionRouter, debuggerMgr: Debugger
 
     [PageActions.BACK]: async (args, tabId) => {
       const tid = await getActiveTabId(tabId);
-      await chrome.tabs.goBack(tid);
+      await navigateHistory(debuggerMgr, tid, -1);
       const { degraded } = await waitForTabLoad(tid, NAVIGATE_LOAD_TIMEOUT_MS);
       const tab = await chrome.tabs.get(tid);
       return { url: tab.url, title: tab.title, ...(degraded ? { degraded: true } : {}) };
@@ -219,7 +260,7 @@ export function registerPageHandlers(router: ActionRouter, debuggerMgr: Debugger
 
     [PageActions.FORWARD]: async (args, tabId) => {
       const tid = await getActiveTabId(tabId);
-      await chrome.tabs.goForward(tid);
+      await navigateHistory(debuggerMgr, tid, 1);
       const { degraded } = await waitForTabLoad(tid, NAVIGATE_LOAD_TIMEOUT_MS);
       const tab = await chrome.tabs.get(tid);
       return { url: tab.url, title: tab.title, ...(degraded ? { degraded: true } : {}) };
