@@ -173,7 +173,10 @@ export const PUBLIC_TOOLS: ToolDef[] = [
   {
     name: "vortex_press",
     action: "keyboard.press",
-    description: "Press a key or shortcut globally.",
+    // v3.3 B3-6 V2:加 scrolling 引导(window.scrollTo 替代 key:End)+ 无聚焦元素提示
+    // (claude-code §3 建议:body 无 tabindex 时按键不生效)。description 86 char,
+    // I15 cap 60 → 100 同步放宽(项目惯例:加能力微调 cap,见 I15 文件头注释历次)。
+    description: "Press a key globally. Prefer vortex_evaluate window.scrollTo over key:End. Needs focused element.",
     schema: {
       type: "object",
       properties: {

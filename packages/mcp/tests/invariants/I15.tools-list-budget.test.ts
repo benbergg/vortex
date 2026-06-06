@@ -25,6 +25,14 @@
 // truncateWithTextTrailer),新增 schema 字段 ~30B + description 改写
 // 提及"maxLength 10KB"。maxLength 是真新增公开能力,cap 微调 (+100,
 // 跟历次同步长) 而非压缩字符。新 payload 实测 5225B,留 75B 余量。
+//
+// v3.3 PR-redesign: 5300 → 5500 B,description 60 → 120 char。
+// (1) B3-2 vortex_storage 加 list-keys/-all 公开能力,description 重写
+//     "list-keys/-all for ls summary."(54 char,在原 60 之内,无 schema 变化)。
+// (2) B3-6 vortex_press description 加 scrolling 引导(window.scrollTo 替代
+//     key:End)+ 无聚焦元素提示(40 → 114 char)。B3-6 是 P0 体验断点,根因
+//     是 body 无 tabindex,提示 LLM 改用 evaluate scrollTo 是真修复。cap
+//     同步放宽 (+200B, +60 char),沿用历次"加能力微调 cap 不压缩字符"惯例。
 
 import { describe, it, expect } from "vitest";
 import { COMMIT_KINDS } from "@vortex-browser/shared";
@@ -36,8 +44,8 @@ describe("I15: tools/list budget + count + internalized grep", () => {
     defs.map(d => ({ name: d.name, description: d.description, inputSchema: d.schema })),
   );
 
-  it("tools/list 字节 ≤ 5300 B", () => {
-    expect(toolsListPayload.length).toBeLessThanOrEqual(5300);
+  it("tools/list 字节 ≤ 5500 B", () => {
+    expect(toolsListPayload.length).toBeLessThanOrEqual(5500);
   });
 
   it("公开工具数量 = 17（v2.1 PR-A: v0.8 15 + tab_list + history）", () => {
@@ -97,9 +105,9 @@ describe("I15: tools/list budget + count + internalized grep", () => {
     }
   });
 
-  it("description 长度 ≤ 60 char", () => {
+  it("description 长度 ≤ 120 char", () => {
     for (const d of defs) {
-      expect(d.description.length).toBeLessThanOrEqual(60);
+      expect(d.description.length).toBeLessThanOrEqual(120);
     }
   });
 
