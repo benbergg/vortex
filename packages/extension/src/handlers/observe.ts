@@ -564,6 +564,19 @@ async function scanOneFrame(
             if (wrapsCheckRadio) {
               const labelText = normName(el.textContent);
               if (labelText) return labelText;
+              // 缺陷① (2026-06-07 v4 淘宝评测): <label> 包 radio/checkbox 但
+              // labelText 为空 (淘宝 emoji 雪碧图、Element Plus 纯图标 label、
+              // Ant Design 自定义单选组等同病)。原行为: 落到 isContainer
+              // 返空 → BUG-3 噪声过滤器丢弃 → 整控件在 observe 中隐形。
+              // 通用化兜底: 用 input.type + input.value + bbox 位置生成可定位
+              // 名, agent 仍能定位并操作 (不写淘宝特定字典, 不依赖 className
+              // 拼写是否正确, 不依赖 aria-label 注入)。位置用 bbox 强保证
+              // 唯一性, 即便同 form 多个未命名 radio 也不冲突。
+              const inp = wrapsCheckRadio as HTMLInputElement;
+              const role = inp.type === "checkbox" ? "checkbox" : "radio";
+              const val = inp.value || "?";
+              const rect = inp.getBoundingClientRect();
+              return `${role}=${val} @x=${Math.round(rect.left)},y=${Math.round(rect.top)}`;
             }
           }
           // AJ: 有交互后代的元素是**容器**,其 textContent 是子控件文本的拼接
@@ -1359,12 +1372,24 @@ async function scanOneFrame(
             // INTERACTIVE_SELECTORS whitelist also requires `a[href]`,
             // so a bare nameless <a> from the cursor:pointer fallback
             // shouldn't bypass the noise filter (review feedback on PR #19).
+            // 缺陷① (2026-06-07 v4 淘宝评测): <label> 包 radio/checkbox 是
+            // HTML labelable 元素的语义容器 (LABEL 关联唯一可标控件), 不应
+            // 被 BUG-3 当作"含交互后代的噪声容器"丢弃。结合 getAccessibleName
+            // 的兜底名生成 (wrapsCheckRadio + labelText 空 → radio/checkbox=val
+            // @x,y 兜底名), LABEL 应保留在 observe 输出中, 淘宝 emoji 评分、
+            // Element Plus 纯图标单选组、Ant Design 自定义单选组等同病通用。
+            const wrapsFormControl =
+              tag === "label" &&
+              htmlEl.querySelector(
+                "input[type=checkbox], input[type=radio]",
+              ) != null;
             const formLike =
               tag === "input" ||
               tag === "select" ||
               tag === "textarea" ||
               tag === "button" ||
-              (tag === "a" && htmlEl.hasAttribute("href"));
+              (tag === "a" && htmlEl.hasAttribute("href")) ||
+              wrapsFormControl;
             const hasExplicitRole =
               !!htmlEl.getAttribute("role") ||
               !!htmlEl.getAttribute("aria-label");
