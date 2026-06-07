@@ -592,25 +592,20 @@ async function scanOneFrame(
           // 判别用「有交互后代」而非 cursor:免一次 getComputedStyle,且精准:leaf
           // 控件 querySelector 落空保留名,容器命中留空(2026-06-02 dogfood AJ)。
           //
-          // P1-1 修复(vortex-bench 2026-06-07 淘宝评测):
-          // 上面的 isContainer 判"含子交互元素即容器"对整张卡是 `<a>` 的场景过严
-          // ——淘宝/天猫/抖音/小红书商品卡 `<a class="doubleCardWrapperAdapt">` 内
-          // 嵌店铺链接+旺旺按钮,querySelector 命中 → isContainer=true → 整卡
-          // 47/153 (30.7%) 被返空名 → BUG-3 丢弃 → LLM 看不到商品卡。V1/V2/V3
-          // 三轮评测验证,真缺陷。先于 isContainer 判"该元素自身是否有直属文本
-          // 节点":有就说明"自身有可读内容",不该被当容器——直接用 textContent
-          // (信息最丰富,如"YSL圣罗兰小金条口红1988 ¥380")。对照 `<label>` 修
-          // 法(wrapsCheckRadio,自身空文本需**合成**兜底名),`<a>` 是**自身有
-          // 真实文本**,两者语义相反,照搬 label 合成名逻辑是错的(评审 §3.2)。
-          const hasDirectText = Array.from(el.childNodes).some(
-            (n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0,
-          );
-          if (hasDirectText) return normName(el.textContent);
+          // P1-1 修复方向重做(vortex-bench 2026-06-07 V4 淘宝评测 §7.3.1):
+          // d4b7330 旧修复"判直属文本节点"在淘宝商品卡 <a class="doubleCardWrapperAdapt">
+          // 上 directTextNodes=[] (所有文本在子 div) → 修复未生效,V4 复跑 3 品类
+          // 空名率仍 ~30%。改判"textContent 含商品特征" (¥/￥/人付款/回头客/
+          // 已售/月销):整张卡是链接 + textContent 含商品信息 → 卡片是商品卡,
+          // 用自身 textContent (信息最丰富,标题/价格/销量/店铺名)。先于
+          // isContainer 判定,确保"自身有商品信息"不被当容器丢弃。
+          const PRODUCT_HINTS = /[\u00a5￥]\d|人付款|回头客|已售|月销/;
+          const text = normName(el.textContent);
+          if (text && PRODUCT_HINTS.test(text)) return text;
           const isContainer =
             el.querySelector(
               "a[href],button,input,select,textarea,[tabindex],[contenteditable=true]",
             ) != null;
-          const text = normName(el.textContent);
           if (text && !isContainer) return text;
           // title 属性是 accname 规范的末位兜底名源:纯图标按钮常只有 title
           // (Excalidraw "更多工具" 触发器只有 title + 一个 svg)。放在 textContent
@@ -628,10 +623,28 @@ async function scanOneFrame(
           // 接在 svg/img 类名之后、字体图标之前:控件语义强于泛图标名。
           const ctrlRole = controlRoleFromClass(el);
           if (ctrlRole) return ctrlRole;
+          // BUG-008 修复(V4 §7.4 淘宝评测):淘宝 sticky bar CTA 是 <div> 包
+          //   <i> 购物车 icon。标准 fallback 全不命中 → 返空 → BUG-3 过滤掉。
+          //   用 STICKY_BAR_CTA_REGEX 共享常量(见下方 collection 步骤)反推
+          //   cta 名,让 BUG-3 放行。仅 div 命中,其它 tag 返空。
+          const stickyCtaName = stickyBarCtaName(el);
+          if (stickyCtaName) return stickyCtaName;
           // 末位:CSS 字体图标按钮(bi-/fa-/glyphicon-/vxe-icon-/van-icon-,::before 字形
           // 无 inner svg/img)。isContainer 已在上方返空,此处只给 leaf 图标按钮补名;
           // 不碰 cursor:pointer 入池门,规避 round-12 幽灵续命。
           return iconFontName(el);
+        }
+
+        // BUG-008 修复(V4 §7.4 淘宝评测) — 命名兜底,函数声明在调用前出现
+        //   (hoisted),内部引用 STICKY_BAR_CTA_REGEX (下方 collection 步骤声明
+        //   的 const),调用时机在 main for-loop,常量已初始化。
+        function stickyBarCtaName(el: HTMLElement): string {
+          if (el.tagName !== "DIV") return "";
+          const iconChild = el.querySelector("i");
+          if (!iconChild) return "";
+          const cls = iconChild.getAttribute("class") || "";
+          if (STICKY_BAR_CTA_REGEX.test(cls)) return "add-to-cart";
+          return "";
         }
 
         // Pre-index aria-label occurrences once per snapshot so buildSelector
@@ -1222,9 +1235,37 @@ async function scanOneFrame(
         const cursorPointerLeaves = cursorPointerExtras.filter(
           (el) => !dropSet.has(el),
         );
+
+        // BUG-008 修复(V4 §7.4 淘宝评测):淘宝 sticky bar CTA 反推 — <div> 包购物车
+        //   icon 类,filter=interactive 默认排除 div → 漏抓。扫 <i> className 关键词
+        //   反推父 div。仅 filter=interactive 启用,避免 default 模式被噪音 div 污染。
+        const STICKY_BAR_CTA_REGEX = /gouwuche|jiaRu|jiarugouwuche|addtoCart|addToCart/i;
+        const knownInteractive = new Set<Element>([...Array.from(interactiveSet), ...cursorPointerLeaves]);
+        const iconCtaExtras: Element[] = [];
+        if (filter === "interactive") {
+          for (const el of Array.from(fallbackPool)) {
+            const isCtaDiv = el.tagName === "DIV" && el !== docRoot && el !== docBody;
+            if (!isCtaDiv) continue;
+            if (knownInteractive.has(el)) continue;
+            const htmlEl = el as HTMLElement;
+            if (htmlEl.offsetWidth === 0 || htmlEl.offsetHeight === 0) continue;
+            if (el.querySelector(INTERACTIVE_SELECTORS)) continue;
+            const iconChild = el.querySelector("i[class]");
+            if (!iconChild) continue;
+            if (!STICKY_BAR_CTA_REGEX.test(iconChild.getAttribute("class") || "")) continue;
+            // 祖先链已入池 → 跳过避免与祖先/兄弟双现
+            let anc: Element | null = el.parentElement, hasIntAnc = false;
+            while (anc && anc !== docBody) { if (knownInteractive.has(anc)) { hasIntAnc = true; break; } anc = anc.parentElement; }
+            if (hasIntAnc) continue;
+            iconCtaExtras.push(el);
+            knownInteractive.add(el);
+          }
+        }
+
         const allCandidates: Element[] = [
           ...Array.from(nodeList),
           ...cursorPointerLeaves,
+          ...iconCtaExtras,
         ];
 
         const elements: Array<{

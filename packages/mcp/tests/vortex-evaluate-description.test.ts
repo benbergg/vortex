@@ -15,7 +15,8 @@ import { dirname, join } from "node:path";
  * Fix: description 必须:
  *   1. 含 "MAIN world" 关键词 (告诉 LLM 这是 page context 而非 isolated)
  *   2. 含 "cross-origin iframe" 关键词 (明确边界)
- *   3. ≤ 60 char (I15 invariant)
+ *   3. ≤ 120 char (I15 invariant; V4 REQ-009 边际改进: 60→120 加 IIFE 模板示例,
+ *      让 LLM 一次看明白箭头/function 必须 IIFE 包裹)
  */
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA_SRC = readFileSync(
@@ -47,9 +48,9 @@ describe("vortex_evaluate description 文档化 (B3-5, v3.1)", () => {
     expect(desc).toMatch(/cross-origin iframe/i);
   });
 
-  it("description 总长度 ≤ 60 char (I15 invariant 约束)", () => {
+  it("description 总长度 ≤ 120 char (I15 invariant 约束; V4 REQ-009 放宽)", () => {
     const desc = getEvaluateDescription();
-    expect(desc.length).toBeLessThanOrEqual(60);
+    expect(desc.length).toBeLessThanOrEqual(120);
   });
 
   it("description 保留 async 行为提示 (回归保护)", () => {

@@ -33,6 +33,15 @@
 //     key:End)+ 无聚焦元素提示(40 → 114 char)。B3-6 是 P0 体验断点,根因
 //     是 body 无 tabindex,提示 LLM 改用 evaluate scrollTo 是真修复。cap
 //     同步放宽 (+200B, +60 char),沿用历次"加能力微调 cap 不压缩字符"惯例。
+//
+// V4 PR-REQ-009 (f577b04): 5500 → 5600 B,description 56 → 112 char。
+// vortex_evaluate description 加 IIFE 模板示例 (function(){return 42;})() /
+// (async function(){...})(),让 LLM 一次看明白箭头/function 必须 IIFE 包裹
+// (vortex_evaluate 用 JSON-RPC 传输 code 字符串,箭头/function 顶层表达式
+// 无法 standalone 求值,IIFE 才能成 statement)。新 payload 实测 5506 B,
+// cap +100 至 5600 留 94 B 余量,沿用"加能力微调 cap 不压缩字符"惯例。
+// description 长度上限同步放宽 60 → 120 (vortex-evaluate-description.test.ts
+// 镜像此决策)。
 
 import { describe, it, expect } from "vitest";
 import { COMMIT_KINDS } from "@vortex-browser/shared";
@@ -44,8 +53,8 @@ describe("I15: tools/list budget + count + internalized grep", () => {
     defs.map(d => ({ name: d.name, description: d.description, inputSchema: d.schema })),
   );
 
-  it("tools/list 字节 ≤ 5500 B", () => {
-    expect(toolsListPayload.length).toBeLessThanOrEqual(5500);
+  it("tools/list 字节 ≤ 5600 B (V4 REQ-009 放宽; 实测 5506 留 94 B buffer)", () => {
+    expect(toolsListPayload.length).toBeLessThanOrEqual(5600);
   });
 
   it("公开工具数量 = 17（v2.1 PR-A: v0.8 15 + tab_list + history）", () => {
