@@ -592,25 +592,20 @@ async function scanOneFrame(
           // 判别用「有交互后代」而非 cursor:免一次 getComputedStyle,且精准:leaf
           // 控件 querySelector 落空保留名,容器命中留空(2026-06-02 dogfood AJ)。
           //
-          // P1-1 修复(vortex-bench 2026-06-07 淘宝评测):
-          // 上面的 isContainer 判"含子交互元素即容器"对整张卡是 `<a>` 的场景过严
-          // ——淘宝/天猫/抖音/小红书商品卡 `<a class="doubleCardWrapperAdapt">` 内
-          // 嵌店铺链接+旺旺按钮,querySelector 命中 → isContainer=true → 整卡
-          // 47/153 (30.7%) 被返空名 → BUG-3 丢弃 → LLM 看不到商品卡。V1/V2/V3
-          // 三轮评测验证,真缺陷。先于 isContainer 判"该元素自身是否有直属文本
-          // 节点":有就说明"自身有可读内容",不该被当容器——直接用 textContent
-          // (信息最丰富,如"YSL圣罗兰小金条口红1988 ¥380")。对照 `<label>` 修
-          // 法(wrapsCheckRadio,自身空文本需**合成**兜底名),`<a>` 是**自身有
-          // 真实文本**,两者语义相反,照搬 label 合成名逻辑是错的(评审 §3.2)。
-          const hasDirectText = Array.from(el.childNodes).some(
-            (n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0,
-          );
-          if (hasDirectText) return normName(el.textContent);
+          // P1-1 修复方向重做(vortex-bench 2026-06-07 V4 淘宝评测 §7.3.1):
+          // d4b7330 旧修复"判直属文本节点"在淘宝商品卡 <a class="doubleCardWrapperAdapt">
+          // 上 directTextNodes=[] (所有文本在子 div) → 修复未生效,V4 复跑 3 品类
+          // 空名率仍 ~30%。改判"textContent 含商品特征" (¥/￥/人付款/回头客/
+          // 已售/月销):整张卡是链接 + textContent 含商品信息 → 卡片是商品卡,
+          // 用自身 textContent (信息最丰富,标题/价格/销量/店铺名)。先于
+          // isContainer 判定,确保"自身有商品信息"不被当容器丢弃。
+          const PRODUCT_HINTS = /[\u00a5￥]\d|人付款|回头客|已售|月销/;
+          const text = normName(el.textContent);
+          if (text && PRODUCT_HINTS.test(text)) return text;
           const isContainer =
             el.querySelector(
               "a[href],button,input,select,textarea,[tabindex],[contenteditable=true]",
             ) != null;
-          const text = normName(el.textContent);
           if (text && !isContainer) return text;
           // title 属性是 accname 规范的末位兜底名源:纯图标按钮常只有 title
           // (Excalidraw "更多工具" 触发器只有 title + 一个 svg)。放在 textContent
