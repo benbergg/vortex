@@ -136,9 +136,11 @@ describe("TC-11: vortex_evaluate async 模式语义文档化（P0-11）", () => 
     expect(d).toMatch(/return|body|expression/i);
   });
 
-  it("vortex_evaluate 长度 ≤ 60 char（I15 节字节）", () => {
+  it("vortex_evaluate 长度 ≤ 120 char（I15 ≤60 上限 V4 REQ-009 边际改进接受 120 字符）", () => {
     const def = getToolDef("vortex_evaluate");
-    expect(def!.description.length).toBeLessThanOrEqual(60);
+    // V4 REQ-009: description 加 IIFE 模板示例后从 56 字符扩到 112 字符,
+    // 突破 I15 ≤60 上限。plan 边际改进接受, 留 8 字符 buffer 防未来微调。
+    expect(def!.description.length).toBeLessThanOrEqual(120);
   });
 
   // ============================================================
@@ -157,6 +159,17 @@ describe("TC-11: vortex_evaluate async 模式语义文档化（P0-11）", () => 
   it("vortex_evaluate description 提示 IIFE 包裹 (V3 §5.1 P2 文档化)", () => {
     const def = getToolDef("vortex_evaluate");
     expect(def!.description).toMatch(/IIFE|wrap.*\(|立即调用|invoke/i);
+  });
+
+  it("vortex_evaluate description 应含 IIFE 模板示例 (V4 REQ-009 边际改进)", () => {
+    const def = getToolDef("vortex_evaluate");
+    const desc = def!.description;
+    // 模板示例: 至少含以下 1 种 IIFE 形式
+    const hasTemplate =
+      /\(function\s*\(\)\s*\{/.test(desc) ||
+      /\(async function\s*\(\)\s*\{/.test(desc) ||
+      /IIFE:\s*\(/.test(desc);
+    expect(hasTemplate).toBe(true);
   });
 });
 

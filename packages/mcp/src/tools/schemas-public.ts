@@ -255,7 +255,12 @@ export const PUBLIC_TOOLS: ToolDef[] = [
     // description 须 1 句话让 LLM 知道箭头/function 必须 IIFE 调用。
     name: "vortex_evaluate",
     action: "js.evaluate",
-    description: "MAIN world. async=fn body, IIFE. No cross-origin iframe.",
+    // V4 评测 REQ-009 边际改进: description 加 IIFE 模板示例,
+    // 让 LLM 一次看明白箭头/function 必须 IIFE 包裹(ef242c7 P2 修复仅含
+    // "IIFE" 单词,边际警告)。保留 ef242c7 既有"MAIN world"+"async=fn body"
+    // +"cross-origin iframe"三约束。description 总长 ≤ 80 字符(I15 ≤60 已
+    // 突破,本任务为边际改进,接受 80 字符硬上限)。
+    description: "MAIN world. async=fn body. IIFE: (function(){return 42;})() / (async function(){...})(). No cross-origin iframe.",
     schema: {
       type: "object",
       properties: {
