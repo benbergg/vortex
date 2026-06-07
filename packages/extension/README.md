@@ -33,18 +33,31 @@ action 名定义在 `@vortex-browser/shared`，handler 在此实现。新增 act
 ## 构建
 
 ```bash
-pnpm build           # vite build → dist/
-pnpm dev             # vite build --watch（监听源码变更，扩展页面手动 reload）
+pnpm build           # 生产构建 → dist/（vite build + page-side IIFE）
+pnpm dev             # 联调 dev loop：vite serve + @crxjs HMR + page-side watch
+pnpm dev:build       # 回退：vite build --watch（无 HMR，需手动 reload 扩展）
 ```
 
-构建产物：`dist/`（manifest + bg + content + assets），可直接作为 unpacked extension 加载。
+构建产物：`dist/`（manifest + bg + content + assets + `page-side/*.js`），可直接作为 unpacked extension 加载。
+
+### dev loop (HMR)
+
+`pnpm dev` 走 `scripts/dev.mjs`，启动 `vite serve`（@crxjs HMR）并并行 watch page-side IIFE，**改 handler 免手动 reload 扩展**。**重载语义**：
+
+| 改动 | 行为 |
+|------|------|
+| handler / background（`src/handlers/*`、`src/lib/*`） | crx **自动 reload 扩展**（免手动 🔄）；整扩展 reload 会断 Native Messaging → 改后需在 LLM 客户端 `/mcp reconnect` |
+| page-side（`src/page-side/*`） | watch 重建文件，下次 `executeScript({files})` 自动取新，**无需任何 reload** |
+| content-main（`src/content-main.ts`，world:MAIN） | crx 整体 reload（MAIN world 不支持模块级 HMR） |
+
+> ⚠️ 为何需要 `dev.mjs` 编排而非直接 `vite`：① page-side 包是独立 IIFE（`build-page-side.mjs`，与 crx 隔离避免 code-splitting），而 crx serve **启动时会清空 dist** → 必须等 serve ready 后再把 page-side 写回，否则 `dom.*` 的 `executeScript({files})` 读不到文件；② 就绪信号需捕获 vite `"ready"`，不能用 `manifest.json` 出现判断（crx 早写晚抹有竞态）。详见 `scripts/dev.mjs` 注释。
 
 ## 安装到 Chrome
 
-1. `pnpm build`
+1. `pnpm build`（或 `pnpm dev`）
 2. Chrome `chrome://extensions/` → 开启「开发者模式」
 3. 「加载已解压的扩展程序」→ 选 `packages/extension/dist/`
-4. 记下扩展 ID（用于 NM host manifest）
+4. 扩展 ID 固定为 `fbonhjdohmkcejfgmaicnkknpfafihnd`（`manifest.json` 内置 RSA `key`，**与加载路径/worktree 无关**），NM host `allowed_origins` 一次配置永久有效
 
 ## Native Messaging 配对
 

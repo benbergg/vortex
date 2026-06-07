@@ -161,10 +161,13 @@ See [`packages/mcp/README.md`](packages/mcp/README.md) for full tool documentati
 ```bash
 pnpm install
 pnpm -r build              # full build
+pnpm -r test               # all tests
 pnpm --filter <pkg> dev    # single package watch mode
 ```
 
-Each sub-package README has its own debug/build instructions.
+**Extension HMR dev loop** — `pnpm --filter @vortex-browser/extension dev` runs Vite serve with `@crxjs` HMR: editing a handler auto-reloads the extension (no manual 🔄 in `chrome://extensions`). Reload semantics, the page-side gotchas, and the `/mcp reconnect` caveat are documented in [`packages/extension/README.md`](packages/extension/README.md#dev-loop-hmr).
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full contributor workflow (TDD, dev loop, tests, commit conventions, ship checklist). Each sub-package README has its own debug/build instructions.
 
 ## License
 
