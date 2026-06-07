@@ -87,4 +87,32 @@ describe("vortex_mouse_drag stepDelay (BUG-007)", () => {
     expect(r.result?.success).toBe(true);
     expect(elapsed).toBeGreaterThan(200);  // 5 × 50ms = 250ms - 漂移
   });
+
+  // BUG-007 根因修复:快路径(stepDelay=0)的中间 move 不再逐个串行 await round-trip,
+  // 而是流水线化(Promise.all,CDP 单 session 保序)。真 Chrome 上 round-trip 非 0 时,
+  // 串行 = N×RTT(steps=30+ 撞 30s mcp timeout),流水线 = ~1×RTT。
+  // mock 每条命令 15ms RTT:串行 (40+3)×15≈645ms,流水线 press/move/release ~3×RTT≈45ms。
+  it("steps=40 stepDelay=0 → 流水线化:总耗时 ≈ 单次 RTT 而非 N×RTT", async () => {
+    sendCommand.mockImplementation(() => new Promise((r) => setTimeout(() => r({}), 15)));
+    const start = Date.now();
+    const r = await router.dispatch(mkReq("mouse.drag", { fromX: 0, fromY: 0, toX: 400, toY: 400, steps: 40 })) as
+      { result?: { success?: boolean } };
+    const elapsed = Date.now() - start;
+    expect(r.result?.success).toBe(true);
+    expect(elapsed).toBeLessThan(200);  // 串行会 ~645ms → 此断言现失败,流水线后通过
+  });
+
+  it("流水线化仍保中间 move 坐标递进顺序", async () => {
+    await router.dispatch(mkReq("mouse.drag", { fromX: 0, fromY: 0, toX: 100, toY: 0, steps: 10 }));
+    // 提取所有 mouseMoved 的 x(跳过初始 hover move),应单调递增
+    const moveXs = sendCommand.mock.calls
+      .filter((c) => c[1] === "Input.dispatchMouseEvent" && (c[2] as { type: string }).type === "mouseMoved")
+      .map((c) => (c[2] as { x: number }).x);
+    // 首个是 hover 到起点(x=0),其后 10 步递进到 100
+    const dragXs = moveXs.slice(1);
+    for (let i = 1; i < dragXs.length; i++) {
+      expect(dragXs[i]).toBeGreaterThanOrEqual(dragXs[i - 1]);
+    }
+    expect(dragXs[dragXs.length - 1]).toBe(100);
+  });
 });

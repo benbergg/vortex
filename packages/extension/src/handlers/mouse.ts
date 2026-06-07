@@ -152,16 +152,34 @@ export function registerMouseHandlers(
       // drag-move 的 buttons:1 是 HTML5 DnD / 拖拽库识别为拖拽(而非 hover)的关键。
       await dispatchMouse(debuggerMgr, tid, "mouseMoved", from.x, from.y);
       await dispatchMouse(debuggerMgr, tid, "mousePressed", from.x, from.y, "left", 1, 1);
-      // BUG-007: 允许 caller 显式 opt-in 慢速 path(DnD 库兼容),默认 0(快速 path,
-      // 避免 22 个 CDP 命令 round-trip 在大 step 数时累计 > 30s mcp timeout)。
-      // 0ms: dispatcher 内部 setTimeout 仍会 fire,但立即 resolve。
+      // BUG-007: 允许 caller 显式 opt-in 慢速 path(DnD 库兼容),默认 0(快速 path)。
       const stepDelay = (args.stepDelay as number | undefined) ?? 0;
-      for (let i = 1; i <= steps; i++) {
+      const stepPoint = (i: number) => {
         const t = i / steps;
-        const xi = from.x + (to.x - from.x) * t;
-        const yi = from.y + (to.y - from.y) * t;
-        await dispatchMouse(debuggerMgr, tid, "mouseMoved", xi, yi, "left", 1, 1);
-        if (stepDelay > 0) await new Promise((r) => setTimeout(r, stepDelay));
+        return {
+          xi: from.x + (to.x - from.x) * t,
+          yi: from.y + (to.y - from.y) * t,
+        };
+      };
+      if (stepDelay > 0) {
+        // 慢路径:逐步串行 + 显式停顿,给 DnD 库时间 engage dragover/drop。
+        for (let i = 1; i <= steps; i++) {
+          const { xi, yi } = stepPoint(i);
+          await dispatchMouse(debuggerMgr, tid, "mouseMoved", xi, yi, "left", 1, 1);
+          await new Promise((r) => setTimeout(r, stepDelay));
+        }
+      } else {
+        // 快路径(BUG-007 根因修复):中间 move 流水线化,而非逐个 await round-trip。
+        // 串行时 steps=30+ 的 N×RTT 在真 Chrome 上累计撞 30s mcp timeout;CDP 单 session
+        // 按 sendCommand 发起顺序保序处理 Input 事件,故同步发起 N 条再一次性 await
+        // 把墙钟从 N×RTT 压到 ~1×RTT,轨迹顺序不变。任一条 reject → Promise.all 整体
+        // reject(与串行抛错同义,优雅失败而非静默)。
+        const moves: Promise<void>[] = [];
+        for (let i = 1; i <= steps; i++) {
+          const { xi, yi } = stepPoint(i);
+          moves.push(dispatchMouse(debuggerMgr, tid, "mouseMoved", xi, yi, "left", 1, 1));
+        }
+        await Promise.all(moves);
       }
       await dispatchMouse(debuggerMgr, tid, "mouseReleased", to.x, to.y, "left", 1, 0);
 
