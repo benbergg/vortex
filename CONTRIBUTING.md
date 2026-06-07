@@ -32,11 +32,29 @@ pnpm --filter @vortex-browser/server dev      # tsc --watch
 
 | You change… | What happens |
 |-------------|--------------|
-| extension handler / background | `@crxjs` auto-reloads the extension (no manual 🔄). The reload drops Native Messaging, so run `/mcp reconnect` in your LLM client afterwards. |
+| extension handler / background | `@crxjs` auto-reloads the extension (no manual 🔄). The reload bounces the Native-Messaging server, but the MCP→server WebSocket auto-reconnects on the next tool call (`client.ts` `ensureConnected` + transient retry) — **no `/mcp reconnect` needed** (verified). |
 | extension page-side (`src/page-side/*`) | Rebuilt by the watcher; picked up on the next `executeScript({files})` call — no reload needed. |
-| mcp schemas / dispatch | The stdio MCP server is a child of your LLM client; run `/mcp reconnect` to respawn it with fresh `dist`. |
+| mcp schemas / dispatch | The stdio MCP server is a long-lived child of your LLM client running compiled `dist`. Only this case needs `/mcp reconnect` to respawn it with fresh code. |
 
 Loading the unpacked extension and the fixed extension ID are documented in the [extension README](packages/extension/README.md#安装到-chrome). The ID is pinned by a `key` in `manifest.json`, so it is stable across worktrees and the Native Messaging `allowed_origins` needs configuring only once.
+
+<details>
+<summary><b>Why there's no headless extension auto-load (Chrome 137+)</b></summary>
+
+The one manual step — loading the unpacked extension once — can't be automated away on a normal Chrome, and the reasons are worth recording so nobody re-treads this:
+
+- **`--load-extension` is dead on stable Chrome (137+).** Verified on **Chrome 148**: the flag is ignored and the extension never appears in the profile's `Preferences`. The historical `--disable-features=DisableLoadExtensionCommandLineSwitch` workaround no longer has any effect.
+- **Chrome for Testing _loads_ it but the worker stays dormant.** CfT 145 (bundled in the Playwright cache, `~/Library/Caches/ms-playwright/chromium-*/…/Google Chrome for Testing.app`) does honor `--load-extension` — the extension ID shows up in `Default/Secure Preferences`. But with a start page of `about:blank`, the MV3 service worker never wakes, so it never runs `connectNative` and no `vortex-server` spawns. `/health` stays down.
+- **CfT also looks elsewhere for the NM host manifest** — `~/Library/Application Support/Google/Chrome for Testing/NativeMessagingHosts/`, not the regular-Chrome dir — so the manifest must be copied there too.
+
+**If you want to chase true zero-touch auto-load** (e.g. for CI), the viable path is Chrome for Testing with the service worker woken explicitly:
+1. Copy the NM manifest into CfT's `NativeMessagingHosts/` dir.
+2. Launch CfT with `--load-extension=…/dist --remote-debugging-port=<p>` and a **real start URL** (a content-scripted page, e.g. the bench playground) instead of `about:blank`, or use CDP to target the worker and call `chrome.runtime.connectNative` / dispatch an event that starts it.
+3. Poll `/health` to confirm the server came up.
+
+For day-to-day work this isn't worth it: load once in your normal Chrome, and `@crxjs` HMR handles every reload after that.
+
+</details>
 
 ## Testing
 
