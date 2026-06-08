@@ -446,6 +446,34 @@ async function scanOneFrame(
           return "";
         }
 
+        // REQ-009 N0060 京东评测 A 方案: 图标式无文本 `<a>` 兜底名(京东
+        // 30 个客服图标 + 1 个 logo 是该模式的代表,跨平台通用)。
+        // 五条件全部命中才兜底 (顺序敏感):
+        //   1. tagName === "a"  (仅链接,不误判 button)
+        //   2. children.length === 0  (排除含 <img>/<svg> 的真图标 link, 让
+        //      它们的 alt/svg-title/aria-label 走 iconNameFromClass 路径)
+        //   3. textContent.trim() === ""  (无文本)
+        //   4. bbox width ≤ 32 && height ≤ 32  (小图标, 32x32 购物车图标等
+        //      真按钮通常含 svg, 已被条件 2 排除; 32x32 boundary 防御)
+        //   5. href 非空  (避免空锚 <a></a> 误判)
+        // 返回 `icon-link @x=N,y=N` 固定名, LLM 一眼识别这是图标式 link,
+        // 不再被空名率统计误伤 (京东 29.90% → ~1%)。
+        // 不命中 aria-label / title: 已有有意义 attribute 命名的链接让原路径
+        // 处理, 避免与 iconNameFromClass 抢名。
+        const ICON_LINK_MAX_SIZE = 32;
+        function iconLinkName(el: Element): string | null {
+          if (el.tagName.toLowerCase() !== "a") return null;
+          if (el.children.length > 0) return null;
+          if (el.textContent.trim() !== "") return null;
+          const href = el.getAttribute("href");
+          if (!href) return null;
+          if (el.getAttribute("aria-label")) return null;
+          if (el.getAttribute("title")) return null;
+          const rect = el.getBoundingClientRect();
+          if (rect.width > ICON_LINK_MAX_SIZE || rect.height > ICON_LINK_MAX_SIZE) return null;
+          return `icon-link @x=${Math.round(rect.x)},y=${Math.round(rect.y)}`;
+        }
+
         // CSS 字体图标约定的前缀(Bootstrap Icons / FontAwesome / Glyphicons):
         // 类名 `<prefix>-<icon>` 经 ::before 字形渲染,无 inner svg/img。
         // bi-/fa-/glyphicon- = 三大图标字体;vxe-icon-(vxe-table)/van-icon-(Vant)=
@@ -645,6 +673,19 @@ async function scanOneFrame(
           // 自定义按钮 div 用 textContent 是 **leaf**(无交互后代)场景,不受影响。
           // 判别用「有交互后代」而非 cursor:免一次 getComputedStyle,且精准:leaf
           // 控件 querySelector 落空保留名,容器命中留空(2026-06-02 dogfood AJ)。
+          //
+          // REQ-009 N0060 京东评测 A 方案: icon-link 兜底 — 京东商品卡 30 个
+          // 客服图标 `<a class="_newIcon_zclqt_32 _customer_service_icon_zclqt_60"
+          // href="https://chat.jd.com/...">` (16x16, 无文本/aria/title) 是
+          // 跨平台"图标式无文本 link"代表, 旧路径返空 → BUG-3 噪声过滤 / 进
+          // LLM 视野当空名 link 处理。检测 5 条件 (tag==a / 无 children /
+          // 无 textContent / bbox ≤32x32 / href 非空), 命中给固定名
+          // `icon-link @x=N,y=N`。放在 PRODUCT_HINTS 之前: 商品卡 (整张 <a>
+          // 含 textContent 商品特征) 应走 PRODUCT_HINTS 优先路径, icon-link
+          // 仅兜底"小图标 link" 场景。aria-label / title 命中时不抢, 让有意义
+          // 的 attribute 优先 (购物车图标常含 aria-label="购物车")。
+          const iconLink = iconLinkName(el);
+          if (iconLink) return iconLink;
           //
           // P1-1 修复方向重做(vortex-bench 2026-06-07 V4 淘宝评测 §7.3.1):
           // d4b7330 旧修复"判直属文本节点"在淘宝商品卡 <a class="doubleCardWrapperAdapt">
