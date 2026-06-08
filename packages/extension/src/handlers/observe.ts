@@ -93,6 +93,12 @@ interface ScannedElement {
   state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean; invalid?: boolean; sort?: "ascending" | "descending" | "none"; haspopup?: string };
   /** 值域控件(slider/spinbutton/progressbar/meter 及原生 range/number/progress)的当前值,如 "30" 或 "30/100"。@since dogfood 2026-06-02 */
   valueNow?: string;
+  /** BUG-010 N0060 京东评测: el 含 onClick 桩 / cursor:pointer 时标 true,
+   * 提示 LLM 评测者该 ref 走真实 mouse (vortex_mouse_drag 或 useRealMouse=true)
+   * 兜底, 不要直接 el.click() (isTrusted=false 拦截)。 */
+  reactClickable?: true;
+  /** reactClickable=true 时给 LLM 的可读提示, 含具体兜底命令名。 */
+  clickHint?: string;
   _sel: string;
 }
 
@@ -185,6 +191,54 @@ export async function resolveTargetFrames(
   // 默认 "main"
   const main = all.find((f) => f.frameId === 0);
   return main ? asTargets([main]) : [];
+}
+
+/**
+ * React/Vue 重写后 SPA 商品卡常用的"非 native onClick"探测 + 标记者 (BUG-010
+ * N0060 京东选品评测 V1): 京东商品卡 div 含 React 桩 `onClick={kd()}` 但
+ * el.click() 不触发跳转 (isTrusted=false, React 18 root delegation 拦截),
+ * 必须真实 mouse 事件 (vortex_mouse_drag 或 useRealMouse=true) 兜底。
+ *
+ * 命中条件 (任一):
+ *   - `el.onclick` property 被框架挂上 (React onClick 桩) —— 现代 SPA
+ *   - `el.getAttribute("onclick")` 非空 —— jQuery-era PHP 后台 (Zentao
+ *     legacy panels, phpMyAdmin) inline handler
+ *   - `getComputedStyle(el).cursor === "pointer"` —— 祖传 framework
+ *     onClick 钩子没暴露 property/attribute (Vue3 vnode 内部 invoker,
+ *     React Fiber 内部引用, 旧 WebForms 装饰 div) 的兜底
+ *
+ * 副作用 (双标): 同时在 live DOM (`el.dataset.vortexReactClickable = "1"`)
+ * 与 ScannedElement 输出 (`out.reactClickable + out.clickHint`) 标记。
+ * live DOM 标用于后续 vortex_act click 自动检测并切换到 CDP 真实 mouse
+ * 路径, ScannedElement 标用于 LLM 评测者直接读 clickHint 提示, 二者解耦
+ * 可独立演进 (评测侧改用 mouse_drag 即可, 不依赖 click 路径变化)。
+ *
+ * Why export: TDD test `observe-react-clickable.test.ts` 在 jsdom 元素
+ * 上直接验证 (1) 命中条件 (2) dataset 副作用 (3) out 字段, 不需跑全
+ * chrome.scripting.executeScript 链路。生产调用方仅 observe emit 阶段。
+ */
+export const REACT_CLICKABLE_HINT =
+  "react onClick or cursor:pointer detected; vortex_act click may not trigger (isTrusted=false). Use vortex_mouse_drag(realMouse) or vortex_act click with useRealMouse=true to bypass.";
+
+export interface ReactClickableMarker {
+  reactClickable: true;
+  clickHint: string;
+}
+
+export function applyReactClickableMarker(
+  el: HTMLElement,
+  out: { reactClickable?: true; clickHint?: string },
+): ReactClickableMarker | null {
+  const hasOnClickProp = el.onclick != null;
+  const hasOnClickAttr = el.getAttribute("onclick") != null;
+  const isPointer = getComputedStyle(el).cursor === "pointer";
+  if (!hasOnClickProp && !hasOnClickAttr && !isPointer) return null;
+  // 副作用 1: live DOM 标, 供后续 vortex_act click 自动检测
+  el.dataset.vortexReactClickable = "1";
+  // 副作用 2: ScannedElement 输出标, 供 LLM 评测者读 clickHint
+  out.reactClickable = true;
+  out.clickHint = REACT_CLICKABLE_HINT;
+  return { reactClickable: true, clickHint: REACT_CLICKABLE_HINT };
 }
 
 async function scanOneFrame(
@@ -1482,6 +1536,11 @@ async function scanOneFrame(
           // 这里的 index 是 frame 内局部 id，observer handler 侧重编全局 index
           const state = getUiState(htmlEl);
           const valueNow = getValueInfo(htmlEl, role);
+          // BUG-010 N0060 京东评测: el 含 onClick 桩 / cursor:pointer 时打标。
+          // 命中后: (1) live DOM dataset 标 (供后续 click 检测) (2) ScannedElement
+          // 输出 reactClickable + clickHint (供 LLM 评测者读提示走 mouse_drag)。
+          // 不命中返 null, push 路径不变 (无副作用)。
+          const reactMarker = applyReactClickableMarker(htmlEl, {});
           elements.push({
             index: elements.length,
             tag: htmlEl.tagName.toLowerCase(),
@@ -1500,6 +1559,9 @@ async function scanOneFrame(
             attrs,
             ...(state ? { state } : {}),
             ...(valueNow !== undefined ? { valueNow } : {}),
+            ...(reactMarker
+              ? { reactClickable: true as const, clickHint: reactMarker.clickHint }
+              : {}),
             _sel: buildSelector(htmlEl),
           });
         }
@@ -1695,6 +1757,9 @@ export function registerObserveHandlers(router: ActionRouter): void {
         state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean; invalid?: boolean; sort?: "ascending" | "descending" | "none"; haspopup?: string };
         /** 值域控件当前值,如 "30" 或 "30/100"(getValueInfo 严格限定值域控件)。 */
         valueNow?: string;
+        /** BUG-010 N0060 京东评测: onClick 桩 / cursor:pointer 命中 (compact 也透传) */
+        reactClickable?: true;
+        clickHint?: string;
         frameId: number;
         // Issue #21 — populated only when input.includeBoxes && e.inViewport (T4).
         bbox?: [number, number, number, number];
@@ -1769,6 +1834,11 @@ export function registerObserveHandlers(router: ActionRouter): void {
               // 缺陷② (2026-06-07 v4 淘宝评测): compact 模式也透传
               // offScreenActionable 标记, agent 用 compact 也能识别离屏可交互。
               offScreenActionable: e.offScreenActionable,
+              // BUG-010 N0060 京东评测: compact 模式也透传 reactClickable + clickHint,
+              // 评测者读 clickHint 即可知用 vortex_mouse_drag / useRealMouse=true。
+              ...(e.reactClickable
+                ? { reactClickable: true as const, clickHint: e.clickHint! }
+                : {}),
               frameId: s.frameId,
               ...(bboxTuple ? { bbox: bboxTuple } : {}),
             });
@@ -1794,6 +1864,11 @@ export function registerObserveHandlers(router: ActionRouter): void {
               attrs: e.attrs,
               ...(e.state ? { state: e.state } : {}),
               ...(e.valueNow !== undefined ? { valueNow: e.valueNow } : {}),
+              // BUG-010 N0060 京东评测: 透传 reactClickable + clickHint,
+              // 评测者读 clickHint 知该 ref 需用 vortex_mouse_drag / useRealMouse=true。
+              ...(e.reactClickable
+                ? { reactClickable: true as const, clickHint: e.clickHint! }
+                : {}),
               frameId: s.frameId,
               ref,
               suggestedUsage: {
