@@ -290,6 +290,25 @@ export function registerDomHandlers(
                 },
               };
             }
+            // BUG-010 N0060 京东评测 B 方案: 元素被 observe emit 阶段标
+            // el.dataset.vortexReactClickable='1' (React/Vue onClick 桩 / cursor:pointer),
+            // 合成 click isTrusted=false 拦截, 必须 CDP real mouse 兜底。
+            // 顺序: 在 submit-intent 之后追加 (submit 优先, react-clickable 兜底)。
+            // cdpAvailable=false 时不 defer, 让合成 click 至少尝试(无 CDP 时连尝试都不给
+            // 等于把可用 click 路径堵死, 反而降级)。
+            const __isReactClickable = el.dataset?.vortexReactClickable === "1";
+            if (__isReactClickable && cdpAvailable) {
+              return {
+                result: {
+                  deferToCdp: true,
+                  element: {
+                    tag: __tagLc,
+                    id: el.id || undefined,
+                    text: (el as HTMLElement).innerText?.slice(0, 200),
+                  },
+                },
+              };
+            }
             // 通过所有检查，执行 click；对可 focus 元素（input/textarea/button/select）
             // 先 focus 再 click，保证后续 vortex_press 键盘事件能落在 active element 上
             // （JS .click() 不像真实鼠标那样顺带 focus，修掉这个行为差异）
