@@ -321,6 +321,7 @@ export const PUBLIC_TOOLS: ToolDef[] = [
         target: TargetRequired,
         value: {},
         kind: { enum: [...COMMIT_KINDS] },
+        force: { type: "boolean" },
         ...tabFields,
       },
       required: ["target", "value"],
