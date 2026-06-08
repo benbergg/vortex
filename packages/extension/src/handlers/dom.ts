@@ -20,6 +20,36 @@ import {
 } from "../patterns/index.js";
 import { waitActionable } from "../action/auto-wait.js";
 
+/**
+ * 判断元素是否为"瞬态覆盖层"(react-virtuoso 动画层 / popper 浮层 / 滚动视口
+ * 元素未到视口时标 aria-hidden 等)。这些元素:
+ *   - 视觉上短暂存在 (opacity 动画、transform 动画)
+ *   - 命中 elementFromPoint(cx, cy) 但不是真遮挡
+ *   - 真点击会从 root delegation 派发到目标 ref (React 事件冒泡)
+ *
+ * BUG-012 N0060 京东选品评测 V1: 京东家电/服饰评价区使用 react-virtuoso
+ * 虚拟列表, 容器与 viewport 间有"动画覆盖层" (opacity < 1 / transform
+ * 滚动 / aria-hidden 容器), elementFromPoint 命中覆盖层 → vortex click
+ * 误报 ELEMENT_OCCLUDED。抽成纯函数供 click probe 放行 transient overlay。
+ *
+ * 三条件任一命中 → transient:
+ *   1. opacity < 0.99 (淡入/淡出动画中)
+ *   2. transform 含 matrix (translate/scale 动画)
+ *   3. aria-hidden="true" (react-virtuoso 评价项未到视口时标)
+ *
+ * 真实遮挡 (京东物流弹层遮罩) opacity=1, transform=定位 matrix,
+ * aria-hidden="false" → 不被误判为 transient → 仍报 ELEMENT_OCCLUDED。
+ */
+export function isTransient(el: Element): boolean {
+  const cs = getComputedStyle(el);
+  if (parseFloat(cs.opacity) < 0.99) return true;
+  if (cs.transform && cs.transform !== "none" && cs.transform.includes("matrix")) {
+    return true;
+  }
+  if (el.getAttribute("aria-hidden") === "true") return true;
+  return false;
+}
+
 export function registerDomHandlers(
   router: ActionRouter,
   debuggerMgr: DebuggerManager,
@@ -204,12 +234,21 @@ export function registerDomHandlers(
                 w = w.parentElement;
               }
             }
+            // BUG-012 N0060 京东评测: react-virtuoso 虚拟列表容器与 viewport 间
+            // 有"动画覆盖层" (opacity/transform 动画 + aria-hidden 容器),
+            // elementFromPoint 命中覆盖层而非目标 ref, 但点击经 React root
+            // delegation 仍能到达目标。在 isInteractiveEl 失败后追加 isTransient
+            // 检测, 命中 transient overlay → 放行。真遮挡 (京东物流弹层遮罩)
+            // opacity=1 / transform=定位 matrix / aria-hidden="false" → 不被
+            // 误判, 仍报 ELEMENT_OCCLUDED。
+            const isTransientOverlay = isTransient(topEl);
             if (
               topEl &&
               topEl !== el &&
               !el.contains(topEl) &&
               !topEl.contains(el) &&
-              !sameWidgetDecoration
+              !sameWidgetDecoration &&
+              !isTransientOverlay
             ) {
               const classStr =
                 typeof topEl.className === "string" && topEl.className
