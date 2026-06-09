@@ -45,6 +45,7 @@ export async function cdpClickElement(
   tabId: number,
   frameId: number | undefined,
   selector: string,
+  options: { force?: boolean } = {},
 ): Promise<{
   success: true;
   element: { tag: string; text?: string };
@@ -61,7 +62,7 @@ export async function cdpClickElement(
   }>(
     tabId,
     frameId,
-    (sel: string) => {
+    (sel: string, force: boolean) => {
       try {
         // === 探测 ===
         // 与门(dom.ts CLICK 同步路径)一致:经 __vortexDomResolve.queryAllDeep 穿 open
@@ -135,26 +136,28 @@ export async function cdpClickElement(
             w = w.parentElement;
           }
         }
-        if (
-          topEl &&
-          topEl !== el &&
-          !el.contains(topEl) &&
-          !topEl.contains(el) &&
-          !sameWidgetDecoration
-        ) {
-          const classStr =
-            typeof topEl.className === "string" && topEl.className
-              ? "." + topEl.className.split(" ").filter(Boolean).join(".")
-              : "";
-          const desc =
-            topEl.tagName.toLowerCase() +
-            (topEl.id ? "#" + topEl.id : "") +
-            classStr;
-          return {
-            errorCode: "ELEMENT_OCCLUDED",
-            error: `Element ${sel} is covered by <${desc}>`,
-            extras: { blocker: desc },
-          };
+        if (!force) {
+          if (
+            topEl &&
+            topEl !== el &&
+            !el.contains(topEl) &&
+            !topEl.contains(el) &&
+            !sameWidgetDecoration
+          ) {
+            const classStr =
+              typeof topEl.className === "string" && topEl.className
+                ? "." + topEl.className.split(" ").filter(Boolean).join(".")
+                : "";
+            const desc =
+              topEl.tagName.toLowerCase() +
+              (topEl.id ? "#" + topEl.id : "") +
+              classStr;
+            return {
+              errorCode: "ELEMENT_OCCLUDED",
+              error: `Element ${sel} is covered by <${desc}>`,
+              extras: { blocker: desc },
+            };
+          }
         }
         return {
           result: {
@@ -168,7 +171,7 @@ export async function cdpClickElement(
         return { error: err instanceof Error ? err.message : String(err) };
       }
     },
-    [selector],
+    [selector, options.force ?? false],
   );
 
   if (rectRes?.error) mapPageError(rectRes, selector);
