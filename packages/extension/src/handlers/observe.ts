@@ -1577,11 +1577,23 @@ async function scanOneFrame(
           // 这里的 index 是 frame 内局部 id，observer handler 侧重编全局 index
           const state = getUiState(htmlEl);
           const valueNow = getValueInfo(htmlEl, role);
-          // BUG-010 N0060 京东评测: el 含 onClick 桩 / cursor:pointer 时打标。
-          // 命中后: (1) live DOM dataset 标 (供后续 click 检测) (2) ScannedElement
-          // 输出 reactClickable + clickHint (供 LLM 评测者读提示走 mouse_drag)。
-          // 不命中返 null, push 路径不变 (无副作用)。
-          const reactMarker = applyReactClickableMarker(htmlEl, {});
+          // V2 P0 修复 D9: applyReactClickableMarker 逻辑内联进 page-side
+          // inject func (避免 background scope 模块级函数 ReferenceError)。
+          // 原 export function applyReactClickableMarker() 保留 (供 V1 BUG-010
+          // bench case + 单元测试仍可单测), 仅 page-side 路径不再依赖
+          // background-scope 函数序列化 (它本来就不在序列化范围内)。
+          // 等价函数体 inline (变量名沿用) + REACT_CLICKABLE_HINT 内联:
+          const __vtxReactHint = "react onClick or cursor:pointer detected; vortex_act click may not trigger (isTrusted=false). Use vortex_mouse_drag(realMouse) or vortex_act click with useRealMouse=true to bypass.";
+          let reactMarker = null;
+          {
+            const __hasOnClickProp = htmlEl.onclick != null;
+            const __hasOnClickAttr = htmlEl.getAttribute("onclick") != null;
+            const __isPointer = getComputedStyle(htmlEl).cursor === "pointer";
+            if (__hasOnClickProp || __hasOnClickAttr || __isPointer) {
+              htmlEl.dataset.vortexReactClickable = "1";
+              reactMarker = { reactClickable: true, clickHint: __vtxReactHint };
+            }
+          }
           elements.push({
             index: elements.length,
             tag: htmlEl.tagName.toLowerCase(),
