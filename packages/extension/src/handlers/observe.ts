@@ -1655,7 +1655,7 @@ export function registerObserveHandlers(router: ActionRouter): void {
       if (explicitFrameId != null) await ensureFrameAttached(tid, explicitFrameId);
       const framesParamProvided = args.frames !== undefined;
       const framesParam = (args.frames as FramesParam | undefined) ?? "main";
-      const maxElements = (args.maxElements as number | undefined) ?? 200;
+      const maxElements = (args.maxElements as number | undefined) ?? 80;
       const viewport =
         (args.viewport as "visible" | "full" | undefined) ?? "visible";
       const includeText = (args.includeText as boolean | undefined) ?? true;

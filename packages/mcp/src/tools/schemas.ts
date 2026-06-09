@@ -124,7 +124,7 @@ function observeTools(): ToolDef[] {
             enum: ["visible", "full"],
             default: "visible",
           },
-          maxElements: { type: "number", default: 200 },
+          maxElements: { type: "number", default: 80 },
           includeAX: { type: "boolean", default: true },
           includeText: { type: "boolean", default: true },
           frames: {
