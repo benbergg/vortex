@@ -235,6 +235,15 @@ export type ActionabilityResult =
   // 恢复 0.5px 容差, 与 Playwright 对齐, 修正 spec 漂移。
   function isStable(el: Element): Promise<boolean> {
     return new Promise((resolve) => {
+      // 后台(hidden)标签 Chrome 暂停/节流 requestAnimationFrame → 下方 rAF 采样
+      // 会卡到 host 探测超时(2026-06-09 京东搜索 fill/click 后台慢 ~2s 的真因;
+      // 实测后台单次 rAF 5000ms 内从未回调、前台 8ms)。hidden 标签无可见动画、
+      // 稳定性检查无意义,跳过 rAF 直接视作稳定 —— 实际交互仍走 CDP/合成路径,
+      // 持续不稳由 force 兜底。
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+        resolve(true);
+        return;
+      }
       const r1 = el.getBoundingClientRect();
       requestAnimationFrame(() => {
         const r2 = el.getBoundingClientRect();
