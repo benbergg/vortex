@@ -45,3 +45,18 @@ describe("observe v2:isSelfClickable 内联 + 信号 swap(源码锁)", () => {
     expect(OBSERVE_SRC).toMatch(/hasFinerPointer && !isClickableContentCard\(el\)\) continue;/);
   });
 });
+
+describe("observe v2:卡吸收内部 cursor:pointer 后代(源码锁)", () => {
+  it("含 cardAbsorbers / absorbedByCard / survivingExtras 吸收逻辑", () => {
+    expect(OBSERVE_SRC).toMatch(/cardAbsorbers/);
+    expect(OBSERVE_SRC).toMatch(/absorbedByCard/);
+    expect(OBSERVE_SRC).toMatch(/survivingExtras/);
+  });
+  it("择叶 candidateSet 与 cursorPointerLeaves 基于 survivingExtras(非原始 cursorPointerExtras)", () => {
+    expect(OBSERVE_SRC).toMatch(/new Set<Element>\(survivingExtras\)/);
+    expect(OBSERVE_SRC).toMatch(/survivingExtras\.filter\(\s*\(el\) => !dropSet\.has\(el\)/);
+  });
+  it("吸收仅 filter=interactive 启用", () => {
+    expect(OBSERVE_SRC).toMatch(/let survivingExtras = cursorPointerExtras;/);
+  });
+});

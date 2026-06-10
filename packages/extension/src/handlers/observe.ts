@@ -1344,6 +1344,31 @@ async function scanOneFrame(
           if (!probe) continue;
           cursorPointerExtras.push(el);
         }
+        // [卡吸收内部] 自身可点的内容卡(isSelfClickable 且含交互后代,如京东 _card
+        // 整张可点、内含 addCart button + 客服 a)吸收其内部所有 cursor:pointer 后代——
+        // 卡是单一点击单元,内部 pointer 子部件(标题/标签/价格块)不是独立目标。否则
+        // 京东每张卡碎成 ~9 条(整页 877 个 cursor:pointer)把 maxElements 预算炸穿。
+        // addCart/客服(button/a)在 ARIA 池独立存活,不在 cursorPointerExtras,不受影响。
+        // 仅 filter=interactive 启用(filter=all 保持穷尽)。
+        let survivingExtras = cursorPointerExtras;
+        if (filter === "interactive") {
+          const cardAbsorbers = new Set<Element>(
+            cursorPointerExtras.filter(
+              (el) => isSelfClickable(el) && el.querySelector(INTERACTIVE_SELECTORS) != null,
+            ),
+          );
+          const absorbedByCard = new WeakSet<Element>();
+          for (const el of cursorPointerExtras) {
+            if (cardAbsorbers.has(el)) continue; // 卡本身不被吸收
+            for (let p = el.parentElement; p; p = p.parentElement) {
+              if (cardAbsorbers.has(p)) {
+                absorbedByCard.add(el);
+                break;
+              }
+            }
+          }
+          survivingExtras = cursorPointerExtras.filter((el) => !absorbedByCard.has(el));
+        }
         // 嵌套 cursor:pointer 时择一保留：
         // - 同文本（如 bytenew sidebar `li > div > div > div` 全是 "首页"）
         //   保留 leaf，drop ancestor；leaf 离 click 目标最近、文本无损失
@@ -1351,11 +1376,11 @@ async function scanOneFrame(
         //   "全部 96%好评" 含 leaf 子串 + 主标签）保留 ancestor，drop leaf；
         //   leaf 仅含 inner span 部分文本会让 LLM 拿不到主标签
         // 走每条 candidate 至多一次到最近的 candidate ancestor (O(N·depth))。
-        const candidateSet = new Set<Element>(cursorPointerExtras);
+        const candidateSet = new Set<Element>(survivingExtras);
         const dropSet = new WeakSet<Element>();
         const normText = (el: Element): string =>
           (el.textContent ?? "").replace(/\s+/g, " ").trim();
-        for (const leaf of cursorPointerExtras) {
+        for (const leaf of survivingExtras) {
           let p: Element | null = leaf.parentElement;
           while (p) {
             if (candidateSet.has(p)) {
@@ -1377,7 +1402,7 @@ async function scanOneFrame(
             p = p.parentElement;
           }
         }
-        const cursorPointerLeaves = cursorPointerExtras.filter(
+        const cursorPointerLeaves = survivingExtras.filter(
           (el) => !dropSet.has(el),
         );
 
