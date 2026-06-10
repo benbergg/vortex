@@ -48,7 +48,9 @@ describe("observe focus-container 命名噪声抑制 (github dogfood 2026-06-02 
     expect(containerReturnIdx).toBeLessThan(iconFallbackIdx);
   });
 
-  it("下游 BUG-3 噪声过滤器仍按 `!name` 丢弃无名 wrapper(空名 → 丢弃链路完整)", () => {
-    expect(OBSERVE_SRC).toMatch(/!formLike && !hasExplicitRole && !name\) continue;/);
+  it("下游 BUG-3 噪声过滤器仍按 `!suppressedName` 丢弃无名 wrapper(空名 → 丢弃链路完整)", () => {
+    // suppressedName 默认 = name,仅内容卡内 icon-link 装饰子被置空;
+    // 空名 → 丢弃的链路对原 focus-container 噪声场景完全保留。
+    expect(OBSERVE_SRC).toMatch(/!formLike && !hasExplicitRole && !suppressedName\) continue;/);
   });
 });

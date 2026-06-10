@@ -1581,6 +1581,16 @@ async function scanOneFrame(
           const role = withAX ? getRole(htmlEl) : htmlEl.tagName.toLowerCase();
           const name = withText ? getAccessibleName(htmlEl) : "";
 
+          // 内容卡入池后,其内部「无文本 icon-link 子」(京东客服 16x16)是冗余噪声——
+          // 若元素名为 icon-link 兜底名且位于某内容卡祖先内,抑制(置空 → 下方 BUG-3
+          // 过滤丢弃)。仅 filter=interactive 启用。
+          let suppressedName = name;
+          if (filter === "interactive" && /^icon-link @/.test(name)) {
+            for (let p = htmlEl.parentElement; p; p = p.parentElement) {
+              if (isClickableContentCard(p)) { suppressedName = ""; break; }
+            }
+          }
+
           // BUG-3: in filter='interactive' mode, drop wrappers that the
           // selector caught structurally but carry no semantic info —
           // typically Element Plus el-popover__reference triggers
@@ -1614,7 +1624,7 @@ async function scanOneFrame(
             const hasExplicitRole =
               !!htmlEl.getAttribute("role") ||
               !!htmlEl.getAttribute("aria-label");
-            if (!formLike && !hasExplicitRole && !name) continue;
+            if (!formLike && !hasExplicitRole && !suppressedName) continue;
           }
 
           // 这里的 index 是 frame 内局部 id，observer handler 侧重编全局 index
@@ -1641,7 +1651,7 @@ async function scanOneFrame(
             index: elements.length,
             tag: htmlEl.tagName.toLowerCase(),
             role,
-            name,
+            name: suppressedName,
             bbox: {
               x: Math.round(rect.left),
               y: Math.round(rect.top),
