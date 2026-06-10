@@ -1279,7 +1279,9 @@ async function scanOneFrame(
           // (Use INTERACTIVE_SELECTORS, not the table-extended set, so
           // table cells with cursor:pointer still get collected when
           // filter='all'.)
-          if (el.querySelector(INTERACTIVE_SELECTORS)) continue;
+          // 内容卡(自身 framework onClick + 自有内容文本)即使含交互后代也保留——
+          // 它本身是可点击单元(京东商品卡 div._card 含客服 a/addCart button)。
+          if (el.querySelector(INTERACTIVE_SELECTORS) && !isClickableContentCard(el)) continue;
           // Cross-pool ancestor short-circuit: 若祖先链上有 INTERACTIVE_SELECTORS
           // 元素（如 `<li role=menuitem><div cursor:pointer>`、`<label>` 包
           // `<span cursor:pointer>`、`<button>` 包装饰 span 等），整个 ARIA
@@ -1314,7 +1316,9 @@ async function scanOneFrame(
                 break;
               }
             }
-            if (hasFinerPointer) continue;
+            // 内容卡不让位——评价卡 li.item 自身有 onClick + 评价正文,内部
+            // cursor:pointer 标签是附属,不该让位给标签(SKU 容器无自有文本仍让位)。
+            if (hasFinerPointer && !isClickableContentCard(el)) continue;
           }
           // Use textContent for the gate check — innerText forces layout
           // and we only need the gate decision here. The accessible name
