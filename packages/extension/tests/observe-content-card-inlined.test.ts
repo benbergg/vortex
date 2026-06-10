@@ -34,8 +34,12 @@ describe("observe v2:isSelfClickable 内联 + 信号 swap(源码锁)", () => {
       /querySelector\(INTERACTIVE_SELECTORS\) && !isSelfClickable\(el\)\) continue;/,
     );
   });
-  it("Task6 抑制祖先判据用 isSelfClickable(p)", () => {
-    expect(OBSERVE_SRC).toMatch(/if \(isSelfClickable\(p\)\) \{ suppressedName = ""; break; \}/);
+  it("Task6 内容卡内 icon-link 直接丢弃(continue),非置空名", () => {
+    // formLike(<a href>)绕过 BUG-3 !name 过滤,置空名仍占 maxElements 预算饿死商品卡,
+    // 故必须显式 continue 丢弃。
+    expect(OBSERVE_SRC).toMatch(/\/\^icon-link @\/\.test\(name\)/);
+    expect(OBSERVE_SRC).toMatch(/if \(inCard\) continue;/);
+    expect(OBSERVE_SRC).not.toMatch(/suppressedName/);
   });
   it("门 1282 仍用 isClickableContentCard(评价卡 BUG-04 不回退)", () => {
     expect(OBSERVE_SRC).toMatch(/hasFinerPointer && !isClickableContentCard\(el\)\) continue;/);
