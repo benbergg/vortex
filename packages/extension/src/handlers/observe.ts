@@ -99,6 +99,10 @@ interface ScannedElement {
   reactClickable?: true;
   /** reactClickable=true 时给 LLM 的可读提示, 含具体兜底命令名。 */
   clickHint?: string;
+  /** 最近的已收集祖先的 frame-local index；根节点 undefined。@since a11y-tree */
+  parentIndex?: number;
+  /** role=link 的 href，供 compact 树渲染 /url。@since a11y-tree */
+  href?: string;
   _sel: string;
 }
 
@@ -1451,8 +1455,14 @@ async function scanOneFrame(
           state?: { checked?: boolean; selected?: boolean; active?: boolean; disabled?: boolean; expanded?: boolean; required?: boolean; current?: boolean; invalid?: boolean; sort?: "ascending" | "descending" | "none"; haspopup?: string };
           /** 值域控件当前值,如 "30" 或 "30/100"(getValueInfo 严格限定值域控件)。 */
           valueNow?: string;
+          /** 最近的已收集祖先的 frame-local index；根节点 undefined。@since a11y-tree */
+          parentIndex?: number;
+          /** role=link 的 href，供 compact 树渲染 /url。@since a11y-tree */
+          href?: string;
           _sel: string;
         }> = [];
+        // a11y-tree: 与 elements 下标对齐的 DOM 元素引用数组，供二次遍历建树。
+        const collectedEls: Element[] = [];
 
         for (const el of allCandidates) {
           if (elements.length >= max) break;
@@ -1680,6 +1690,10 @@ async function scanOneFrame(
               reactMarker = { reactClickable: true, clickHint: __vtxReactHint };
             }
           }
+          // a11y-tree: 记引用，下标严格与 elements 对齐（此处是循环内最后一个
+          // 可能 continue 之后、elements.push 之前的唯一 push 点）。
+          collectedEls.push(htmlEl);
+          const __href = role === "link" ? (htmlEl.getAttribute("href") || undefined) : undefined;
           elements.push({
             index: elements.length,
             tag: htmlEl.tagName.toLowerCase(),
@@ -1701,8 +1715,33 @@ async function scanOneFrame(
             ...(reactMarker
               ? { reactClickable: true as const, clickHint: reactMarker.clickHint }
               : {}),
+            ...(__href !== undefined ? { href: __href } : {}),
             _sel: buildSelector(htmlEl),
           });
+        }
+
+        // a11y-tree: 为每个收集元素算最近的已收集祖先（穿 shadow host）→ frame-local parentIndex。
+        // 中间未收集节点折叠，得紧凑 containment 树。collectedEls 下标对齐 elements。
+        // 注意:本段算法须与 tests/observe-parent-index-page-side.test.ts 的
+        // COMPUTE_PARENT_INDEX 保持同步(真源+内联副本,改一处须改另一处)。
+        {
+          const __set = new Set(collectedEls);
+          for (let i = 0; i < collectedEls.length; i++) {
+            let cur =
+              collectedEls[i].parentElement ||
+              (collectedEls[i].getRootNode() && collectedEls[i].getRootNode().host) ||
+              null;
+            while (cur) {
+              if (__set.has(cur)) {
+                elements[i].parentIndex = collectedEls.indexOf(cur);
+                break;
+              }
+              cur =
+                cur.parentElement ||
+                (cur.getRootNode() && cur.getRootNode().host) ||
+                null;
+            }
+          }
         }
 
         return {
@@ -1902,6 +1941,8 @@ export function registerObserveHandlers(router: ActionRouter): void {
         frameId: number;
         // Issue #21 — populated only when input.includeBoxes && e.inViewport (T4).
         bbox?: [number, number, number, number];
+        parentIndex?: number;
+        href?: string;
       };
       type FullElementOut = Omit<ScannedElement, "_sel"> & {
         frameId: number;
@@ -1939,8 +1980,13 @@ export function registerObserveHandlers(router: ActionRouter): void {
         }
         totalCandidates += s.page.candidateCount;
         anyTruncated = anyTruncated || s.page.truncated;
+        // a11y-tree: 该 frame 首元素的全局 index，用于把 frame-local parentIndex 重映射成全局 index。
+        const frameBase = cursor;
         for (const e of s.page.elements) {
           const globalIdx = cursor++;
+          // a11y-tree: frame-local parentIndex → global parentIndex（globalParent = frameBase + localParent）。
+          const globalParentIndex =
+            e.parentIndex !== undefined ? frameBase + e.parentIndex : undefined;
           const centerX = e.bbox.x + Math.round(e.bbox.w / 2);
           const centerY = e.bbox.y + Math.round(e.bbox.h / 2);
           if (format === "compact") {
@@ -1978,6 +2024,9 @@ export function registerObserveHandlers(router: ActionRouter): void {
               ...(e.reactClickable
                 ? { reactClickable: true as const, clickHint: e.clickHint! }
                 : {}),
+              // a11y-tree: 全局重映射后的父指针 + href（link 元素）。
+              ...(globalParentIndex !== undefined ? { parentIndex: globalParentIndex } : {}),
+              ...(e.href ? { href: e.href } : {}),
               frameId: s.frameId,
               ...(bboxTuple ? { bbox: bboxTuple } : {}),
             });
@@ -2008,6 +2057,9 @@ export function registerObserveHandlers(router: ActionRouter): void {
               ...(e.reactClickable
                 ? { reactClickable: true as const, clickHint: e.clickHint! }
                 : {}),
+              // a11y-tree: 全局重映射后的父指针 + href（link 元素）。
+              ...(globalParentIndex !== undefined ? { parentIndex: globalParentIndex } : {}),
+              ...(e.href ? { href: e.href } : {}),
               frameId: s.frameId,
               ref,
               suggestedUsage: {

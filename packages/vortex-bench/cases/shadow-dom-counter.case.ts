@@ -22,11 +22,11 @@ import type { CaseDefinition } from "../src/types.js";
 import { assertResultContains, extractText } from "./_helpers.js";
 
 function findRef(snapshot: string, name: string): string | null {
-  // v0.8 hashed ref support: matches @eN / @fNeM / @<hash>:eN / @<hash>:fNeM
-  const re = new RegExp(`(@(?:[a-f0-9]{4}:)?(?:f\\d+)?e\\d+)\\s+\\[[^\\]]+\\]\\s+"([^"]*?)"`, "g");
+  // a11y-tree 格式：`- role "name" [ref=@..]`，ref 在 [ref=] 内（旧扁平是行首 @ref [role] "name"）。
+  const re = new RegExp(`-\\s+\\S+\\s+"([^"]*?)"\\s+\\[ref=(@[\\w:]+)\\]`, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(snapshot)) !== null) {
-    if (m[2].trim() === name) return m[1];
+    if (m[1].trim() === name) return m[2];
   }
   return null;
 }

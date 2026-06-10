@@ -49,16 +49,16 @@ const def: CaseDefinition = {
       `observe should surface the positive-control button "Click me". snapshot head:\n${snap.slice(0, 500)}`,
     );
 
-    // Element line format (see observe-render.ts:71-81):
-    //   `@<ref> [<role>]<state-flags?><bbox?>` when name is empty
-    //   `@<ref> [<role>] "<name>"<state-flags?><bbox?>` when name is set
+    // a11y-tree 行格式 (see observe-render.ts renderObserveTree):
+    //   `{indent}- {role} [ref=@..] {flags?}`            when name is empty
+    //   `{indent}- {role} "{name}" [ref=@..] {flags?}`   when name is set
     //
-    // A nameless `[div]` is any line that starts with `@<ref> [div]` and
-    // is NOT followed by `\s+"...` for the quoted name. Tolerates trailing
-    // state flags like ` [active]` and bbox segments like ` bbox=[..]`.
+    // A nameless `div` is any line whose role token `div` is immediately
+    // followed by `[ref=` (no quoted name in between). A named div has
+    // `- div "name" [ref=` so it does NOT match. Tolerates leading indent.
     const namelessDivLines: string[] = [];
     for (const line of snap.split("\n")) {
-      if (/^@\S+\s+\[div\](?!\s+")/.test(line)) {
+      if (/^\s*-\s+div\s+\[ref=/.test(line)) {
         namelessDivLines.push(line);
       }
     }
@@ -66,7 +66,7 @@ const def: CaseDefinition = {
 
     ctx.assert(
       namelessDivLines.length === 0,
-      `Issue #18: vortex_observe(frames=main) should not emit nameless [div] lines. Found ${namelessDivLines.length}:\n${namelessDivLines.join("\n")}`,
+      `Issue #18: vortex_observe(frames=main) should not emit nameless div lines. Found ${namelessDivLines.length}:\n${namelessDivLines.join("\n")}`,
     );
   },
 };

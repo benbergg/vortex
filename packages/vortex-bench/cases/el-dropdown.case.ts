@@ -4,14 +4,14 @@
 import type { CaseDefinition } from "../src/types.js";
 import { assertResultContains, extractEvalJson, extractText } from "./_helpers.js";
 
-/** 从 observe snapshot 里提取某个可交互项的 @eN ref（按 accessible name 精确匹配） */
+/** 从 observe snapshot 里提取某个可交互项的 ref（按 accessible name 精确匹配） */
 function findRef(snapshot: string, name: string): string | null {
-  // 匹配形如：@e12 [menuitem] "选项 B"、@f34e7 [button] "选项 B"，
-  // 以及 v0.8 hashed 形态 @a1b2:e12 / @a1b2:f34e7
-  const re = new RegExp(`(@(?:[a-f0-9]{4}:)?(?:f\\d+)?e\\d+)\\s+\\[[^\\]]+\\]\\s+"([^"]*?)"`, "g");
+  // a11y-tree 格式：`- role "name" [ref=@..]`，ref 在 [ref=] 内（旧扁平是行首 @ref）。
+  // 兼容 hashed 形态 @a1b2:e12 / @a1b2:f34e7 与无 hash @e12 / @f34e7。
+  const re = new RegExp(`-\\s+\\S+\\s+"([^"]*?)"\\s+\\[ref=(@[\\w:]+)\\]`, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(snapshot)) !== null) {
-    if (m[2].trim() === name) return m[1];
+    if (m[1].trim() === name) return m[2];
   }
   return null;
 }

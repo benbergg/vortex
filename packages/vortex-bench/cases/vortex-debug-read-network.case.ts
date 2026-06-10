@@ -19,10 +19,11 @@ const MARKER_ALPHA = "vortex-bench-net-marker-alpha";
 const MARKER_BETA = "vortex-bench-net-marker-beta";
 
 function findRef(snapshot: string, name: string): string | null {
-  const re = new RegExp(`(@(?:[a-f0-9]{4}:)?(?:f\\d+)?e\\d+)\\s+\\[[^\\]]+\\]\\s+"([^"]*?)"`, "g");
+  // a11y-tree 格式：`- role "name" [ref=@..]`，ref 在 [ref=] 内（旧扁平是行首 @ref [role] "name"）。
+  const re = new RegExp(`-\\s+\\S+\\s+"([^"]*?)"\\s+\\[ref=(@[\\w:]+)\\]`, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(snapshot)) !== null) {
-    if (m[2].trim() === name) return m[1];
+    if (m[1].trim() === name) return m[2];
   }
   return null;
 }
@@ -35,7 +36,12 @@ const def: CaseDefinition = {
     //    network handler runs ensureSubscribed which attaches the
     //    Network domain on this tab; without this, fetches fired
     //    BEFORE the first vortex_debug_read are not captured.
-    await ctx.call("vortex_debug_read", { source: "network" });
+    // B3-8 guard: source=network 必须带 pattern(防 5000 条 dump)。两个 marker
+    // 共享前缀 "vortex-bench-net-marker"，用它作 substring 过滤即可命中 alpha+beta。
+    await ctx.call("vortex_debug_read", {
+      source: "network",
+      pattern: "vortex-bench-net-marker",
+    });
 
     // 2. Find the "Fire requests" button and click it. The page-side
     //    handler runs two fetches in Promise.all and then writes the
@@ -54,7 +60,10 @@ const def: CaseDefinition = {
     //    with `url` / `method` / `status` / etc.; the MCP boundary
     //    JSON-stringifies it, so the marker URLs are findable as
     //    substrings of the response text.
-    const netResp = await ctx.call("vortex_debug_read", { source: "network" });
+    const netResp = await ctx.call("vortex_debug_read", {
+      source: "network",
+      pattern: "vortex-bench-net-marker",
+    });
     const netText = extractText(netResp);
 
     // 4. Both markers must appear. Substring search is sufficient — the
