@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { JSDOM } from "jsdom";
-import { hasOwnContentText, isClickableContentCard } from "../src/page-side/content-card.js";
+import { hasOwnContentText, isClickableContentCard, isSelfClickable } from "../src/page-side/content-card.js";
 
 function setupDom(html: string): Document {
   const dom = new JSDOM(`<!DOCTYPE html><body>${html}</body>`);
@@ -78,5 +78,31 @@ describe("isClickableContentCard — 真值表", () => {
   it("纯 wrapper:无 onClick → false", () => {
     const doc = setupDom(`<div id="t"><span>Apple iPhone 16 白色长文本</span></div>`);
     expect(isClickableContentCard(doc.getElementById("t")!)).toBe(false);
+  });
+});
+
+describe("isSelfClickable — 自身独立可点", () => {
+  it("cursor:pointer 无 fw → true", () => {
+    const doc = setupDom(`<div id="t" style="cursor:pointer">商品卡片标题文本</div>`);
+    expect(isSelfClickable(doc.getElementById("t")!)).toBe(true);
+  });
+
+  it("framework onClick 无 cursor:pointer → true", () => {
+    const doc = setupDom(`<div id="t">框架卡片</div>`);
+    const el = doc.getElementById("t")!;
+    attachReactClick(el);
+    expect(isSelfClickable(el)).toBe(true);
+  });
+
+  it("cursor:pointer + framework onClick(京东 _card)→ true", () => {
+    const doc = setupDom(`<div id="t" style="cursor:pointer">Apple iPhone 16</div>`);
+    const el = doc.getElementById("t")!;
+    attachReactClick(el);
+    expect(isSelfClickable(el)).toBe(true);
+  });
+
+  it("cursor:auto 无 fw(普通布局 wrapper)→ false", () => {
+    const doc = setupDom(`<div id="t"><button style="cursor:pointer">提交</button></div>`);
+    expect(isSelfClickable(doc.getElementById("t")!)).toBe(false);
   });
 });

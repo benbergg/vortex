@@ -44,3 +44,8 @@ export function hasOwnContentText(el: Element, threshold = 8): boolean {
 export function isClickableContentCard(el: Element): boolean {
   return hasFrameworkClickHandler(el) && hasOwnContentText(el);
 }
+
+/** el 自身独立可点:cursor:pointer 或框架 onClick 挂在 el 自己身上。 */
+export function isSelfClickable(el: Element): boolean {
+  return getComputedStyle(el).cursor === "pointer" || hasFrameworkClickHandler(el);
+}
