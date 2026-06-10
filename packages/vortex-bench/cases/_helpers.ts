@@ -34,10 +34,12 @@ export function extractEvalJson<T = unknown>(res: unknown): T {
  * case 不能硬编码,须 observe→findRef→act。范式来自 shadow-dom-counter.case.ts。
  */
 export function findRef(snapshot: string, name: string): string | null {
-  const re = new RegExp(`(@(?:[a-f0-9]{4}:)?(?:f\\d+)?e\\d+)\\s+\\[[^\\]]+\\]\\s+"([^"]*?)"`, "g");
+  // a11y-tree 格式：`- role "name" [ref=@..]`，ref 在 [ref=] 内（旧扁平是行首 @ref [role] "name"）。
+  // 兼容 hashed 形态 @a1b2:e12 / @a1b2:f34e7 与无 hash @e12 / @f34e7。
+  const re = new RegExp(`-\\s+\\S+\\s+"([^"]*?)"\\s+\\[ref=(@[\\w:]+)\\]`, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(snapshot)) !== null) {
-    if (m[2].trim() === name) return m[1];
+    if (m[1].trim() === name) return m[2];
   }
   return null;
 }

@@ -21,18 +21,20 @@ import type { CaseDefinition } from "../src/types.js";
 import { assertResultContains, extractText } from "./_helpers.js";
 
 function findRef(snapshot: string, name: string): string | null {
-  const re = new RegExp(`(@(?:[a-f0-9]{4}:)?(?:f\\d+)?e\\d+)\\s+\\[[^\\]]+\\]\\s+"([^"]*?)"`, "g");
+  // a11y-tree 格式：`- role "name" [ref=@..]`，ref 在 [ref=] 内（旧扁平是行首 @ref [role] "name"）。
+  const re = new RegExp(`-\\s+\\S+\\s+"([^"]*?)"\\s+\\[ref=(@[\\w:]+)\\]`, "g");
   let m: RegExpExecArray | null;
   while ((m = re.exec(snapshot)) !== null) {
-    if (m[2].trim() === name) return m[1];
+    if (m[1].trim() === name) return m[2];
   }
   return null;
 }
 
-/** Return the whole compact line whose quoted name matches, or null. */
+/** a11y-tree 行内按 accessible name 精确匹配，返回整行（含 [active] 等 flag）。 */
 function findLineWithName(snapshot: string, name: string): string | null {
   for (const line of snapshot.split("\n")) {
-    const m = line.match(/^@\S+\s+\[[^\]]+\]\s+"([^"]*?)"/);
+    // 新树格式：`  - role "name" [ref=@..] [active]`，name 在引号内
+    const m = line.match(/-\s+\S+\s+"([^"]*?)"/);
     if (m && m[1].trim() === name) return line;
   }
   return null;
