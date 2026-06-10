@@ -217,4 +217,31 @@ describe("spike(cdp-first): FILL cdpFill / TYPE cdpType 实验分支", () => {
     // contentEditable 分支只 insertText 一次(无实验分支的二次 readback/select 调用)
     expect(debuggerMgr.sendCommand).toHaveBeenCalledTimes(1);
   });
+
+  // C 组:CLICK 的 forceSynthetic 实验开关。
+  // 背景:server 对 dom.click 无条件注入 trustedMode=detect()(message-router),
+  // trusted Chrome(--silent-debugger-extension-api)上 click 恒走 CDP,
+  // compare-cdp 的「合成对照组」被污染。forceSynthetic=true 压过 trustedMode,
+  // 还原非 trusted 普通用户的合成默认路径(启发式 deferToCdp 不受影响——
+  // 非 trusted 现状本就含启发式升级)。
+  it.skip("C1: trustedMode=true(server 注入)→ click 走 CDP(现状锁)[TODO forceSynthetic 未实现]", async () => {
+    const resp = await router.dispatch(
+      mkReq(DomActions.CLICK, { selector: "#kw", trustedMode: true }),
+    );
+    expect(resp.error).toBeUndefined();
+    // cdpClickElement 内部:probe(pageQuery)→ attach → 3×dispatchMouseEvent
+    expect(debuggerMgr.sendCommand).toHaveBeenCalledWith(
+      1,
+      "Input.dispatchMouseEvent",
+      expect.objectContaining({ type: "mousePressed" }),
+    );
+  });
+
+  it.skip("C2: trustedMode=true + forceSynthetic=true → 不走 CDP(合成对照可制造)[TODO forceSynthetic 未实现]", async () => {
+    const resp = await router.dispatch(
+      mkReq(DomActions.CLICK, { selector: "#kw", trustedMode: true, forceSynthetic: true }),
+    );
+    expect(resp.error).toBeUndefined();
+    expect(debuggerMgr.sendCommand).not.toHaveBeenCalled();
+  });
 });
