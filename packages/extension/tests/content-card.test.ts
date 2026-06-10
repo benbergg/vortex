@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { JSDOM } from "jsdom";
-import { hasOwnContentText } from "../src/page-side/content-card.js";
+import { hasOwnContentText, isClickableContentCard } from "../src/page-side/content-card.js";
 
 function setupDom(html: string): Document {
   const dom = new JSDOM(`<!DOCTYPE html><body>${html}</body>`);
@@ -42,5 +42,41 @@ describe("hasOwnContentText — 容器自有内容判定", () => {
   it("阈值:非可点文本不足 8 字符 → false", () => {
     const doc = setupDom(`<div id="t"><span>短</span></div>`);
     expect(hasOwnContentText(doc.getElementById("t")!)).toBe(false);
+  });
+});
+
+/** 手挂 React fiber 模拟 __reactProps$.onClick(hasFrameworkClickHandler 检测的真信号)。 */
+function attachReactClick(el: Element): void {
+  (el as unknown as Record<string, unknown>)["__reactProps$test"] = { onClick: () => {} };
+}
+
+describe("isClickableContentCard — 真值表", () => {
+  it("商品卡:onClick + 自有文本 → true", () => {
+    const doc = setupDom(`<div id="t"><span>Apple iPhone 16 白色</span>` +
+      `<button style="cursor:pointer">加入购物车</button></div>`);
+    const el = doc.getElementById("t")!;
+    attachReactClick(el);
+    expect(isClickableContentCard(el)).toBe(true);
+  });
+
+  it("评价卡:onClick + 正文 + cursor:pointer 标签 → true", () => {
+    const doc = setupDom(`<li id="t"><div class="info">很长的评价正文内容在此</div>` +
+      `<div class="term" style="cursor:pointer">拍照清晰</div></li>`);
+    const el = doc.getElementById("t")!;
+    attachReactClick(el);
+    expect(isClickableContentCard(el)).toBe(true);
+  });
+
+  it("SKU 容器:onClick(委托) + 文本全在可点子 → false", () => {
+    const doc = setupDom(`<div id="t"><span style="cursor:pointer">粉色</span>` +
+      `<span style="cursor:pointer">黑色</span></div>`);
+    const el = doc.getElementById("t")!;
+    attachReactClick(el);
+    expect(isClickableContentCard(el)).toBe(false);
+  });
+
+  it("纯 wrapper:无 onClick → false", () => {
+    const doc = setupDom(`<div id="t"><span>Apple iPhone 16 白色长文本</span></div>`);
+    expect(isClickableContentCard(doc.getElementById("t")!)).toBe(false);
   });
 });
