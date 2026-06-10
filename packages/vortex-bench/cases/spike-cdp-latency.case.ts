@@ -23,11 +23,12 @@ const def: CaseDefinition = {
     // selector 直击(#toggle-btn),不走 ref:循环内不掺 observe 开销,两模式同构
     const target = "#toggle-btn";
 
-    // ===== pass 1:合成 click(默认路径)× N =====
+    // ===== pass 1:合成 click(forceSynthetic 压过 trusted Chrome 的注入,
+    // 否则本机 --silent-debugger-extension-api 下两组全是 CDP,对照失效)× N =====
     const synthetic: number[] = [];
     for (let i = 0; i < SAMPLES; i++) {
       const t0 = Date.now();
-      await ctx.call("vortex_act", { action: "click", target });
+      await ctx.call("vortex_act", { action: "click", target, forceSynthetic: true });
       synthetic.push(Date.now() - t0);
     }
 

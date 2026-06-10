@@ -10,6 +10,7 @@ import {
   summarizeCdpCompare,
   renderCdpCompareTable,
   CDP_FIRST_OVERRIDES,
+  SYNTHETIC_BASELINE_OVERRIDES,
 } from "../src/compare-cdp.js";
 import type { CaseMetrics } from "../src/types.js";
 
@@ -76,5 +77,12 @@ describe("CDP_FIRST_OVERRIDES 实验旋钮", () => {
       cdpType: true,
     });
     expect(CDP_FIRST_OVERRIDES.vortex_fill).toMatchObject({ cdpFill: true });
+  });
+
+  it("pass A 基线注入 forceSynthetic(trusted Chrome 上还原非 trusted 合成默认)", () => {
+    expect(SYNTHETIC_BASELINE_OVERRIDES.vortex_act).toMatchObject({ forceSynthetic: true });
+    // 基线不得携带任何 CDP 旋钮
+    expect(SYNTHETIC_BASELINE_OVERRIDES.vortex_act).not.toHaveProperty("useRealMouse");
+    expect(SYNTHETIC_BASELINE_OVERRIDES.vortex_act).not.toHaveProperty("cdpFill");
   });
 });

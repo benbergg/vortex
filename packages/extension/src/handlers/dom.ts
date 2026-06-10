@@ -144,7 +144,11 @@ export function registerDomHandlers(
       // flag-自适应:server 在 trusted Chrome(带 --silent-debugger-extension-api)下注入
       // trustedMode=true。此时 click 默认走 CDP trusted(无黄条、广覆盖 isTrusted-gated),
       // 等价于隐式 useRealMouse。非 trusted 时落到下方合成 + submit-intent 路径(不变)。
-      const trustedMode = args.trustedMode === true;
+      // spike(cdp-first):forceSynthetic=true 压过注入的 trustedMode——server 对
+      // dom.click 无条件注入(spread 在 args 之后,调用方覆盖不了),trusted Chrome 上
+      // compare-cdp 的「合成对照组」必须用本开关还原非 trusted 默认路径。
+      // 仅否 trustedMode,不动 deferToCdp 启发式(非 trusted 现状本就含启发式升级)。
+      const trustedMode = args.trustedMode === true && args.forceSynthetic !== true;
 
       // L2 integration: actionability + auto-wait pre-check
       // NOT_STABLE 自动 force 重试(对齐 FILL BUG-011):京东 sticky 搜索按钮在

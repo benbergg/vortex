@@ -48,6 +48,11 @@ vi.mock("../src/lib/tab-utils.js", () => ({
   ensureFrameAttached: vi.fn().mockResolvedValue(undefined),
 }));
 
+// C 组(CLICK CDP 路径)依赖:cdpClickElement 内部会算 iframe offset
+vi.mock("../src/lib/iframe-offset.js", () => ({
+  getIframeOffset: vi.fn().mockResolvedValue({ x: 0, y: 0 }),
+}));
+
 // pageQuery 真执行 inline func(jsdom 全局);记录每次调用的 func 源码供 F2 断言。
 const executedFuncSources: string[] = [];
 vi.mock("../src/adapter/native.js", async (importOriginal) => {
@@ -111,6 +116,21 @@ describe("spike(cdp-first): FILL cdpFill / TYPE cdpType 实验分支", () => {
     (dom.window as unknown as Record<string, unknown>).__vortexDomResolve = {
       queryAllDeep: (sel: string) => Array.from(dom.window.document.querySelectorAll(sel)),
       isEnabled: () => true,
+      // C 组 CDP click probe 的 occlusion 检查:返回 null = 无遮挡
+      deepElementFromPoint: () => null,
+    };
+
+    // jsdom 不实现 scrollIntoView,CDP click probe 会调用
+    (dom.window.Element.prototype as unknown as { scrollIntoView: () => void }).scrollIntoView =
+      () => {};
+
+    // C2 合成 click 路径直接走 chrome.scripting.executeScript(不经 pageQuery);
+    // 合成 inline func 依赖过重(PointerEvent/framework 标记),stub 返回罐头成功,
+    // C2 只断言「不碰 CDP」。
+    (globalThis as unknown as { chrome: unknown }).chrome = {
+      scripting: {
+        executeScript: async () => [{ result: { result: { success: true, clicked: true } } }],
+      },
     };
 
     // jsdom 不实现 isContentEditable(恒 undefined),probe 的 contentEditable 检测需手工补
@@ -224,7 +244,7 @@ describe("spike(cdp-first): FILL cdpFill / TYPE cdpType 实验分支", () => {
   // compare-cdp 的「合成对照组」被污染。forceSynthetic=true 压过 trustedMode,
   // 还原非 trusted 普通用户的合成默认路径(启发式 deferToCdp 不受影响——
   // 非 trusted 现状本就含启发式升级)。
-  it.skip("C1: trustedMode=true(server 注入)→ click 走 CDP(现状锁)[TODO forceSynthetic 未实现]", async () => {
+  it("C1: trustedMode=true(server 注入)→ click 走 CDP(现状锁)", async () => {
     const resp = await router.dispatch(
       mkReq(DomActions.CLICK, { selector: "#kw", trustedMode: true }),
     );
@@ -237,7 +257,7 @@ describe("spike(cdp-first): FILL cdpFill / TYPE cdpType 实验分支", () => {
     );
   });
 
-  it.skip("C2: trustedMode=true + forceSynthetic=true → 不走 CDP(合成对照可制造)[TODO forceSynthetic 未实现]", async () => {
+  it("C2: trustedMode=true + forceSynthetic=true → 不走 CDP(合成对照可制造)", async () => {
     const resp = await router.dispatch(
       mkReq(DomActions.CLICK, { selector: "#kw", trustedMode: true, forceSynthetic: true }),
     );

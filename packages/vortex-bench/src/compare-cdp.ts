@@ -16,6 +16,15 @@ export const CDP_FIRST_OVERRIDES: Record<string, Record<string, unknown>> = {
   vortex_fill: { cdpFill: true },
 };
 
+/**
+ * pass A 的 argOverrides:server 对 dom.click 无条件注入 trustedMode=detect(),
+ * trusted Chrome(--silent-debugger-extension-api)上 click 恒走 CDP,基线被污染。
+ * forceSynthetic 在 extension 侧压过注入,还原非 trusted 普通用户的合成默认路径。
+ */
+export const SYNTHETIC_BASELINE_OVERRIDES: Record<string, Record<string, unknown>> = {
+  vortex_act: { forceSynthetic: true },
+};
+
 export type CdpVerdict = "both-pass" | "cdp-regression" | "cdp-fixes" | "both-fail";
 
 export interface CdpCompareRow {

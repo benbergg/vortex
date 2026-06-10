@@ -59,7 +59,8 @@ const def: CaseDefinition = {
     ctx.recordMetric("btnLeftDelta", Math.round((before!.btnLeft - after!.btnLeft) * 100) / 100);
 
     // ④ attach 常驻状态下两路 click 各一次,验证坐标/路径都仍命中同一元素
-    await ctx.call("vortex_act", { action: "click", target: "#toggle-btn" }); // 合成 → "false"
+    // (forceSynthetic:trusted Chrome 上还原真合成路径)
+    await ctx.call("vortex_act", { action: "click", target: "#toggle-btn", forceSynthetic: true }); // 合成 → "false"
     const synth = extractEvalJson<Geom>(await ctx.call("vortex_evaluate", { code: GEOM_CODE }));
     ctx.assert(synth!.pressed === "false", `attach 后合成 click 应翻转回 false,实际 ${synth!.pressed}`);
 

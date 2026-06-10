@@ -27,6 +27,7 @@ import type { FixtureRobustness, RobustnessReport } from "./robustness-types.js"
 import { judgePage, type JudgeTarget } from "./runner/judge.js";
 import {
   CDP_FIRST_OVERRIDES,
+  SYNTHETIC_BASELINE_OVERRIDES,
   summarizeCdpCompare,
   renderCdpCompareTable,
 } from "./compare-cdp.js";
@@ -323,7 +324,7 @@ async function cmdCompareCdp(args: string[]): Promise<number> {
     return results;
   }
 
-  const before = await runPass("baseline (synthetic default)");
+  const before = await runPass("baseline (synthetic, forceSynthetic 压过 trusted)", SYNTHETIC_BASELINE_OVERRIDES);
   const after = await runPass("CDP-first (useRealMouse+cdpFill+cdpType)", CDP_FIRST_OVERRIDES);
 
   const summary = summarizeCdpCompare(before, after);
