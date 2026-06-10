@@ -130,6 +130,83 @@ const COLLECT_IFRAMES = `
 const collectCount = (doc: Document): number =>
   new Function("document", COLLECT_IFRAMES)(doc);
 
+describe("getIframeOffset — CDP 兜底(DOM 够不到 closed shadow 内嵌 iframe)", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // 新 CDP 兜底走 DOM.getDocument({pierce:true}) 穿 closed shadow 拿全树,按 src 找
+  // owner <iframe>(OOPIF 是独立 target,getFrameTree 不收录,但 owner 元素在主 DOM),
+  // 再 DOM.getBoxModel。mock 返回:document 树里一个嵌在 shadowRoots 内、src 匹配的 iframe。
+  function mockDebuggerMgr(opts: {
+    iframeSrc?: string;
+    boxQuad?: number[] | null;
+  }) {
+    const iframeNode =
+      opts.iframeSrc === undefined
+        ? null
+        : {
+            nodeName: "IFRAME",
+            backendNodeId: 99,
+            attributes: ["src", opts.iframeSrc],
+          };
+    return {
+      enableDomain: vi.fn().mockResolvedValue(undefined),
+      sendCommand: vi.fn(async (_tabId: number, method: string) => {
+        if (method === "DOM.getDocument")
+          return {
+            root: {
+              nodeName: "#document",
+              children: [
+                {
+                  nodeName: "DIV",
+                  // iframe 嵌在 closed shadow(pierce:true 才可见)
+                  shadowRoots: iframeNode ? [{ nodeName: "#document-fragment", children: [iframeNode] }] : [],
+                },
+              ],
+            },
+          };
+        if (method === "DOM.getBoxModel")
+          return opts.boxQuad ? { model: { content: opts.boxQuad } } : {};
+        return {};
+      }),
+    } as any;
+  }
+
+  it("falls back to CDP getDocument(pierce)+getBoxModel when DOM rect is null", async () => {
+    // DOM 路径返回 null(rects 空 → queryIframeRectInParent 找不到 → null)。
+    stubChrome({
+      frames: [
+        { frameId: 0, parentFrameId: -1, url: "https://a/" },
+        { frameId: 30, parentFrameId: 0, url: "https://cross/child" },
+      ],
+      rects: {}, // closed shadow：DOM 找不到 iframe 元素
+    });
+    const dbg = mockDebuggerMgr({
+      iframeSrc: "https://cross/child",
+      boxQuad: [42, 20, 142, 20, 142, 60, 42, 60],
+    });
+    // 不传 dbg → DOM 失败 → {0,0}（旧行为）
+    await expect(getIframeOffset(1, 30)).resolves.toEqual({ x: 0, y: 0 });
+    // 传 dbg → CDP 穿 shadow 找到 owner iframe，box content 左上角 (42,20)
+    await expect(getIframeOffset(1, 30, dbg)).resolves.toEqual({ x: 42, y: 20 });
+    expect(dbg.sendCommand).toHaveBeenCalledWith(1, "DOM.getDocument", { depth: -1, pierce: true });
+  });
+
+  it("returns {0,0} when CDP also cannot locate (no matching iframe / no box)", async () => {
+    stubChrome({
+      frames: [
+        { frameId: 0, parentFrameId: -1, url: "https://a/" },
+        { frameId: 30, parentFrameId: 0, url: "https://cross/child" },
+      ],
+      rects: {},
+    });
+    // 树里无 iframe → 找不到
+    const dbg = mockDebuggerMgr({});
+    await expect(getIframeOffset(1, 30, dbg)).resolves.toEqual({ x: 0, y: 0 });
+  });
+});
+
 describe("queryIframeRectInParent collectIframes — 穿 open shadow", () => {
   it("finds an iframe nested in an open shadow root (shallow querySelectorAll misses it)", async () => {
     const { JSDOM } = await import("jsdom");

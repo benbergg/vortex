@@ -180,7 +180,9 @@ export async function cdpClickElement(
 
   const { x: cx, y: cy, tag, text } = rectRes.result!;
   // 提前算 1 次 iframe offset，给 dispatch + return 共用（避免两次 round-trip + race）
-  const { x: ox, y: oy } = await getIframeOffset(tabId, frameId);
+  // 传 debuggerMgr 启用 CDP 兜底：DOM 够不到 shadow 内嵌 iframe 时(如 oopif-in-csr
+  // 跨源 iframe ⊂ closed shadow)经 CDP 穿 shadow 拿 offset，否则 realMouse 点空。
+  const { x: ox, y: oy } = await getIframeOffset(tabId, frameId, debuggerMgr);
   const px = cx + ox;
   const py = cy + oy;
   // CDP 真鼠标三连击（已 page-coords，clickBBox 内部不再算 offset）
