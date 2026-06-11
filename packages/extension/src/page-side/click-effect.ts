@@ -58,7 +58,9 @@ interface PendingEntry {
 }
 
 (function () {
-  if ((window as unknown as { __vortexClickEffect?: { version?: number } }).__vortexClickEffect?.version === 1) {
+  // version 2（#43 自适应窗口）：bump 自 1，使旧 v1 模块在已加载页被新注入覆盖——
+  // 否则扩展 reload 后未硬刷新的页面仍跑旧固定钳制逻辑（活验证 2026-06-11 实测踩到）。
+  if ((window as unknown as { __vortexClickEffect?: { version?: number } }).__vortexClickEffect?.version === 2) {
     return;
   }
 
@@ -151,7 +153,7 @@ interface PendingEntry {
   };
 
   (window as unknown as { __vortexClickEffect: unknown }).__vortexClickEffect = {
-    version: 1,
+    version: 2,
 
     /** 派发前调用：snapshot（url/activeElement/target aria）+ 启动 document 根 observer。返回 token。 */
     begin(sel: string, windowMs: number): string {
