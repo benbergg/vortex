@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh"><head><meta charset="utf-8"><title>multi cta card</title>
+<style>.box,.cta{cursor:pointer}.box{border:1px solid #888;padding:16px;width:320px}.cta{display:inline-block;padding:8px 12px;margin:4px;border:1px solid #ccc}.illust{cursor:default}</style>
+</head><body>
+<h1>多 CTA 卡片(嵌套 cursor:pointer 子按钮)</h1>
+<!-- #42 班牛 createBox:容器 cursor:pointer 含 3 个功能不同的 cursor:pointer 子按钮。
+     容器本身不打 data-vtx-oracle(它不是 act 目标;且大矩形 oracle 会在几何 join 时
+     吸走子按钮 observe 行致假 recall-miss)。只断言 3 个子按钮独立暴露。 -->
+<div class="box">
+  <div class="illust">创建工作表</div>
+  <span class="cta" data-vtx-oracle="cta-blank">创建空白工作表</span>
+  <span class="cta" data-vtx-oracle="cta-template">模板中心</span>
+  <span class="cta" data-vtx-oracle="cta-create">创建</span>
+</div>
+</body></html>

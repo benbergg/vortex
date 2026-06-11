@@ -1,0 +1,11 @@
+{
+  "fixture": "multi-cta-card",
+  "path": "/synth/multi-cta-card.html",
+  "tier": "hard",
+  "frames": "main",
+  "entries": [
+    { "id": "cta-blank", "interactive": true, "expectedName": "创建空白工作表", "expectedRole": null, "pattern": "multi-cta-card", "note": "#42 多 CTA 子按钮须独立暴露" },
+    { "id": "cta-template", "interactive": true, "expectedName": "模板中心", "expectedRole": null, "pattern": "multi-cta-card" },
+    { "id": "cta-create", "interactive": true, "expectedName": "创建", "expectedRole": null, "pattern": "multi-cta-card" }
+  ]
+}
