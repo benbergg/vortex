@@ -4,6 +4,6 @@
   "tier": "medium",
   "frames": "main",
   "entries": [
-    { "id": "filter-tag", "interactive": true, "expectedName": "全部 96%好评", "expectedRole": null, "pattern": "split-label-negative", "note": "#42 单片段子不拆分,保 ancestor 主标签" }
+    { "id": "filter-tag", "interactive": true, "expectedName": "全部96%好评", "expectedRole": null, "pattern": "split-label-negative", "note": "#42 单片段子不拆分,保 ancestor 主标签" }
   ]
 }
